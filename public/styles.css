@@ -1,0 +1,475 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header Styles */
+.header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.header h1 {
+    color: #4a5568;
+    font-size: 2rem;
+    font-weight: 600;
+}
+
+.user-controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.user-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.user-selector label {
+    font-weight: 500;
+    color: #4a5568;
+}
+
+.user-selector input {
+    padding: 8px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.user-selector input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.user-selector button {
+    padding: 8px 16px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.3s ease;
+}
+
+.user-selector button:hover {
+    background: #5a67d8;
+}
+
+/* Notification Bell */
+.notification-bell {
+    position: relative;
+    cursor: pointer;
+    padding: 12px;
+    background: #667eea;
+    color: white;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.notification-bell:hover {
+    background: #5a67d8;
+    transform: scale(1.1);
+}
+
+.notification-bell i {
+    font-size: 20px;
+}
+
+.notification-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #e53e3e;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    min-width: 20px;
+}
+
+.notification-count.hidden {
+    display: none;
+}
+
+/* Main Content */
+.main-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+}
+
+.demo-section,
+.notifications-section {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.demo-section h2,
+.notifications-section h2 {
+    color: #4a5568;
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.demo-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+.control-group {
+    padding: 20px;
+    background: #f7fafc;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+}
+
+.control-group h3 {
+    color: #4a5568;
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #4a5568;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+button {
+    padding: 12px 20px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    font-size: 14px;
+}
+
+button:hover {
+    background: #5a67d8;
+    transform: translateY(-2px);
+}
+
+/* Notifications List */
+.notifications-list {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.notification-item {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.notification-item:hover {
+    background: #edf2f7;
+    transform: translateX(5px);
+}
+
+.notification-item.unread {
+    border-left: 4px solid #667eea;
+    background: #ebf8ff;
+}
+
+.notification-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.notification-type {
+    background: #667eea;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.notification-type.order {
+    background: #38a169;
+}
+
+.notification-type.broadcast {
+    background: #d69e2e;
+}
+
+.notification-time {
+    font-size: 12px;
+    color: #718096;
+}
+
+.notification-message {
+    color: #4a5568;
+    line-height: 1.5;
+}
+
+/* Notification Panel */
+.notification-panel {
+    position: fixed;
+    top: 0;
+    right: -400px;
+    width: 400px;
+    height: 100vh;
+    background: white;
+    box-shadow: -5px 0 20px rgba(0, 0, 0, 0.1);
+    transition: right 0.3s ease;
+    z-index: 1000;
+}
+
+.notification-panel.open {
+    right: 0;
+}
+
+.panel-header {
+    padding: 20px;
+    background: #667eea;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.panel-header h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 4px;
+    transition: background 0.3s ease;
+}
+
+.close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.panel-content {
+    padding: 20px;
+    height: calc(100vh - 80px);
+    overflow-y: auto;
+}
+
+/* Notification Toast */
+.notification-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    padding: 15px;
+    transform: translateX(450px);
+    transition: transform 0.3s ease;
+    z-index: 1001;
+    max-width: 350px;
+}
+
+.notification-toast.show {
+    transform: translateX(0);
+}
+
+.toast-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.toast-icon {
+    color: #667eea;
+    font-size: 20px;
+}
+
+.toast-message {
+    flex: 1;
+    color: #4a5568;
+    font-weight: 500;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    color: #718096;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background 0.3s ease;
+}
+
+.toast-close:hover {
+    background: #f7fafc;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+
+    .header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+
+    .header h1 {
+        font-size: 1.5rem;
+    }
+
+    .user-controls {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .main-content {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .notification-panel {
+        width: 100%;
+        right: -100%;
+    }
+
+    .notification-toast {
+        right: 10px;
+        left: 10px;
+        max-width: none;
+        transform: translateY(-100px);
+    }
+
+    .notification-toast.show {
+        transform: translateY(0);
+    }
+}
+
+/* Animations */
+@keyframes bellShake {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-10deg); }
+    75% { transform: rotate(10deg); }
+}
+
+.notification-bell.shake {
+    animation: bellShake 0.5s ease-in-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.notification-item {
+    animation: fadeInUp 0.3s ease;
+}
+
+/* Status Indicators */
+.status-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.status-indicator.connected {
+    background: #38a169;
+}
+
+.status-indicator.disconnected {
+    background: #e53e3e;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    color: #4a5568;
+    margin-top: 10px;
+}
+

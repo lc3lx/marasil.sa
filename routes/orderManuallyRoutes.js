@@ -1,0 +1,29 @@
+const express = require("express");
+
+const router = express.Router({mergeParams: true});
+const auth = require("../controllers/authController");
+router.use(auth.Protect);
+
+const {
+    createOrders,
+    getoneOrder,
+    getOrders,
+    updateOrders,
+    deleteOrders,
+    setclientAddressToBody,
+    getStatusOrder,
+    updateOrderStatus,
+
+
+} = require("../controllers/orderManuallyController");
+router.route("/").get(getOrders).post(setclientAddressToBody,createOrders);
+router
+  .route("/:id")
+  .get(getoneOrder)
+  .put(updateOrders)
+  .delete(deleteOrders);
+
+  router.get("/filter/status",getStatusOrder);
+  router.put("/:orderId/status", updateOrderStatus);
+
+module.exports = router;
