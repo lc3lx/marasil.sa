@@ -1,6 +1,34 @@
 const ShippingCompany = require("../models/shipping_company");
 const asyncHandler = require("express-async-handler");
 
+// 🔸 Get Shipping Companies with Essential Info
+exports.getShippingCompaniesInfo = asyncHandler(async (req, res) => {
+  const companies = await ShippingCompany.aggregate([
+    {
+      $project: {
+        _id: 0,
+        name: '$company',
+        deliveryTime: 1,
+        shippingTypes: {
+          $map: {
+            input: '$shippingTypes',
+            as: 'type',
+            in: {
+              type: '$$type.type',
+              price: {
+                $add: ['$$type.basePrice', '$$type.profitPrice']
+              },
+              deliveryTime: '$deliveryTime'
+            }
+          }
+        }
+      }
+    }
+  ]);
+  
+  res.json(companies);
+});
+
 // 🔸 Create Shipping Company
 exports.createShippingCompany = asyncHandler(async (req, res) => {
   const { shippingTypes } = req.body;
@@ -102,5 +130,34 @@ exports.getShippingTypeForCompany = asyncHandler(async (req, res) => {
     company: company.company,
     shippingType: shippingType,
     details: typeDetails,
+  });
+});
+
+// @desc    Get all shipping companies with basic info
+// @route   GET /api/v1/shipments/companies
+// @access  Public
+module.exports.getShippingCompanies = asyncHandler(async (req, res, next) => {
+  // Get all enabled shipping companies
+  const companies = await shappingCompany.find({ status: "Enabled" });
+
+  // Map the companies to only include the required fields
+  const companiesList = companies.map(company => ({
+    id: company._id,
+    name: company.company,
+    deliveryTime: company.deliveryAt || '2-3 أيام عمل',
+    shippingTypes: company.shippingTypes.map(type => ({
+      type: type.type,
+      price: type.basePrice + type.profitPrice, // Total price = base + profit
+      deliveryTime: company.deliveryAt || '2-3 أيام عمل',
+      codAvailable: type.COD,
+      maxWeight: type.maxWeight,
+      maxCodAmount: type.maxCodAmount
+    }))
+  }));
+
+  res.status(200).json({
+    status: 'success',
+    results: companiesList.length,
+    data: companiesList
   });
 });

@@ -73,9 +73,9 @@ const shapmentSchema = new mongoose.Schema({
   smsaResponse: { type: Object, default: null },
   aramexResponse: { type: Object, default: null },
   companyshipmentid: String,
-
+  totalprice: { type: Number,  },
   // Pricing Information
-  shapmentPrice: { type: Number, required: true },
+  shapmentPrice: { 
     priceaddedtax: { type: Number, default: 0.15 },
     basePrice: { type: Number }, // السعر الأساسي (للمتعاقدين فقط)
     profitPrice: { type: Number },
@@ -88,9 +88,12 @@ const shapmentSchema = new mongoose.Schema({
     byocPrice: { type: Number, default: 0.0 },
     basepickUpPrice: { type: Number, default: 0.0 },
     profitpickUpPrice: { type: Number, default: 0.0 },
-    baseRTOprice: { type: Number, default: 0.0 },
+    baseRTOprice: { type: Number, default: 0.0 },}
   },
-);
+ 
+{
+  timestamps: true  // This will automatically add createdAt and updatedAt fields
+});
 
 // إضافة indexes إضافية
 shapmentSchema.index({ trackingId: 1 });

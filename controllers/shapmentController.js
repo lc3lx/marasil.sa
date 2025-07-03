@@ -1,5 +1,6 @@
 //module import
 const mongoose = require("mongoose");
+const moment = require("moment");
 const Shapment = require("../models/shipmentModel");
 const Order = require("../models/Order");
 const shappingCompany = require("../models/shipping_company");
@@ -46,6 +47,38 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           400
         )
       );
+    }
+
+    let orderToUse = order;
+    let newOrder = null;
+
+    // If order doesn't have an ID, create a new order
+    if (!order._id) {
+      newOrder = new Order({
+        customer: {
+          full_name: order.customer?.full_name || "اسم العميل",
+          email: order.customer?.email || `${Date.now()}@example.com`,
+          mobile: order.customer?.mobile || "0500000000",
+          address: order.customer?.address || "عنوان العميل",
+          country: order.customer?.country || "السعودية",
+          city: order.customer?.city || "الرياض",
+          district: order.customer?.district || "حي الرياض",
+        },
+        total: {
+          amount: order.total?.amount || 0,
+          currency: order.total?.currency || "SAR",
+        },
+        payment_method: order.payment_method || "COD",
+        platform: order.platform || "manual",
+        store_id: order.store_id || null,
+        status: "pending",
+        items: order.items || [],
+        created_at: new Date(),
+      });
+
+      await newOrder.save();
+      orderToUse = newOrder.toObject();
+      orderToUse._id = newOrder._id;
     }
 
     // 2. جلب بيانات شركة الشحن والتحقق من صلاحيتها
@@ -231,34 +264,25 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
     shipmentData = {
       receiverAddress: address._id, // استخدام معرف العنوان
       customerId: req.customer._id,
-      ordervalue: order.total.amount,
-      orderId: order._id,
+      ordervalue: orderToUse.total.amount,
+      orderId: orderToUse._id,
       senderAddress: shipperAddress,
       boxNum: Parcels,
-      weight: weight,
-      dimension: req.body.dimension
-        ? {
-            high: req.body.dimension.high || 0,
-            width: req.body.dimension.width || 0,
-            length: req.body.dimension.length || 0,
-          }
-        : { high: 0, width: 0, length: 0 },
-      orderDescription: order.description || "",
       paymentMathod: order.payment_method === "COD" ? "COD" : "Prepaid",
       shipmentstates: "READY_FOR_PICKUP",
       shapmentingType: shapmentingType,
       shapmentCompany: company,
       trackingId: trackingInfo.trackingNumber,
+      orderSou: order.platform,
       storId: order.store_id,
       // حفظ ردود API
-      smsaResponse: apiResponses.smsa,
-      aramexResponse: apiResponses.aramex,
-      redboxResponse: apiResponses.redbox,
-      omniclamaResponse: apiResponses.omniclama,
+      smsaResponse: apiResponses.smsa || null,
+      aramexResponse: apiResponses.aramex || null,
+      redboxResponse: apiResponses.redbox || null,
+      omniclamaResponse: apiResponses.omniclama || null,
       shapmentType: "straight",
-      shapmentPrice: pricing.total,
-      orderSou: order.platform,
-      pricesetting: {
+      totalprice: pricing.total,
+      shapmentPrice: {
         priceaddedtax: shippingType.priceaddedtax || 0.15,
         basePrice: shippingType.basePrice || 0,
         profitPrice: shippingType.profitPrice || 0,
@@ -287,8 +311,10 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
       `تم خصم ${pricing.total} ريال من رصيد المحفظة. الرصيد الجديد: ${wallet.balance} ريال`
     );
 
-    // تحديث حالة الطلب
-    await Order.findByIdAndUpdate(order._id, { status: "shipped" });
+    // تحديث حالة الطلب إذا كان موجوداً
+    if (order._id) {
+      await Order.findByIdAndUpdate(order._id, { status: "shipped" });
+    }
 
     res.status(201).json({
       status: "success",
@@ -826,6 +852,82 @@ module.exports.deleteShipment = asyncHandler(async (req, res, next) => {
 METHOD: GET
 SEARCH SHIPMENTS BY VARIOUS CRITERIA
 */
+// @desc    Get shipment statistics for the logged-in customer
+// @route   GET /api/shipments/statistics
+// @access  Private
+module.exports.getShipmentStatistics = asyncHandler(async (req, res, next) => {
+  try {
+    // Get customer ID from the authenticated request
+    const customerId = req.customer._id;
+
+    // Get today's start and end
+    const todayStart = moment().startOf("day");
+    const todayEnd = moment().endOf("day");
+
+    // Get yesterday's start and end for growth calculation
+    const yesterdayStart = moment().subtract(1, "days").startOf("day");
+    const yesterdayEnd = moment().subtract(1, "days").endOf("day");
+
+    // Base query for customer's shipments
+    const customerQuery = { customerId };
+
+    // Get total shipments for the customer
+    const totalShipments = await Shapment.countDocuments(customerQuery);
+
+    // Get today's shipments for the customer
+    const todaysShipments = await Shapment.countDocuments({
+      ...customerQuery,
+      createdAt: {
+        $gte: todayStart.toDate(),
+        $lte: todayEnd.toDate(),
+      },
+    });
+
+    // Get received shipments (Delivered) for the customer
+    const receivedShipments = await Shapment.countDocuments({
+      ...customerQuery,
+      shipmentstates: "Delivered",
+    });
+
+    // Get canceled shipments for the customer
+    const canceledShipments = await Shapment.countDocuments({
+      ...customerQuery,
+      shipmentstates: "Canceled",
+    });
+
+    // Calculate growth rate for the customer
+    const yesterdayShipments = await Shapment.countDocuments({
+      ...customerQuery,
+      createdAt: {
+        $gte: yesterdayStart.toDate(),
+        $lte: yesterdayEnd.toDate(),
+      },
+    });
+
+    const growthRate =
+      yesterdayShipments > 0
+        ? ((todaysShipments - yesterdayShipments) / yesterdayShipments) * 100
+        : todaysShipments > 0
+        ? 100
+        : 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalShipments,
+        todaysShipments,
+        receivedShipments,
+        canceledShipments,
+        growthRate: parseFloat(growthRate.toFixed(2)),
+      },
+    });
+  } catch (error) {
+    return next(
+      new ApiEror(error.message || "حدث خطأ أثناء جلب إحصائيات الشحنات", 500)
+    );
+  }
+});
+
 module.exports.searchShipments = asyncHandler(async (req, res, next) => {
   try {
     const { trackingNumber, phone, email, shipmentId, customerId } = req.query;

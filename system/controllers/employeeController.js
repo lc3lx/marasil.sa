@@ -159,14 +159,14 @@ exports.createEmployee = asyncHandler(async (req, res, next) => {
     directManager: req.customer.firstName,
   });
 
-  res.status(200).json({message:"success",data:newEmployee})
+  res.status(200).json({ message: "success", data: newEmployee });
 });
 
 // Get all employees
 exports.getAllEmployees = asyncHandler(async (req, res) => {
   const employees = await Employee.find().select(
-    "name idNumber jobTitledepartment address email jobTitle isActive"
-  ).populate('salaryPayments')
+    "fullName department address email jobTitle salary isActive"
+  );
 
   res.status(200).json({
     status: "success",
@@ -178,7 +178,7 @@ exports.getAllEmployees = asyncHandler(async (req, res) => {
 });
 
 // Get employee by ID
-exports.getEmployee = factory.getOne(Employee,"salaryPayments");
+exports.getEmployee = factory.getOne(Employee, "salaryPayments");
 
 // Update employee
 exports.updateEmployee = factory.updateOne(Employee);

@@ -56,11 +56,11 @@ const employeeSchema = new mongoose.Schema(
     experienceCertificates: [{ type: String }],
     otherDocuments: [{ type: String }],
 
-        // Salary Status (حالة الراتب)
+    // Salary Status (حالة الراتب)
     salaryStatus: {
       type: String,
-      enum: ['pending', 'active'],
-      default: 'pending'
+      enum: ["pending", "active"],
+      default: "active",
     },
 
     isActive: { type: Boolean, default: false },
@@ -116,13 +116,15 @@ employeeSchema.post("save", (doc) => {
   SetImageUrl(doc);
 });
 // Virtual for getting all salary payments
-employeeSchema.virtual('salaryPayments', {
-  ref: 'Salary',
-  localField: '_id',
-  foreignField: 'employeeId'
+employeeSchema.virtual("salaryPayments", {
+  ref: "Salary",
+  localField: "_id",
+  foreignField: "employeeId",
+
+  
 });
-employeeSchema.set("toObject", { virtuals: false });
-employeeSchema.set("toJSON", { virtuals: false });
+employeeSchema.set("toObject", { virtuals: true });
+employeeSchema.set("toJSON", { virtuals: true });
 
 const Employee = mongoose.model("Employee", employeeSchema);
 

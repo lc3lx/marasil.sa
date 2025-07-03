@@ -23,7 +23,7 @@ router
 router
   .route("/:id")
   .get(getEmployee)
-  .patch(uploadEmployeeFiles, ResizeEmployeeImage,updateEmployee)
+  .put(uploadEmployeeFiles, ResizeEmployeeImage,updateEmployee)
 
 // Hard delete route (admin only)
 router.delete("/:id", hardDeleteEmployee);

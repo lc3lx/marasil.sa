@@ -121,6 +121,31 @@ exports.shipmentData = (
         Consignee: exports.formatParty(order.customer || {}),
         ShippingDateTime: exports.formatAramexDate(now), // استخدام التنسيق الجديد
         DueDate: exports.formatAramexDate(dueDate), // استخدام التنسيق الجديد
+        ThirdParty: {
+          PartyId: process.env.ARAMEX_ACCOUNT_NUMBER,
+          AccountNumber: process.env.ARAMEX_ACCOUNT_NUMBER,
+          AccountEntity: process.env.ARAMEX_ACCOUNT_ENTITY || "JED",
+          type: "Customer",
+          Name: "Marasil",
+          PartyAddress: {
+            Line1: "حي النهضة",
+            Line2: "",
+            Line3: "",
+            City: "الرياض",
+            StateOrProvinceCode: "",
+            PostCode: "12345",
+            CountryCode: "SA",
+          },
+          Contact: {
+            PersonName: "Marasil",
+            CompanyName: "Marasil",
+            PhoneNumber1: "00966123456789",
+            PhoneNumber2: "",
+            Type: "Business",
+            CellPhone: "00966123456789",
+            EmailAddress: "info@marasil.sa",
+          },
+        },
         Details: {
           Dimensions: {
             Length: dimension.length || 10,
@@ -139,10 +164,10 @@ exports.shipmentData = (
           DescriptionOfGoods:
             orderDescription || order.description || "منتجات عامة",
           GoodsOriginCountry: "SA",
-          NumberOfPieces: Parcels,
-          ProductGroup: "EXP",
-          ProductType: "PDX",
-          PaymentType: paymentType,
+          NumberOfPieces: 6,
+          ProductGroup: "DOM",
+          ProductType: "CDS",
+          PaymentType: "3",
           PaymentOptions: paymentOptions,
           ItemCount: order.items?.length || 1,
           CustomsValueAmount: {

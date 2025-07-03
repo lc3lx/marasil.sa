@@ -6,6 +6,11 @@ const ShippingCompanySchema = new mongoose.Schema({
     enum: ["smsa", "redbox", "omniclama", "aramex"],
     required: true,
   },
+  deliveryTime: {
+    type: String,
+    default: '2-3 أيام عمل',
+    required: true
+  },
   caver: {
     type: String,
   },

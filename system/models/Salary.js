@@ -39,8 +39,6 @@ const salarySchema = new mongoose.Schema(
   }
 );
 
-// Index for efficient querying by date
-salarySchema.index({ salaryDate: 1, employeeId: 1 });
 
 const Salary = mongoose.model("Salary", salarySchema);
 

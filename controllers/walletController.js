@@ -11,6 +11,15 @@ const customer = require("../models/customerModel");
 
 // recharge wallet by moyasar
 
+exports.getCustomerBalance = asyncHandler(async (req, res, next) => {
+  let wallet = await Wallet.findOne({ customerId: req.customer._id });
+
+  if (!wallet) {
+    wallet = await Wallet.create({ customerId: req.customer._id });
+  }
+  res.json({ data: wallet.balance });
+});
+
 exports.getMyWallet = asyncHandler(async (req, res, next) => {
   let wallet = await Wallet.findOne({ customerId: req.customer._id });
 

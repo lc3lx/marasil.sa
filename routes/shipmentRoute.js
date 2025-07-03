@@ -11,6 +11,7 @@ const {
   updateShipment,
   deleteShipment,
   searchShipments,
+  getShipmentStatistics,
 } = require("../controllers/shapmentController");
 const auth = require("../controllers/authController");
 const shipmentReturnController = require("../controllers/shipmentReturenController");
@@ -19,6 +20,7 @@ const router = express.Router();
 
 // Customer routes (requires authentication)
 router.get("/stats", auth.Protect, getShipmentsStats);
+router.get("/statistics", auth.Protect, getShipmentStatistics);
 router.get("/my-shipments", auth.Protect, getCustomerShipments);
 router.get("/my-shipment/:id", auth.Protect, getShipment);
 router.get("/search", auth.Protect, searchShipments);

@@ -2,24 +2,56 @@ const asyncHandler = require("express-async-handler");
 const factory = require("./handlersFactory");
 const Order = require("../models/Order");
 
+exports.TodayAndTotalOrder = asyncHandler(async (req, res, next) => {
+  try {
+    const customerId = req.customer._id;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const todayOrders = await Order.countDocuments({
+      Customer: customerId,
+      createdAt: {
+        $gte: today,
+        $lt: tomorrow,
+      },
+    });
+
+    const totalOrders = await Order.countDocuments({
+      Customer: customerId,
+    });
+
+    res.json({
+      todayOrders,
+      totalOrders,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "حدث خطأ داخلي" });
+  }
+});
+
 exports.getStatusOrder = asyncHandler(async (req, res, next) => {
   const { status } = req.query;
 
-  const validStatuses = ["pending", "completed", "canceled","shipped"];
+  const validStatuses = ["pending", "completed", "canceled", "shipped"];
   if (status && !validStatuses.includes(status)) {
     return res.status(400).json({ error: "Invalid status value" });
   }
 
   const filter = status ? { "status.name": status } : {};
 
-  const orders = await Order.find(filter).sort({ createdAt: -1 });;
+  const orders = await Order.find(filter).sort({ createdAt: -1 });
   res.json(orders);
 });
 exports.updateOrderStatus = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
   const { status } = req.body;
 
-  const validStatuses = ["pending", "completed", "canceled","shipped"];
+  const validStatuses = ["pending", "completed", "canceled", "shipped"];
 
   if (!validStatuses.includes(status)) {
     return res.status(400).json({ error: "Invalid status value" });
@@ -43,7 +75,9 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
   res.json({ message: "Status updated successfully", order: updatedOrder });
 });
 exports.getOrders = asyncHandler(async (req, res, next) => {
-  const order = await Order.find({ Customer: req.customer._id }).sort({ createdAt: -1 });;
+  const order = await Order.find({ Customer: req.customer._id }).sort({
+    createdAt: -1,
+  });
   res.status(200).json({ results: order.length, data: order });
 });
 

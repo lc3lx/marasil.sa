@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   getMyWallet,
+  getCustomerBalance,
   getOneWallet,
   getAllWallet,
   RechargeWallet,
@@ -10,7 +11,7 @@ const {
   removeBalance,
   RechargeWalletbyBank,
   updatestatus,
-  uplaodBankreceiptImage
+  uplaodBankreceiptImage,
 } = require("../controllers/walletController");
 
 const auth = require("../controllers/authController");
@@ -20,8 +21,10 @@ const router = express.Router();
 router.use(auth.Protect);
 
 router.get("/myWallet", getMyWallet);
+router.get("/myBalance", getCustomerBalance);
 router.get("/:id", getOneWallet);
 router.get("/", getAllWallet);
+
 // moyasar payment route
 router.post("/rechargeWallet", RechargeWallet);
 router.get("/paymentstatus/:paymentId", getPaymentStatus);

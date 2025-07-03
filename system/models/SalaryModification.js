@@ -41,7 +41,7 @@ const salaryModificationSchema = new mongoose.Schema({
 salaryModificationSchema.pre(/^find/, function(next) {
   this.populate({
     path: 'employee',
-    select: 'name'
+    select: 'fullName' 
   });
   next();
 });
