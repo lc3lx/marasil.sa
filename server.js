@@ -53,14 +53,12 @@ const server = http.createServer(app);
 
 // Socket.IO setup
 const socketIo = require("socket.io");
+
 const io = socketIo(server, {
   cors: {
-    origin:
-      process.env.NODE_ENV === "production"
-        ? process.env.FRONTEND_URL
-        : ["http://localhost:3000", "http://localhost:3001"],
+    origin: "*", // السماح بكل النطاقات
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    credentials: true,
+    credentials: false, // لا حاجة لـ credentials مع origin: "*"
     allowedHeaders: ["Content-Type", "Authorization", "x-auth-token"],
   },
 });
