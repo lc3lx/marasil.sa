@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Notification System</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Real-time Notification System</h1>
+            <div class="user-controls">
+                <div class="user-selector">
+                    <label for="userId">User ID:</label>
+                    <input type="text" id="userId" placeholder="Enter user ID" value="user123">
+                    <button id="connectBtn">Connect</button>
+                </div>
+                <div class="notification-bell" id="notificationBell">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-count" id="notificationCount">0</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="demo-section">
+                <h2>Demo Controls</h2>
+                <div class="demo-controls">
+                    <div class="control-group">
+                        <h3>Create Notification</h3>
+                        <div class="form-group">
+                            <label for="notificationType">Type:</label>
+                            <select id="notificationType">
+                                <option value="broadcast">Broadcast</option>
+                                <option value="targeted">Targeted</option>
+                                <option value="order">Order</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="targetUserId">Target User ID (for targeted):</label>
+                            <input type="text" id="targetUserId" placeholder="Leave empty for broadcast">
+                        </div>
+                        <div class="form-group">
+                            <label for="notificationMessage">Message:</label>
+                            <textarea id="notificationMessage" placeholder="Enter notification message"></textarea>
+                        </div>
+                        <button id="sendNotificationBtn">Send Notification</button>
+                    </div>
+
+                    <div class="control-group">
+                        <h3>Salla Webhook Test</h3>
+                        <p>Simulate a Salla order webhook:</p>
+                        <button id="simulateOrderBtn">Simulate New Order</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="notifications-section">
+                <h2>Notifications</h2>
+                <div class="notifications-list" id="notificationsList">
+                    <!-- Notifications will be displayed here -->
+                </div>
+            </div>
+        </main>
+
+        <!-- Notification Panel -->
+        <div class="notification-panel" id="notificationPanel">
+            <div class="panel-header">
+                <h3>Notifications</h3>
+                <button class="close-btn" id="closePanelBtn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="panelContent">
+                <!-- Notifications will be displayed here -->
+            </div>
+        </div>
+
+        <!-- Notification Toast -->
+        <div class="notification-toast" id="notificationToast">
+            <div class="toast-content">
+                <i class="fas fa-bell toast-icon"></i>
+                <div class="toast-message" id="toastMessage"></div>
+                <button class="toast-close" id="toastClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
+

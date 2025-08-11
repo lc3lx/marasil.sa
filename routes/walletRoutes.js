@@ -1,0 +1,46 @@
+const express = require("express");
+const {
+  getMyWallet,
+  getCustomerBalance,
+  getOneWallet,
+  getAllWallet,
+  RechargeWallet,
+  getPaymentStatus,
+  refundBalance,
+  addBalane,
+  removeBalance,
+  RechargeWalletbyBank,
+  updatestatus,
+  uplaodBankreceiptImage,
+  MoyasarWebhook,
+} = require("../controllers/walletController");
+
+const auth = require("../controllers/authController");
+
+const router = express.Router();
+
+router.post("/webhook/moyasar", MoyasarWebhook);
+
+router.use(auth.Protect);
+
+router.get("/myWallet", getMyWallet);
+router.get("/myBalance", getCustomerBalance);
+router.get("/:id", getOneWallet);
+router.get("/", getAllWallet);
+
+// moyasar payment route
+router.post("/rechargeWallet", RechargeWallet);
+router.get("/paymentstatus/:paymentId", getPaymentStatus);
+router.post("/refund/:paymentId", refundBalance);
+router.post("/addbalance/:id", addBalane);
+router.post("/removebalance/:id", removeBalance);
+
+// bank_Transfer payment route
+router.post(
+  "/rechargeWalletbyBank",
+  uplaodBankreceiptImage,
+  RechargeWalletbyBank
+);
+router.put("/updatestatus/:id", updatestatus);
+
+module.exports = router;
