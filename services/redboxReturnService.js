@@ -110,7 +110,7 @@ const createRedboxReturnShipment = async (originalShipment, redboxService) => {
       }
       return {
         full_name: address.full_name || (isReceiver ? 'عميل' : 'متجر'),
-        mobile: address.mobile || address.phone || '0500000000',
+        mobile: address.mobile || address.mobile ,
         email: address.email || (isReceiver ? 'no-email@example.com' : 'store@example.com'),
         address: address.address || address.address_line1 || (isReceiver ? 'عنوان غير محدد' : 'عنوان المتجر'),
         city: address.city || 'غير محدد',

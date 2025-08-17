@@ -1,36 +1,6 @@
 const omnidPlatform = require("../platforms/shipment/omnidPlatform");
 
 /**
- * تحويل بيانات الاتصال إلى صيغة OmniDelivery
- * @param {Object} contact بيانات الاتصال
- * @returns {Object} بيانات الاتصال بصيغة OmniDelivery
- */
-exports.formatContact = (contact) => {
-  return {
-    company_name: contact.company_name || "Marasil",
-    company_reg_number: contact.mobile || "",
-    email: contact.email || "test@example.com",
-    name: contact.full_name || "customer marasil ",
-    phone: contact.phone || "0000000000",
-  };
-};
-
-/**
- * تحويل بيانات الموقع إلى صيغة OmniDelivery
- * @param {Object} location بيانات الموقع
- * @returns {Object} بيانات الموقع بصيغة OmniDelivery
- */
-exports.formatLocation = (location) => {
-  return {
-    address: `${location.city}, ${location.country}` || "غير محدد",
-    city: location.city || "غير محدد",
-    country: location.country || "SA",
-    coordinates: location.coordinates || { lat: 0, lng: 0 },
-    post_code: location.post_code || "",
-  };
-};
-
-/**
  * تحويل بيانات الشحنة إلى صيغة OmniDelivery
  * @param {Object} order بيانات الطلب
  * @param {Object} shipperAddress عنوان المرسل
@@ -66,7 +36,7 @@ exports.shipmentData = async (
   }
 
   if (isNaN(Parcels) || Parcels <= 0) {
-    throw new Error("عدد الطرود يجب أن يكون رقماً موجباً");
+    throw new Error("عدد الطرودc  يجب أن يكون رقماً موجباً");
   }
 
   // إنشاء رقم فريد للشحنة
@@ -133,7 +103,7 @@ exports.shipmentData = async (
         company_reg_number: order.customer.mobile || "",
         email: order.customer.email || "",
         name: order.customer.full_name || "",
-        phone: order.customer.mobile || "",
+        phone: `+966${order.customer.mobile}` || "",
       },
       weight: Math.ceil(weight),
       width: dimension.width || 10,
