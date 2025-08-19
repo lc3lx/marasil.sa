@@ -238,13 +238,14 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
 
     // 7. البحث عن عنوان المستلم أو إنشاؤه
     const ClientAddress = mongoose.model("ClientAddress");
+    
+    // إذا وجد عنوان للعميل يرجع مباشرة، إذا لم يوجد يضيفه فقط
     let address = await ClientAddress.findOne({
-      clientEmail: order.customer.email,
+
       clientPhone: order.customer.mobile,
     });
-
     if (!address) {
-      address = new ClientAddress({
+      address = await ClientAddress.create({
         clientName: order.customer.full_name,
         clientPhone: order.customer.mobile,
         clientEmail: order.customer.email,
@@ -254,7 +255,6 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
         district: order.customer.district,
         customer: req.customer._id,
       });
-      await address.save();
     }
 
     // 8. حفظ بيانات الشحنة مع جميع التفاصيل والأسعار

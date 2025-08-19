@@ -5,7 +5,7 @@
  */
 exports.formatAramexDate = (date) => {
   const timestamp = date.getTime();
-  return `\/Date(${timestamp})\/`;
+  return `/Date(${timestamp})/`;
 };
 
 /**
@@ -15,10 +15,10 @@ exports.formatAramexDate = (date) => {
  */
 exports.formatAddress = (address) => {
   return {
-    Line1: address.address,
+    Line1: address.line1 || `${address.city || "الرياض"}, ${address.country || "SA"}`,
     Line2: address.addressLine2 || "",
     Line3: address.addressLine3 || "",
-    City: address.city,
+    City: address.city || "الرياض",
     PostCode: address.postCode || "",
     CountryCode: address.country ? address.country.toUpperCase() : "SA",
   };
@@ -31,26 +31,19 @@ exports.formatAddress = (address) => {
  */
 exports.formatParty = (partyData) => {
   return {
-    AccountEntity: process.env.ARAMEX_ACCOUNT_ENTITY || "JED",
+    PartyName: partyData.full_name || partyData.company_name || "Marasil", // قيمة افتراضية
+    AccountEntity: "RUH", // ثابت RUH للشحنات المحلية
     AccountNumber: process.env.ARAMEX_ACCOUNT_NUMBER,
-
-    Reference1: partyData._id || "Ref1",
-    PartyAddress: {
-      Line1: partyData.address,
-      Line2: partyData.addressLine2 || "",
-      Line3: partyData.addressLine3 || "",
-      City: partyData.city,
-      PostCode: partyData.postCode || "",
-      CountryCode: partyData.country ? partyData.country.toUpperCase() : "SA",
-    },
+    Reference1: "Ref1",
+    PartyAddress: exports.formatAddress(partyData), // استخدام formatAddress
     Contact: {
-      PersonName: partyData.full_name,
-      CompanyName: partyData.company_name,
-      PhoneNumber1: partyData.mobile,
+      PersonName: partyData.full_name || partyData.company_name || "Marasil", // قيمة افتراضية
+      CompanyName: partyData.company_name || "Marasil",
+      PhoneNumber1: partyData.mobile || "0000000000",
       PhoneNumber2: partyData.phone2 || "",
       Type: partyData.type || "Business",
       CellPhone: partyData.phone || "0000000000",
-      EmailAddress: partyData.email || "test@example.com",
+      EmailAddress: partyData.email || "info@marasil.sa", // بريد إلكتروني صالح
     },
   };
 };
@@ -89,12 +82,9 @@ exports.shipmentData = (
     throw new Error("عدد الطرود يجب أن يكون رقماً موجباً");
   }
 
-  // تحديد نوع الدفع بشكل صحيح
-  // 'C' for Cash on Delivery, 'P' for Prepaid
+  // تحديد PaymentType و PaymentOptions بناءً على طريقة الدفع
   const paymentType = order.payment_method === "COD" ? "C" : "P";
-  // PaymentOptions is often not needed when PaymentType is clear, or should be compatible.
-  // For COD, Aramex might expect a specific option, but for Prepaid ('P'), it's often left blank.
-  const paymentOptions = order.payment_method === "COD" ? "C" : "P";
+  const paymentOptions = ""; // فارغ للشحنات المحلية
 
   // تحضير تواريخ الشحن والاستحقاق
   const now = new Date();
@@ -108,44 +98,19 @@ exports.shipmentData = (
       Version: "v1.0",
       AccountNumber: process.env.ARAMEX_ACCOUNT_NUMBER,
       AccountPin: process.env.ARAMEX_ACCOUNT_PIN,
-      AccountEntity: process.env.ARAMEX_ACCOUNT_ENTITY || "JED",
+      AccountEntity: process.env.ARAMEX_ACCOUNT_ENTITY || "RUH", // ثابت RUH للشحنات المحلية
       AccountCountryCode: process.env.ARAMEX_ACCOUNT_COUNTRY_CODE || "SA",
       Source: 24,
     },
     Shipments: [
       {
-        Reference1: order.reference_id || `ORD-${Date.now()}`,
+        Reference1: order._id || `ORD-${Date.now()}`,
         Reference2: order.order_number || "",
-        Reference3: order.platform || "",
+        Reference3: order.platform || "manual",
         Shipper: exports.formatParty(shipperAddress),
-        Consignee: exports.formatParty(order.customer || {}),
-        ShippingDateTime: exports.formatAramexDate(now), // استخدام التنسيق الجديد
-        DueDate: exports.formatAramexDate(dueDate), // استخدام التنسيق الجديد
-        ThirdParty: {
-          PartyId: process.env.ARAMEX_ACCOUNT_NUMBER,
-          AccountNumber: process.env.ARAMEX_ACCOUNT_NUMBER,
-          AccountEntity: process.env.ARAMEX_ACCOUNT_ENTITY || "JED",
-          type: "Customer",
-          Name: "Marasil",
-          PartyAddress: {
-            Line1: "حي النهضة",
-            Line2: "",
-            Line3: "",
-            City: "الرياض",
-            StateOrProvinceCode: "",
-            PostCode: "12345",
-            CountryCode: "SA",
-          },
-          Contact: {
-            PersonName: "Marasil",
-            CompanyName: "Marasil",
-            PhoneNumber1: "00966123456789",
-            PhoneNumber2: "",
-            Type: "Business",
-            CellPhone: "00966123456789",
-            EmailAddress: "info@marasil.sa",
-          },
-        },
+        Consignee: exports.formatParty(order.customer),
+        ShippingDateTime: exports.formatAramexDate(now),
+        DueDate: exports.formatAramexDate(dueDate),
         Details: {
           Dimensions: {
             Length: dimension.length || 10,
@@ -164,14 +129,15 @@ exports.shipmentData = (
           DescriptionOfGoods:
             orderDescription || order.description || "منتجات عامة",
           GoodsOriginCountry: "SA",
-          NumberOfPieces: 6,
-          ProductGroup: "DOM",
-          ProductType: "CDS",
-          PaymentType: "3",
-          PaymentOptions: paymentOptions,
+          NumberOfPieces: Parcels,
+          ProductGroup: "DOM", // DOM للشحنات المحلية
+          ProductType: "CDS", // CDS للدفع عند الاستلام المحلي
+          PaymentType: paymentType, // P أو C بناءً على طريقة الدفع
+          PaymentOptions: paymentOptions, // فارغ للشحنات المحلية
+          Services: "", // حقل مطلوب
           ItemCount: order.items?.length || 1,
           CustomsValueAmount: {
-            Value: parseFloat(order.total || 0),
+            Value: parseFloat(order.total?.amount || 349),
             CurrencyCode: "SAR",
           },
         },
@@ -192,11 +158,11 @@ exports.shipmentData = (
 exports.pickupData = (pickupData) => {
   return {
     pickupAddress: exports.formatAddress(pickupData.address),
-    contactName: pickupData.full_name || "customer marasil ",
+    contactName: pickupData.full_name || pickupData.company_name || "Marasil",
     companyName: pickupData.company_name || "Marasil",
-    phone: pickupData.phone || "0000000000",
-    mobile: pickupData.phone || "0000000000",
-    email: pickupData.email || "test@example.com",
+    phone: pickupData.mobile || "0000000000",
+    mobile: pickupData.mobile || "0000000000",
+    email: pickupData.email || "info@marasil.sa",
     pickupDateTime: exports.formatAramexDate(
       new Date(pickupData.pickup_date_time || Date.now())
     ),
@@ -217,10 +183,11 @@ exports.deliveryData = (deliveryData) => {
       new Date(deliveryData.delivery_date_time || Date.now())
     ),
     address: exports.formatAddress(deliveryData.address),
-    contactName: deliveryData.full_name || "customer marasil ",
+    contactName:
+      deliveryData.full_name || deliveryData.company_name || "Marasil",
     companyName: deliveryData.company_name || "Marasil",
-    phone: deliveryData.phone || "0000000000",
+    phone: deliveryData.mobile || "0000000000",
     mobile: deliveryData.mobile || "0000000000",
-    email: deliveryData.email || "test@example.com",
+    email: deliveryData.email || "info@marasil.sa",
   };
 };
