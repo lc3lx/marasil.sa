@@ -1,5 +1,5 @@
 module.exports.shipmentnorm = (shippingType, orderData) => {
-  // التحقق من صحة المدخلات
+
   if (!shippingType || !orderData) {
     throw new Error("البيانات غير مكتملة");
   }
@@ -36,7 +36,7 @@ module.exports.shipmentnorm = (shippingType, orderData) => {
   
   // حساب المجموع النهائي (يشمل الأرباح والضريبة على البنود الأساسية فقط)
   const subtotal = baseCost + additionalWeightCost + codFees;
-  const total = subtotal + tax;
+  const total = subtotal ;
 
   return {
     breakdown: {
@@ -44,7 +44,7 @@ module.exports.shipmentnorm = (shippingType, orderData) => {
       additionalWeightCost,
       codFees,
       subtotal,
-      tax,
+     
     },
     total,
   };

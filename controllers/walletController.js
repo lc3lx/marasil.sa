@@ -60,7 +60,7 @@ exports.RechargeWallet = asyncHandler(async (req, res, next) => {
       return res.status(400).json({ error: "Invalid amount" });
     }
 
-    const netAmount = amount * 0.97;
+    const netAmount = amount ;
 
     res.json({
       success: true,

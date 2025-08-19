@@ -22,8 +22,41 @@ const aramxServers = require("../services/AramexService");
 // helpers import
 const ApiEror = require("../utils/apiError");
 const asyncHandler = require("express-async-handler");
+/**?
+ * Mathod // Post 
+ *thie Mothod for accounting shipmenting price 
+ * 
+ * 
+ * 
+ */
+module.exports.acountingShipmentPrice = asyncHandler(async (req, res, next) => {
+  try {
+    const { company, order,  shapmentingType} = req.body ;
+    if(!company || !order){
+      return next(new ApiEror("All data is required", 400));
+    }
+    const shippingCompany = await shappingCompany.findOne({ company });
+    const shippingType = shippingCompany.shippingTypes.find(
+      (t) => t.type === shapmentingType
+    );
+    if (!shippingType) {
+      return next(new ApiEror(`Shipping type ${shapmentingType} is not found`, 400));
+    }
+   
+    const pricing = shipmentnorm(shippingType, order);
+   
+    res.status(200).json({ data: pricing });
+    
+  } catch (error) {
+    return next(new ApiEror(error.message, 500));
+  }
+    
+})
+
 
 /*
+
+
 MATHOD : POST
 THIS MOTHOD FOR CREATE SHIPMENT 
 
@@ -91,6 +124,36 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
     if (shippingCompany.status !== "Enabled") {
       return next(new ApiEror(`شركة الشحن ${company} غير مفعلة حالياً`, 400));
     }
+    if (shappingCompany == "omniclama" || shappingCompany == "redbox") {
+      if (!req.body.dimension) {
+        return next(
+          new ApiEror("الطول والعرض والارتفاع مطلوبة", 400)
+        );
+        // أوقف التنفيذ بعد الخطأ
+        
+      }
+      if (!Array.isArray(shippingCompany.allowedBoxSizes)) {
+        return next(
+          new ApiEror("لم يتم ضبط أبعاد الصندوق المسموح به لشركة الشحن", 400)
+        );
+        // أوقف التنفيذ بعد الخطأ
+        
+      }
+      const allowed = shippingCompany.allowedBoxSizes[0];
+      console.log(allowed)
+      const reqDim = req.body.dimension;
+      console.log(dimension)
+      const reqVolume = Number(reqDim.length) * Number(reqDim.width) * Number(reqDim.height);
+      const allowedVolume = Number(allowed.length) * Number(allowed.width) * Number(allowed.height);
+    
+      if (reqVolume > allowedVolume) {
+        return next(
+          new ApiEror("الحجم يتجاوز الحد الأقصى المسموح به", 400)
+        );
+        // أوقف التنفيذ بعد الخطأ
+        
+      }
+    }
 
     // 3. ا
     // لتحقق من نوع الشحن المطلوب
@@ -110,10 +173,10 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
     }
 
     // 4. التحقق من قيود الوزن والطرود
-    if (weight > shippingType.maxWeight) {
+    if (weight > shippingType.denayWeight) {
       return next(
         new ApiEror(
-          `الوزن يتجاوز الحد الأقصى المسموح به (${shippingType.maxWeight} كجم)`,
+          `الوزن يتجاوز الحد الأقصى المسموح به (${shippingType.denayWeight} كجم)`,
           400
         )
       );
@@ -126,6 +189,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
         )
       );
     }
+    
 
     // 5. حساب تكلفة الشحن
     const orderWithWeight = {
@@ -153,6 +217,9 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
       );
     }
 
+
+   
+
     // 6. إنشاء الشحنة حسب الشركة
     let trackingInfo;
     let shipmentData;
@@ -170,6 +237,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
         trackingInfo = await smsaExxpress.createShipment(shipmentData);
         break;
       case "redbox":
+        
         shipmentData = redboxServers.shipmentdata(
           orderToUse,
           shipperAddress,
@@ -211,6 +279,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
         }
         break;
       case "omniclama":
+    
         try {
           shipmentData = await ominServers.shipmentData(
             orderToUse,

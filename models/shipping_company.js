@@ -33,6 +33,7 @@ const ShippingCompanySchema = new mongoose.Schema({
       COD: { type: Boolean, required: true },
       maxCodAmount: { type: Number, required: true },
       maxWeight: { type: Number, required: true },
+      denayWeight: { type: Number, required: true },
       maxBoxes: { type: Number, required: true },
       priceaddedtax: { type: Number, required: true, default: 0.15 },
       basePrice: { type: Number, required: true },
