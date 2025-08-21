@@ -50,6 +50,7 @@ exports.shipmentData = async (
         declared_cost: parseFloat(order.total || 0),
         services_payment: [],
       },
+      initial_status:11,
 
       description: orderDescription || order.description || "منتجات عامة",
 
@@ -134,3 +135,6 @@ exports.trackingData = (trackingData) => {
     updated_at: trackingData.updated_at || new Date().toISOString(),
   };
 };
+
+
+

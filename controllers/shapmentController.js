@@ -23,16 +23,16 @@ const aramxServers = require("../services/AramexService");
 const ApiEror = require("../utils/apiError");
 const asyncHandler = require("express-async-handler");
 /**?
- * Mathod // Post 
- *thie Mothod for accounting shipmenting price 
- * 
- * 
- * 
+ * Mathod // Post
+ *thie Mothod for accounting shipmenting price
+ *
+ *
+ *
  */
 module.exports.acountingShipmentPrice = asyncHandler(async (req, res, next) => {
   try {
-    const { company, order,  shapmentingType} = req.body ;
-    if(!company || !order){
+    const { company, order, shapmentingType } = req.body;
+    if (!company || !order) {
       return next(new ApiEror("All data is required", 400));
     }
     const shippingCompany = await shappingCompany.findOne({ company });
@@ -40,19 +40,18 @@ module.exports.acountingShipmentPrice = asyncHandler(async (req, res, next) => {
       (t) => t.type === shapmentingType
     );
     if (!shippingType) {
-      return next(new ApiEror(`Shipping type ${shapmentingType} is not found`, 400));
+      return next(
+        new ApiEror(`Shipping type ${shapmentingType} is not found`, 400)
+      );
     }
-   
+
     const pricing = shipmentnorm(shippingType, order);
-   
+
     res.status(200).json({ data: pricing });
-    
   } catch (error) {
     return next(new ApiEror(error.message, 500));
   }
-    
-})
-
+});
 
 /*
 
@@ -126,32 +125,27 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
     }
     if (shappingCompany == "omniclama" || shappingCompany == "redbox") {
       if (!req.body.dimension) {
-        return next(
-          new ApiEror("الطول والعرض والارتفاع مطلوبة", 400)
-        );
+        return next(new ApiEror("الطول والعرض والارتفاع مطلوبة", 400));
         // أوقف التنفيذ بعد الخطأ
-        
       }
       if (!Array.isArray(shippingCompany.allowedBoxSizes)) {
         return next(
           new ApiEror("لم يتم ضبط أبعاد الصندوق المسموح به لشركة الشحن", 400)
         );
         // أوقف التنفيذ بعد الخطأ
-        
       }
       const allowed = shippingCompany.allowedBoxSizes[0];
-      console.log(allowed)
+      console.log(allowed);
       const reqDim = req.body.dimension;
-      console.log(dimension)
-      const reqVolume = Number(reqDim.length) * Number(reqDim.width) * Number(reqDim.height);
-      const allowedVolume = Number(allowed.length) * Number(allowed.width) * Number(allowed.height);
-    
+      console.log(dimension);
+      const reqVolume =
+        Number(reqDim.length) * Number(reqDim.width) * Number(reqDim.height);
+      const allowedVolume =
+        Number(allowed.length) * Number(allowed.width) * Number(allowed.height);
+
       if (reqVolume > allowedVolume) {
-        return next(
-          new ApiEror("الحجم يتجاوز الحد الأقصى المسموح به", 400)
-        );
+        return next(new ApiEror("الحجم يتجاوز الحد الأقصى المسموح به", 400));
         // أوقف التنفيذ بعد الخطأ
-        
       }
     }
 
@@ -189,7 +183,6 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
         )
       );
     }
-    
 
     // 5. حساب تكلفة الشحن
     const orderWithWeight = {
@@ -217,9 +210,6 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
       );
     }
 
-
-   
-
     // 6. إنشاء الشحنة حسب الشركة
     let trackingInfo;
     let shipmentData;
@@ -237,7 +227,6 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
         trackingInfo = await smsaExxpress.createShipment(shipmentData);
         break;
       case "redbox":
-        
         shipmentData = redboxServers.shipmentdata(
           orderToUse,
           shipperAddress,
@@ -279,7 +268,6 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
         }
         break;
       case "omniclama":
-    
         try {
           shipmentData = await ominServers.shipmentData(
             orderToUse,
@@ -295,11 +283,13 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           if (!trackingInfo || !trackingInfo.trackingNumber) {
             throw new Error("فشل في الحصول على رقم التتبع");
           }
+       
         } catch (error) {
           console.error("OmniDelivery Error:", error);
           return next(
             new ApiEror(`فشل في إنشاء الشحنة: ${error.message}`, 500)
           );
+
         }
         break;
     }
@@ -307,10 +297,9 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
 
     // 7. البحث عن عنوان المستلم أو إنشاؤه
     const ClientAddress = mongoose.model("ClientAddress");
-    
+
     // إذا وجد عنوان للعميل يرجع مباشرة، إذا لم يوجد يضيفه فقط
     let address = await ClientAddress.findOne({
-
       clientPhone: order.customer.mobile,
     });
     if (!address) {
@@ -1151,11 +1140,9 @@ module.exports.webhookUpdateShipmentStatus = asyncHandler(
     try {
       const { trackingNumber, newStatus, company } = req.body;
       if (!trackingNumber || !newStatus || !company) {
-        return res
-          .status(400)
-          .json({
-            error: "trackingNumber, newStatus, and company are required",
-          });
+        return res.status(400).json({
+          error: "trackingNumber, newStatus, and company are required",
+        });
       }
       // Find shipment by trackingId and company
       const shipment = await Shapment.findOne({

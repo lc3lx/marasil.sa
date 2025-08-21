@@ -205,9 +205,6 @@ class OmniDeliveryAPI {
     return response.data;
   }
 
-
-
-
   // === الطباعة ===
   async printLabels(orders, size) {
     await this.ensureAuth();
@@ -245,6 +242,29 @@ class OmniDeliveryAPI {
       throw error;
     }
   }
+  async createcall(content) {
+    await this.ensureAuth();
+    try {
+      const response = await this.client.post(
+        `${this.baseURL}/delivery/shipment`,
+        content,
+        { headers: this.headers }
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "فشل في تتبع الاتصال ");
+      }
+
+      return {
+        status: response.status_code,
+        statusName: response.message,
+        scuccess: response.success,
+      };
+    } catch (error) {
+      console.error("OmniDelivery Track Shipment Error:", error);
+      throw error;
+    }
+  }
 
   async createShipment(payload) {
     await this.ensureAuth();
@@ -254,8 +274,6 @@ class OmniDeliveryAPI {
         JSON.stringify(payload, null, 2)
       );
       console.log("Using headers:", this.headers);
-
-      // التحقق من البيانات المطلوبة
 
       const response = await this.client.post(
         `${this.baseURL}/delivery/order`,
@@ -286,13 +304,13 @@ class OmniDeliveryAPI {
       }
 
       const data = response.data.data;
+      console.log(data);
       if (!data) {
         throw new Error("لم يتم استلام بيانات الشحنة");
       }
 
       // استخدام رقم الطلب من شركة الشحن كرقم تتبع
-      const trackingNumber =
-        data.order_uid ;
+      const trackingNumber = data.order_uid;
       if (!trackingNumber) {
         throw new Error("لم يتم استلام رقم التتبع");
       }
@@ -348,9 +366,6 @@ class OmniDeliveryAPI {
       throw error;
     }
   }
-
-
-  
 }
 
 module.exports = new OmniDeliveryAPI();
