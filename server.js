@@ -30,7 +30,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const shipmentRoutes = require("./routes/shipmentRoute");
 const companyShipmentRoutes = require("./routes/shippingCompanyRoute");
 const { MoyasarWebhook } = require("./controllers/walletController");
-
+const bodyParser = require("body-parser");
 // Scheduled tasks
 const { scheduleSalaryProcessing } = require("./utils/scheduler");
 scheduleSalaryProcessing();
@@ -120,7 +120,7 @@ app.use(
 );
 
 // Body parsers
-app.use(express.json());
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "uploads")));
 app.use(express.static("public"));
@@ -151,7 +151,12 @@ app.set("io", io);
 app.set("activeUsers", activeUsers);
 
 // API Routes
-app.use("/api/wallet/webhook/moyasar", MoyasarWebhook);
+app.post(
+  "/api/wallet/webhook/moyasar",
+  bodyParser.raw({ type: "application/json" }), // هنا نخلي البودي raw
+  MoyasarWebhook
+);
+app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/customer", customerRoutes);
 app.use("/api/order", orderRoutes);

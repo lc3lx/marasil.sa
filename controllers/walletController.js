@@ -60,7 +60,7 @@ exports.RechargeWallet = asyncHandler(async (req, res, next) => {
       return res.status(400).json({ error: "Invalid amount" });
     }
 
-    const netAmount = amount ;
+    const netAmount = amount;
 
     res.json({
       success: true,
@@ -132,16 +132,23 @@ exports.MoyasarWebhook = asyncHandler(async (req, res) => {
   try {
     const secret = process.env.MOYASAR_SECRET_KEY;
     const signature = req.headers["x-moyasar-signature"];
-    const body = JSON.stringify(req.body);
 
-    const hash = crypto.createHmac("sha256", secret).update(body).digest("hex");
+    // ناخد البودي raw (Buffer) ونحوّله نص
+    const rawBody = req.body.toString("utf8");
+
+    // نحسب التوقيع
+    const hash = crypto
+      .createHmac("sha256", secret)
+      .update(rawBody)
+      .digest("hex");
 
     if (hash !== signature) {
-      console.error("فشل التحقق من التوقيع في Webhook");
+      console.error("❌ فشل التحقق من التوقيع");
       return res.status(400).json({ error: "توقيع غير صالح" });
     }
 
-    const payment = req.body;
+    // نعمل parse بعد التأكد
+    const payment = JSON.parse(rawBody);
 
     if (payment.status !== "paid") {
       return res
@@ -181,9 +188,7 @@ exports.MoyasarWebhook = asyncHandler(async (req, res) => {
     });
 
     console.log(
-      `تم شحن محفظة العميل ${customerId} بمبلغ ${
-        netAmount / 100
-      } ريال بعد الخصم`
+      "✅ تم شحن محفظة العميل ${customerId} بمبلغ ${netAmount / 100} ريال"
     );
 
     res.status(200).json({ success: true });
