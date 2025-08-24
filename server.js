@@ -29,6 +29,7 @@ const addressRotues = require("./routes/addressRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const shipmentRoutes = require("./routes/shipmentRoute");
 const companyShipmentRoutes = require("./routes/shippingCompanyRoute");
+const { MoyasarWebhook } = require("./controllers/walletController");
 
 // Scheduled tasks
 const { scheduleSalaryProcessing } = require("./utils/scheduler");
@@ -150,6 +151,7 @@ app.set("io", io);
 app.set("activeUsers", activeUsers);
 
 // API Routes
+app.use("/api/wallet/webhook/moyasar", MoyasarWebhook);
 app.use("/api/auth", authRoutes);
 app.use("/api/customer", customerRoutes);
 app.use("/api/order", orderRoutes);

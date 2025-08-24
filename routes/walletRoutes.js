@@ -12,14 +12,11 @@ const {
   RechargeWalletbyBank,
   updatestatus,
   uplaodBankreceiptImage,
-  MoyasarWebhook,
 } = require("../controllers/walletController");
 
 const auth = require("../controllers/authController");
 
 const router = express.Router();
-
-router.post("/webhook/moyasar", MoyasarWebhook);
 
 router.use(auth.Protect);
 
