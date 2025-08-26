@@ -164,7 +164,8 @@ exports.MoyasarWebhook = asyncHandler(async (req, res) => {
     }
 
     // تحديث أو إنشاء المحفظة
-    const wallet = await Wallet.findOneAndUpdate(
+    const wallet = await Wallet.findOne
+    AndUpdate(
       { customerId },
       { $inc: { balance: netAmount } },
       { upsert: true, new: true }
