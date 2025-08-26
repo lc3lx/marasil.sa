@@ -222,7 +222,7 @@ class OmniDeliveryAPI {
     await this.ensureAuth();
     try {
       const response = await this.client.get(
-        `${this.baseURL}/delivery/order/info?q=${orderUid}`,
+        `${this.baseURL}/api/1.0.0/public/order/info?q=${orderUid}`,
         { headers: this.headers }
       );
 
