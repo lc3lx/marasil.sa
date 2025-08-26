@@ -12,7 +12,8 @@ const {
   deleteShipment,
   searchShipments,
   getShipmentStatistics,
-  acountingShipmentPrice
+  acountingShipmentPrice,
+  printShipmentInvoice
 } = require("../controllers/shapmentController");
 const auth = require("../controllers/authController");
 const shipmentReturnController = require("../controllers/shipmentReturenController");
@@ -34,6 +35,7 @@ router.post("/createshipment", auth.Protect, createShapment);
 router.post("/traking", auth.Protect, trackingShipment);
 router.post("/cancel/:trackingNumber", auth.Protect, cancelShipment);
 router.post("/accountingshipmentprice", auth.Protect, acountingShipmentPrice);
+router.post("/printShipmentInvoice", auth.Protect, printShipmentInvoice);
 
 // مسارات نظام الاسترجاع (بدون تسجيل دخول)
 router.post("/return/request-otp", shipmentReturnController.requestEmailOTP);

@@ -685,19 +685,13 @@ M
 
 module.exports.printShipmentInvoice = asyncHandler(async (req, res, next) => {
   try {
-    const { company, trackingNumber, items, options } = req.body;
+    const { company, trackingNumber } = req.body;
 
     // 1. التحقق من البيانات المطلوبة
-    if (
-      !company ||
-      !trackingNumber ||
-      !items ||
-      !Array.isArray(items) ||
-      items.length === 0
-    ) {
+    if (!company || !trackingNumber) {
       return next(
         new ApiEror(
-          "جميع البيانات مطلوبة: company, trackingNumber, items[]",
+          "جميع البيانات مطلوبة: company, trackingNumber",
           400
         )
       );
@@ -718,8 +712,6 @@ module.exports.printShipmentInvoice = asyncHandler(async (req, res, next) => {
       case "smsa":
         invoiceResult = await smsaExxpress.pushShipmentInvoice(
           trackingNumber,
-          items,
-          options
         );
         break;
       case "aramex":
@@ -733,11 +725,11 @@ module.exports.printShipmentInvoice = asyncHandler(async (req, res, next) => {
         return next(
           new ApiEror("طباعة الفواتير لـ RedBox غير متوفرة حالياً", 501)
         );
-      case "omnid":
-        // TODO: Implement Omnid invoice printing when available
-        return next(
-          new ApiEror("طباعة الفواتير لـ Omnid غير متوفرة حالياً", 501)
+      case "omniclama":
+        invoiceResult = await omin.printLabels(
+          trackingNumber,
         );
+        break;
       default:
         return next(new ApiEror(`شركة الشحن ${company} غير مدعومة`, 400));
     }
@@ -1243,3 +1235,4 @@ module.exports.getShipmentsStats = asyncHandler(async (req, res, next) => {
     );
   }
 });
+
