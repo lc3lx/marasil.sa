@@ -12,12 +12,13 @@ const {
   RechargeWalletbyBank,
   updatestatus,
   uplaodBankreceiptImage,
+  paymentCallback,
 } = require("../controllers/walletController");
 
 const auth = require("../controllers/authController");
 
 const router = express.Router();
-
+router.get("/wallet/payment-callback", paymentCallback);
 router.use(auth.Protect);
 
 router.get("/myWallet", getMyWallet);

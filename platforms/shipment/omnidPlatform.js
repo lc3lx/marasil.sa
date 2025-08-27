@@ -211,7 +211,7 @@ class OmniDeliveryAPI {
     const url = `${this.baseURL}/delivery/print/label`;
     const response = await axios.post(
       url,
-      { orders, size },
+      { orders:[orders], size:"A6" },
       { headers: this.headers }
     );
     return response.data;

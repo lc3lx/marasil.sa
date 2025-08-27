@@ -2,8 +2,8 @@ const axios = require("axios");
 
 class SMSAService {
   constructor() {
-    this.apiKey = "b60dbb7bc50a4331a3411c820c08dffc".toUpperCase(); // API Key must be in uppercase
-    this.baseURL = "https://ecomapis-sandbox.azurewebsites.net";
+    this.apiKey = "43e1e7b2eb6f4999a4a91a7c1383285d".toUpperCase(); // API Key must be in uppercase
+    this.baseURL = "https://ecomapis.smsaexpress.com";
   }
 
   async createShipment(shipmentData) {
@@ -15,7 +15,7 @@ class SMSAService {
           headers: {
             apikey: this.apiKey.toUpperCase(), // حسب التوثيق
             "Content-Type": "application/json",
-            Host: "ecomapis-sandbox.azurewebsites.net",
+            Host: "ecomapis.smsaexpress.com",
           },
 
           validateStatus: function (status) {
@@ -85,7 +85,7 @@ class SMSAService {
           headers: {
             ApiKey: this.apiKey,
             "Content-Type": "application/json",
-            Host: "ecomapis-sandbox.azurewebsites.net",
+            Host: "ecomapis.smsaexpress.com",
           },
           validateStatus: function (status) {
             return status < 500;
@@ -116,20 +116,20 @@ class SMSAService {
         tracking: {
           trackingNumber: response.data.AWB,
           reference: response.data.Reference,
-          status: response.data.Scans?.[0]?.ScanDescription || 'قيد المعالجة',
+          status: response.data.Scans?.[0]?.ScanDescription || "قيد المعالجة",
           isDelivered: response.data.isDelivered || false,
           scans: response.data.Scans || [],
-          ...response.data
-        }
+          ...response.data,
+        },
       };
     } catch (error) {
       console.error("SMSA Tracking Error:", {
         message: error.message,
         status: error.response?.status,
         data: error.response?.data,
-        url: error.config?.url
+        url: error.config?.url,
       });
-      
+
       throw new Error(
         `فشل في تتبع الشحنة: ${error.response?.data?.message || error.message}`
       );
@@ -151,7 +151,7 @@ class SMSAService {
         headers: {
           apikey: this.apiKey.toUpperCase(),
           "Content-Type": "application/json",
-          Host: "ecomapis-sandbox.azurewebsites.net",
+          Host: "ecomapis.smsaexpress.com",
         },
         validateStatus: (status) => status < 500,
       });
@@ -207,11 +207,12 @@ class SMSAService {
           headers: {
             apikey: this.apiKey.toUpperCase(), // حسب التوثيق
             "Content-Type": "application/json",
-            Host: "ecomapis-sandbox.azurewebsites.net",
+            Host: "ecomapis.smsaexpress.com",
           },
-      
-        validateStatus: (status) => status < 500,
-      });
+
+          validateStatus: (status) => status < 500,
+        }
+      );
 
       // التحقق من نجاح عملية الطلب عبر رمز الاستجابة
       if (response.status !== 200) {
@@ -263,7 +264,7 @@ class SMSAService {
         headers: {
           apikey: this.apiKey.toUpperCase(),
           "Content-Type": "application/json",
-          Host: "ecomapis-sandbox.azurewebsites.net",
+          Host: "ecomapis.smsaexpress.com",
         },
         validateStatus: (status) => status < 500,
       });
@@ -315,7 +316,7 @@ class SMSAService {
         headers: {
           apikey: this.apiKey.toUpperCase(),
           "Content-Type": "application/json",
-          Host: "ecomapis-sandbox.azurewebsites.net",
+          Host: "ecomapis.smsaexpress.com",
         },
         validateStatus: (status) => status < 500,
       });
@@ -392,7 +393,7 @@ class SMSAService {
         headers: {
           apikey: this.apiKey.toUpperCase(),
           "Content-Type": "application/json",
-          Host: "ecomapis-sandbox.azurewebsites.net",
+          Host: "ecomapis.smsaexpress.com",
         },
         validateStatus: (status) => status < 500,
       });
@@ -435,7 +436,7 @@ class SMSAService {
         headers: {
           apikey: this.apiKey.toUpperCase(),
           "Content-Type": "application/json",
-          Host: "ecomapis-sandbox.azurewebsites.net",
+          Host: "ecomapis.smsaexpress.com",
         },
         validateStatus: (status) => status < 500,
       });
@@ -513,7 +514,7 @@ class SMSAService {
           headers: {
             apikey: this.apiKey.toUpperCase(),
             "Content-Type": "application/json",
-            Host: "ecomapis-sandbox.azurewebsites.net",
+            Host: "ecomapis.smsaexpress.com",
           },
           validateStatus: (status) => status < 500,
         }
@@ -550,7 +551,7 @@ class SMSAService {
         headers: {
           apikey: this.apiKey.toUpperCase(),
           "Content-Type": "application/json",
-          Host: "ecomapis-sandbox.azurewebsites.net",
+          Host: "ecomapis.smsaexpress.com",
         },
         validateStatus: (status) => status < 500,
       });
@@ -587,12 +588,12 @@ class SMSAService {
   async getServiceTypes() {
     try {
       const response = await this.client.get(
-        "https://ecomapis-sandbox.azurewebsites.net/api/lookUp/ServiceTypes",
+        "https://ecomapis.smsaexpress.com/api/lookUp/ServiceTypes",
         {
           headers: {
             apikey: this.apiKey.toUpperCase(),
             "Content-Type": "application/json",
-            Host: "ecomapis-sandbox.azurewebsites.net",
+            Host: "ecomapis.smsaexpress.com",
           },
           validateStatus: (status) => status < 500,
         }
@@ -630,12 +631,12 @@ class SMSAService {
   async getOfficesAddress() {
     try {
       const response = await axios.get(
-        "https://ecomapis-sandbox.azurewebsites.net/api/lookUp/smsaoffices",
+        "https://ecomapis.smsaexpress.com/api/lookUp/smsaoffices",
         {
           headers: {
             apikey: this.apiKey.toUpperCase(),
             "Content-Type": "application/json",
-            Host: "ecomapis-sandbox.azurewebsites.net",
+            Host: "ecomapis.smsaexpress.com",
           },
           validateStatus: (status) => status < 500,
         }
