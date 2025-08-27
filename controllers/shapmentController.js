@@ -151,16 +151,15 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
 
     // 3. ا
     // لتحقق من نوع الشحن المطلوب
-
+    console.log(shippingCompany.shippingTypes);
     const shippingType = shippingCompany.shippingTypes.find(
       (t) => t.type === shapmentingType
     );
 
-    if (shippingType.type === null) {
-      console.log(shippingType.type);
+    if (!shippingType) {
       return next(
         new ApiEror(
-          `نوع الشحن ${shapmentingType.type} غير متوفر مع ${company}`,
+          `نوع الشحن ${shapmentingType} غير متوفر مع ${company}`,
           400
         )
       );

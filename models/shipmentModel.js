@@ -44,7 +44,7 @@ const shapmentSchema = new mongoose.Schema(
 
     shapmentingType: {
       type: String,
-      enum: ["Dry", "Cold", "Quick", "Box", "office"],
+      enum: ["Dry", "Cold", "Quick", "Box", "offices"],
       required: true,
     },
     shapmentCompany: {
