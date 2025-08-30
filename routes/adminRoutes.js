@@ -26,8 +26,7 @@ const {
 const auth = require("../controllers/authController");
 
 const router = express.Router();
-const { getCompanyInfo } = require("../controllers/adminController");
-router.get("/company-info/:id", getCompanyInfo);
+
 router.use(auth.Protect); // apply protect  for all routes (admin and users)
 
 router.use(auth.protcetactive); // apply protect active for all routes
@@ -49,9 +48,6 @@ router.put(
 
 // Admin routes
 router.use(auth.allowedTo("admin")); // apply  authroiztion for all admin  routes
-
-// Get company info for a customer (admin)
-
 // router.put(
 //   "/chandgePassword/:id",
 //   changeCustomerPasswordValidator,
