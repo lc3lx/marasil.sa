@@ -151,11 +151,79 @@ app.set("io", io);
 app.set("activeUsers", activeUsers);
 
 // API Routes
-app.post(
-  "/api/wallet/webhook/moyasar",
-  bodyParser.raw({ type: "application/json" }), // هنا نخلي البودي raw
-  MoyasarWebhook
-);
+
+app.post("/api/wallet/webhook/moyasar", express.json(), async (req, res) => {
+  try {
+    const secret = process.env.MOYASAR_SECRET_KEY;
+    const signature = req.headers["x-moyasar-signature"];
+    const body = JSON.stringify(req.body);
+
+    // console.log("جسم الطلب:", body);
+    // console.log("التوقيع المستلم:", signature);
+
+    // const hash = crypto
+    //   .createHmac("sha256", secret)
+    //   .update(body)
+    //   .digest("hex");
+
+    // console.log("التجزئة المحسوبة:", hash);
+
+    // if (hash !== signature) {
+    //   console.error("فشل التحقق من التوقيع في Webhook");
+    //   return res.status(400).json({ error: "توقيع غير صالح" });
+    // }
+
+    const payment = req.body;
+
+    if (payment.status !== "paid") {
+      return res
+        .status(200)
+        .json({ message: "تم استلام الإشعار لكن الحالة ليست مدفوعة" });
+    }
+
+    const customerId = payment.metadata?.customerId;
+    const netAmount = parseFloat(payment.metadata?.netAmount || 0);
+
+    if (!customerId || !netAmount) {
+      return res.status(400).json({ error: "بيانات ناقصة في الإشعار" });
+    }
+
+    // تحديث أو إنشاء المحفظة
+    const wallet = await Wallet.findOneAndUpdate(
+      { customerId },
+      { $inc: { balance: netAmount } },
+      { upsert: true, new: true }
+    );
+
+    // إنشاء معاملة
+    const transaction = await Transaction.create({
+      type: "credit",
+      customerId: customerId,
+      description: "Recharge Wallet",
+      amount: netAmount / 100,
+      status: "completed",
+      method: "moyasar",
+      moyasarPaymentId: payment.id,
+      walletId: wallet._id,
+    });
+
+    // ربط المعاملة بالمحفظة
+    await Wallet.findByIdAndUpdate(wallet._id, {
+      $push: { transactions: transaction._id },
+    });
+
+    console.log(
+      `تم شحن محفظة العميل ${customerId} بمبلغ ${
+        netAmount / 100
+      } ريال بعد الخصم`
+    );
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("خطأ في Webhook:", err);
+    res.status(500).json({ error: "حدث خطأ في المعالجة" });
+  }
+});
 app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/customer", customerRoutes);

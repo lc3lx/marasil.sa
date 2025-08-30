@@ -22,11 +22,9 @@ exports.Shapmentdata = (
   serviceCode,
   retailID
 ) => {
+  console.log(order.total.amount);
   const shipmentData = {
-    CODAmount:
-      order.paymentMethod === "COD"
-        ? parseFloat(order.total.amount) || 0.0
-        : 0.0,
+    CODAmount: order.total.amount,
     ConsigneeAddress: exports.formatAddress(order.customer),
     ShipperAddress: exports.formatAddress(shipperAddress),
     ContentDescription: order.product_description || "omar",

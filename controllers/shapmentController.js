@@ -641,9 +641,12 @@ module.exports.cancelShipment = asyncHandler(async (req, res, next) => {
       }
     }
 
-    // 7. تحديث حالة الشحنة في قاعدة البيانات
+    // 7. تحديث حالة الشحنة في قاعدة البيانات وحذفها
     shipment.shipmentstates = "Canceled";
     await shipment.save();
+    
+    // حذف الشحنة من قاعدة البيانات
+    await Shapment.deleteOne({ _id: shipment._id });
 
     // إرسال بريد إلكتروني عند إلغاء شحنة أرامكس أو سمسا
     if (["aramex"].includes(company.toLowerCase())) {

@@ -15,7 +15,9 @@ exports.formatAramexDate = (date) => {
  */
 exports.formatAddress = (address) => {
   return {
-    Line1: address.line1 || `${address.city || "الرياض"}, ${address.country || "SA"}`,
+    Line1:
+      address.line1 ||
+      `${address.city || "الرياض"}, ${address.country || "SA"}`,
     Line2: address.addressLine2 || "",
     Line3: address.addressLine3 || "",
     City: address.city || "الرياض",
@@ -137,7 +139,7 @@ exports.shipmentData = (
           Services: "", // حقل مطلوب
           ItemCount: order.items?.length || 1,
           CustomsValueAmount: {
-            Value: parseFloat(order.total?.amount || 349),
+            Value: parseFloat(order.total?.amount),
             CurrencyCode: "SAR",
           },
         },

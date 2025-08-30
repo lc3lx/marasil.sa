@@ -45,14 +45,13 @@ exports.shipmentData = async (
   try {
     const shipmentData = {
       cost: {
-        cod_value:
-          order.paymentMethod === "COD" ? parseFloat(order.total || 0) : 0,
-        declared_cost: parseFloat(order.total || 0),
+        cod_value: parseFloat(order.total.amount),
+        declared_cost: parseFloat(order.total.amount || 0),
         services_payment: [],
       },
-      initial_status:11,
+      initial_status: 11,
 
-      description: orderDescription || order.description || "منتجات عامة",
+      description: order.description || "منتجات عامة",
 
       direction_type: 0, // إضافة نوع الاتجاه
 
@@ -135,6 +134,3 @@ exports.trackingData = (trackingData) => {
     updated_at: trackingData.updated_at || new Date().toISOString(),
   };
 };
-
-
-

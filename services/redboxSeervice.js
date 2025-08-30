@@ -22,8 +22,7 @@ exports.shipmentdata = (
   const shipmentdata = {
     // البيانات المطلوبة
     reference: order._id,
-    cod_amount:
-      order.payment_method === "COD" ? parseFloat(order.total.amount) || 0 : 0,
+    cod_amount: parseFloat(order.total.amount),
     cod_currency: "SAR",
     customer_name: order.customer?.full_name,
     customer_phone: order.customer?.mobile,
