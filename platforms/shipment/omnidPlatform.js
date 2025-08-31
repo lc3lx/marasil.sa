@@ -211,7 +211,7 @@ class OmniDeliveryAPI {
     const url = `${this.baseURL}/delivery/print/label`;
     const response = await axios.post(
       url,
-      { orders:[orders], size:"A6" },
+      { orders: [orders], size: "A6" },
       { headers: this.headers }
     );
     return response.data;
@@ -222,7 +222,7 @@ class OmniDeliveryAPI {
     await this.ensureAuth();
     try {
       const response = await this.client.get(
-        `${this.baseURL}/api/1.0.0/public/order/info?q=${orderUid}`,
+        `https://api.dev.omnic.solutions/delivery/order/${orderUid}`,
         { headers: this.headers }
       );
 

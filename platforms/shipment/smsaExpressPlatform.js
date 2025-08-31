@@ -436,7 +436,6 @@ class SMSAService {
         headers: {
           apikey: this.apiKey.toUpperCase(),
           "Content-Type": "application/json",
-          Host: "ecomapis.smsaexpress.com",
         },
         validateStatus: (status) => status < 500,
       });

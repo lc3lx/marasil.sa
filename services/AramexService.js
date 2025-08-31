@@ -33,7 +33,7 @@ exports.formatAddress = (address) => {
  */
 exports.formatParty = (partyData) => {
   return {
-    PartyName: partyData.full_name || partyData.company_name || "Marasil", // قيمة افتراضية
+    PartyName: partyData.full_name|| "Marasil", // قيمة افتراضية
     AccountEntity: "RUH", // ثابت RUH للشحنات المحلية
     AccountNumber: process.env.ARAMEX_ACCOUNT_NUMBER,
     Reference1: "Ref1",
