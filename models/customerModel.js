@@ -4,6 +4,10 @@ const customerSchema = new mongoose.Schema(
   {
     firstName: { type: String },
     lastName: { type: String },
+    phone: {
+      type: String,
+      required: true,
+    },
 
     slug: {
       type: String,

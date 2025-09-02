@@ -170,8 +170,7 @@ exports.paymentCallback = async (req, res) => {
       if (customerId) {
         const wallet = await Wallet.findOne({ customerId });
         if (wallet) {
-          const fee = (3 / 100) * payment.amount; // 3% رسوم
-          const netAmount = payment.amount - fee;
+          const netAmount = payment.amount;
 
           wallet.balance += netAmount / 100; // halalas → ريال
           await wallet.save();

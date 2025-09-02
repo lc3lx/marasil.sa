@@ -158,20 +158,17 @@ app.post("/api/wallet/webhook/moyasar", express.json(), async (req, res) => {
     const signature = req.headers["x-moyasar-signature"];
     const body = JSON.stringify(req.body);
 
-    // console.log("جسم الطلب:", body);
-    // console.log("التوقيع المستلم:", signature);
+    console.log("جسم الطلب:", body);
+    console.log("التوقيع المستلم:", signature);
 
-    // const hash = crypto
-    //   .createHmac("sha256", secret)
-    //   .update(body)
-    //   .digest("hex");
+    const hash = crypto.createHmac("sha256", secret).update(body).digest("hex");
 
-    // console.log("التجزئة المحسوبة:", hash);
+    console.log("التجزئة المحسوبة:", hash);
 
-    // if (hash !== signature) {
-    //   console.error("فشل التحقق من التوقيع في Webhook");
-    //   return res.status(400).json({ error: "توقيع غير صالح" });
-    // }
+    if (hash !== signature) {
+      console.error("فشل التحقق من التوقيع في Webhook");
+      return res.status(400).json({ error: "توقيع غير صالح" });
+    }
 
     const payment = req.body;
 

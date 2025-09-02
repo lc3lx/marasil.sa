@@ -158,13 +158,10 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
 
     if (!shippingType) {
       return next(
-        new ApiEror(
-          `نوع الشحن ${shapmentingType} غير متوفر مع ${company}`,
-          400
-        )
+        new ApiEror(`نوع الشحن ${shapmentingType} غير متوفر مع ${company}`, 400)
       );
     }
-
+    console.log(shippingType);
     // 4. التحقق من قيود الوزن والطرود
     if (weight > shippingType.denayWeight) {
       return next(
@@ -282,13 +279,11 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           if (!trackingInfo || !trackingInfo.trackingNumber) {
             throw new Error("فشل في الحصول على رقم التتبع");
           }
-       
         } catch (error) {
           console.error("OmniDelivery Error:", error);
           return next(
             new ApiEror(`فشل في إنشاء الشحنة: ${error.message}`, 500)
           );
-
         }
         break;
     }
@@ -644,7 +639,7 @@ module.exports.cancelShipment = asyncHandler(async (req, res, next) => {
     // 7. تحديث حالة الشحنة في قاعدة البيانات وحذفها
     shipment.shipmentstates = "Canceled";
     await shipment.save();
-    
+
     // حذف الشحنة من قاعدة البيانات
     await Shapment.deleteOne({ _id: shipment._id });
 
@@ -692,10 +687,7 @@ module.exports.printShipmentInvoice = asyncHandler(async (req, res, next) => {
     // 1. التحقق من البيانات المطلوبة
     if (!company || !trackingNumber) {
       return next(
-        new ApiEror(
-          "جميع البيانات مطلوبة: company, trackingNumber",
-          400
-        )
+        new ApiEror("جميع البيانات مطلوبة: company, trackingNumber", 400)
       );
     }
 
@@ -712,9 +704,7 @@ module.exports.printShipmentInvoice = asyncHandler(async (req, res, next) => {
     let invoiceResult;
     switch (company) {
       case "smsa":
-        invoiceResult = await smsaExxpress.pushShipmentInvoice(
-          trackingNumber,
-        );
+        invoiceResult = await smsaExxpress.pushShipmentInvoice(trackingNumber);
         break;
       case "aramex":
         const aramexService = new Aramex();
@@ -728,9 +718,7 @@ module.exports.printShipmentInvoice = asyncHandler(async (req, res, next) => {
           new ApiEror("طباعة الفواتير لـ RedBox غير متوفرة حالياً", 501)
         );
       case "omniclama":
-        invoiceResult = await omin.printLabels(
-          trackingNumber,
-        );
+        invoiceResult = await omin.printLabels(trackingNumber);
         break;
       default:
         return next(new ApiEror(`شركة الشحن ${company} غير مدعومة`, 400));
@@ -1237,4 +1225,3 @@ module.exports.getShipmentsStats = asyncHandler(async (req, res, next) => {
     );
   }
 });
-
