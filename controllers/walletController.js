@@ -99,8 +99,8 @@ exports.RechargeWallet = asyncHandler(async (req, res) => {
       }
 
       // خصم رسوم (مثال 3%)
-      const fee = (3 / 100) * payment.amount;
-      const netAmount = payment.amount - fee;
+      
+      const netAmount = payment.amount;
 
       wallet.balance += netAmount / 100; // لأنه halalas → ريال
       await wallet.save();
