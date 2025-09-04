@@ -152,93 +152,74 @@ app.set("io", io);
 app.set("activeUsers", activeUsers);
 
 // API Routes
-app.post(
-  "/api/wallet/webhook/moyasar",
-  express.raw({ type: "application/json" }), // مهم: raw body
-  async (req, res) => {
-    try {
-      const secret = process.env.MOYASAR_SECRET_KEY; // sk_test_xxx
-      const signature = req.headers["x-moyasar-signature"];
-      const body = req.body.toString("utf8");
 
-      console.log("📥 الهيدرز:", req.headers);
-      console.log("📦 الجسم:", body);
+app.post("/api/wallet/webhook/moyasar", async (req, res) => {
+  try {
+    const secret = process.env.MOYASAR_SECRET_TOKEN; // نفس القيمة اللي بتحطها بميسر
+    const payload = req.body;
 
-      // حساب التوقيع
-      const hash = crypto
-        .createHmac("sha256", secret)
-        .update(body)
-        .digest("hex");
-      console.log("🔑 التوقيع المستلم:", signature);
-      console.log("🔑 التجزئة المحسوبة:", hash);
+    console.log("📥 Webhook Payload:", payload);
 
-      if (hash !== signature) {
-        console.error("❌ فشل التحقق من التوقيع");
-        return res.status(400).json({ error: "Invalid signature" });
-      }
-
-      // تحليل البيانات
-      const payload = JSON.parse(body);
-      const payment = payload.data;
-
-      if (payment.status !== "paid") {
-        return res
-          .status(200)
-          .json({ message: "تم الاستلام لكن الحالة ليست مدفوعة" });
-      }
-
-      console.log("✅ دفع صحيح:", payment.id, payment.amount);
-
-      if (payment.status !== "paid") {
-        return res.status(200).json({
-          message: "تم استلام الإشعار لكن الحالة ليست مدفوعة",
-        });
-      }
-
-      const customerId = payment.metadata?.customerId;
-      const netAmount = parseFloat(payment.metadata?.netAmount || 0);
-
-      if (!customerId || !netAmount) {
-        return res.status(400).json({ error: "بيانات ناقصة في الإشعار" });
-      }
-
-      // 🔹 تحديث أو إنشاء المحفظة
-      const wallet = await Wallet.findOneAndUpdate(
-        { customerId },
-        { $inc: { balance: netAmount } },
-        { upsert: true, new: true }
-      );
-
-      // 🔹 إنشاء معاملة
-      const transaction = await Transaction.create({
-        type: "credit",
-        customerId: customerId,
-        description: "Recharge Wallet",
-        amount: netAmount / 100, // إذا netAmount بالـ halalas
-        status: "completed",
-        method: "moyasar",
-        moyasarPaymentId: payment.id,
-        walletId: wallet._id,
-      });
-
-      // 🔹 ربط المعاملة بالمحفظة
-      await Wallet.findByIdAndUpdate(wallet._id, {
-        $push: { transactions: transaction._id },
-      });
-
-      console.log(
-        `✅ تم شحن محفظة العميل ${customerId} بمبلغ ${
-          netAmount / 100
-        } ريال بعد الخصم`
-      );
-
-      res.status(200).json({ success: true });
-    } catch (err) {
-      console.error("خطأ في Webhook:", err);
-      res.status(500).json({ error: "حدث خطأ في المعالجة" });
+    // ✅ تحقق من السر (secret_token)
+    if (!payload.secret_token || payload.secret_token !== secret) {
+      console.error("❌ فشل التحقق من التوقيع (secret_token غير صحيح)");
+      return res.status(400).json({ error: "Invalid secret_token" });
     }
+
+    const payment = payload.data;
+
+    // ✅ تحقق من حالة الدفع
+    if (payment.status !== "paid") {
+      return res
+        .status(200)
+        .json({ message: "تم الاستلام لكن الحالة ليست مدفوعة" });
+    }
+
+    // ✅ تحقق من التكرار (idempotency)
+    const exists = await Transaction.findOne({ moyasarPaymentId: payment.id });
+    if (exists) {
+      return res.status(200).json({ message: "تمت المعالجة سابقًا" });
+    }
+
+    const customerId = payment.metadata?.customerId;
+    const netAmount = parseFloat(payment.metadata?.netAmount || 0);
+
+    if (!customerId || !netAmount) {
+      return res.status(400).json({ error: "بيانات ناقصة" });
+    }
+
+    // 🔹 تحديث أو إنشاء المحفظة
+    const wallet = await Wallet.findOneAndUpdate(
+      { customerId },
+      { $inc: { balance: netAmount } },
+      { upsert: true, new: true }
+    );
+
+    // 🔹 إنشاء معاملة
+    const transaction = await Transaction.create({
+      type: "credit",
+      customerId,
+      description: "Recharge Wallet",
+      amount: netAmount / 100, // إذا netAmount بالـ halalas
+      status: "completed",
+      method: "moyasar",
+      moyasarPaymentId: payment.id,
+      walletId: wallet._id,
+    });
+
+    // 🔹 ربط المعاملة بالمحفظة
+    await Wallet.findByIdAndUpdate(wallet._id, {
+      $push: { transactions: transaction._id },
+    });
+
+    console.log(`✅ تم شحن محفظة ${customerId} بمبلغ ${netAmount / 100} ريال`);
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("❌ Webhook Error:", err);
+    res.status(500).json({ error: "حدث خطأ في المعالجة" });
   }
-);
+});
 app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/customer", customerRoutes);
