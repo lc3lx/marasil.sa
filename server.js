@@ -5,6 +5,7 @@ const cors = require("cors");
 const session = require("express-session");
 const MongoStore = require("connect-mongo");
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 require("dotenv").config();
 
 // Middlewares
