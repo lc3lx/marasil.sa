@@ -158,28 +158,28 @@ app.post(
   async (req, res) => {
     try {
       const secret = process.env.MOYASAR_SECRET_KEY; // sk_live_xxx أو sk_test_xxx
-      const signature = req.headers["x-moyasar-signature"];
+      // const signature = req.headers["x-moyasar-signature"];
       const body = req.body.toString("utf8"); // raw body كنص
 
       console.log("جسم الطلب:", body);
-      console.log("التوقيع المستلم:", signature);
+      //  console.log("التوقيع المستلم:", signature);
 
-      // احسب HMAC SHA256
-      const hash = crypto
-        .createHmac("sha256", secret)
-        .update(body)
-        .digest("hex");
+      // // احسب HMAC SHA256
+      // const hash = crypto
+      //   .createHmac("sha256", secret)
+      //   .update(body)
+      //   .digest("hex");
 
-      console.log("التجزئة المحسوبة:", hash);
+      // console.log("التجزئة المحسوبة:", hash);
 
-      if (hash !== signature) {
-        console.error("❌ فشل التحقق من التوقيع في Webhook");
-        return res.status(400).json({ error: "توقيع غير صالح" });
-      }
+      // if (hash !== signature) {
+      //   console.error("❌ فشل التحقق من التوقيع في Webhook");
+      //   return res.status(400).json({ error: "توقيع غير صالح" });
+      // }
 
-      // ✅ إذا التوقيع صحيح: حلّل JSON
-      const payload = JSON.parse(body);
-      const payment = payload.data;
+      // // ✅ إذا التوقيع صحيح: حلّل JSON
+      // const payload = JSON.parse(body);
+      // const payment = payload.data;
 
       if (payment.status !== "paid") {
         return res.status(200).json({
