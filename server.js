@@ -157,29 +157,37 @@ app.post(
   express.raw({ type: "application/json" }), // مهم: raw body
   async (req, res) => {
     try {
-      const secret = process.env.MOYASAR_SECRET_KEY; // sk_live_xxx أو sk_test_xxx
-      // const signature = req.headers["x-moyasar-signature"];
-      const body = req.body.toString("utf8"); // raw body كنص
+      const secret = process.env.MOYASAR_SECRET_KEY; // sk_test_xxx
+      const signature = req.headers["x-moyasar-signature"];
+      const body = req.body.toString("utf8");
 
-      console.log("جسم الطلب:", body);
-      //  console.log("التوقيع المستلم:", signature);
+      console.log("📥 الهيدرز:", req.headers);
+      console.log("📦 الجسم:", body);
 
-      // // احسب HMAC SHA256
-      // const hash = crypto
-      //   .createHmac("sha256", secret)
-      //   .update(body)
-      //   .digest("hex");
+      // حساب التوقيع
+      const hash = crypto
+        .createHmac("sha256", secret)
+        .update(body)
+        .digest("hex");
+      console.log("🔑 التوقيع المستلم:", signature);
+      console.log("🔑 التجزئة المحسوبة:", hash);
 
-      // console.log("التجزئة المحسوبة:", hash);
+      if (hash !== signature) {
+        console.error("❌ فشل التحقق من التوقيع");
+        return res.status(400).json({ error: "Invalid signature" });
+      }
 
-      // if (hash !== signature) {
-      //   console.error("❌ فشل التحقق من التوقيع في Webhook");
-      //   return res.status(400).json({ error: "توقيع غير صالح" });
-      // }
+      // تحليل البيانات
+      const payload = JSON.parse(body);
+      const payment = payload.data;
 
-      // // ✅ إذا التوقيع صحيح: حلّل JSON
-      // const payload = JSON.parse(body);
-      // const payment = payload.data;
+      if (payment.status !== "paid") {
+        return res
+          .status(200)
+          .json({ message: "تم الاستلام لكن الحالة ليست مدفوعة" });
+      }
+
+      console.log("✅ دفع صحيح:", payment.id, payment.amount);
 
       if (payment.status !== "paid") {
         return res.status(200).json({
