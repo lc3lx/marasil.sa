@@ -150,7 +150,7 @@ io.on("connection", (socket) => {
 // Expose io and activeUsers to routes
 app.set("io", io);
 app.set("activeUsers", activeUsers);
-
+app.use(express.json());
 // API Routes
 
 app.post("/api/wallet/webhook/moyasar", async (req, res) => {
@@ -220,7 +220,7 @@ app.post("/api/wallet/webhook/moyasar", async (req, res) => {
     res.status(500).json({ error: "حدث خطأ في المعالجة" });
   }
 });
-app.use(express.json());
+
 app.use("/api/auth", authRoutes);
 app.use("/api/customer", customerRoutes);
 app.use("/api/order", orderRoutes);
