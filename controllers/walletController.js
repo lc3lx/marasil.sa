@@ -64,7 +64,7 @@ exports.RechargeWallet = asyncHandler(async (req, res) => {
     const response = await axios.post(
       "https://api.moyasar.com/v1/payments",
       {
-        amount: amount, // لازم بالـ halalas (مثلاً 100 ريال = 10000)
+        amount: amount * 100, // لازم بالـ halalas (مثلاً 100 ريال = 10000)
         currency: "SAR",
         source: {
           type: "token",
@@ -99,7 +99,7 @@ exports.RechargeWallet = asyncHandler(async (req, res) => {
       }
 
       // خصم رسوم (مثال 3%)
-      
+
       const netAmount = payment.amount;
 
       wallet.balance += netAmount / 100; // لأنه halalas → ريال
