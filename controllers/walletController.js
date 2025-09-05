@@ -54,88 +54,79 @@ exports.getAllWallet = asyncHandler(async (req, res, next) => {
 exports.RechargeWallet = asyncHandler(async (req, res) => {
   try {
     const customerId = req.customer._id;
-    const { token, amount, description } = req.body;
+    const { paymentId, amount, description } = req.body;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: "Invalid amount" });
     }
+    if (!paymentId) {
+      return res.status(400).json({ error: "Missing paymentId" });
+    }
 
-    // إنشاء عملية دفع عند ميسر
-    const response = await axios.post(
-      "https://api.moyasar.com/v1/payments",
+    // التحقق من الدفع عبر API ميسر
+    const authHeader =
+      "Basic " + Buffer.from(process.env.MOYASAR_SECRET_KEY + ":").toString("base64");
+    const response = await axios.get(
+      `https://api.moyasar.com/v1/payments/${paymentId}`,
       {
-        amount: amount * 100, // لازم بالـ halalas (مثلاً 100 ريال = 10000)
-        currency: "SAR",
-        source: {
-          type: "token",
-          token: token,
-        },
-        description: description || "Wallet recharge",
-        callback_url: `${process.env.BASE_URL}/api/wallet/payment-callback`,
-      },
-      {
-        auth: {
-          username: process.env.MOYASAR_SECRET_KEY, // sk_test أو sk_live
-          password: "",
+        headers: {
+          Authorization: authHeader,
+          "Content-Type": "application/json",
         },
       }
     );
 
     const payment = response.data;
 
-    // إذا الدفع بده 3DS (redirect)
-    if (payment.status === "initiated" && payment.transaction_url) {
-      return res.json({
-        success: true,
-        transaction_url: payment.transaction_url,
+    // تحقق من حالة الدفع والمبلغ والعملة
+    if (
+      payment.status !== "paid" ||
+      payment.amount !== amount * 100 ||
+      payment.currency !== "SAR"
+    ) {
+      return res.status(400).json({
+        error: "Payment not verified or invalid amount/currency",
+        payment,
       });
     }
 
-    // إذا الدفع تم مباشرةً (مثلاً Apple Pay أو بطاقة مقبولة فوراً)
-    if (payment.status === "paid") {
-      const wallet = await Wallet.findOne({ customerId });
-      if (!wallet) {
-        throw new Error("Wallet not found");
-      }
-
-      // خصم رسوم (مثال 3%)
-
-      const netAmount = payment.amount;
-
-      wallet.balance += netAmount / 100; // لأنه halalas → ريال
-      await wallet.save();
-
-      const transaction = await Transaction.create({
-        type: "credit",
-        customerId,
-        description,
-        amount: netAmount / 100,
-        status: "completed",
-        method: "moyasar",
-        moyasarPaymentId: payment.id,
-        walletId: wallet._id,
-      });
-
-      await Wallet.findByIdAndUpdate(wallet._id, {
-        $push: { transactions: transaction._id },
-      });
-
-      return res.json({
-        success: true,
-        message: "Wallet recharged successfully",
-        balance: wallet.balance,
-      });
+    // شحن الرصيد وتسجيل العملية
+    const wallet = await Wallet.findOne({ customerId });
+    if (!wallet) {
+      throw new Error("Wallet not found");
     }
 
-    // في حال حالة غير متوقعة
+    wallet.balance += amount;
+    await wallet.save();
+
+    const transaction = await Transaction.create({
+      type: "credit",
+      customerId,
+      description: description || "Wallet recharge",
+      amount: amount,
+      status: "completed",
+      method: "moyasar",
+      moyasarPaymentId: payment.id,
+      walletId: wallet._id,
+    });
+
+    await Wallet.findByIdAndUpdate(wallet._id, {
+      $push: { transactions: transaction._id },
+    });
+
     return res.json({
       success: true,
-      status: payment.status,
-      payment,
+      message: "Wallet recharged successfully",
+      balance: wallet.balance,
     });
   } catch (err) {
-    console.error(err.response?.data || err.message);
-    res.status(400).json({ error: err.response?.data || err.message });
+    // دعم رسائل الخطأ من ميسر
+    if (err.response && err.response.data) {
+      console.error(err.response.data);
+      return res.status(400).json({ error: err.response.data });
+    }
+    console.error(err.message);
+    res.status(400).json({ error: err.message });
   }
 });
 
