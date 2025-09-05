@@ -53,21 +53,22 @@ exports.getAllWallet = asyncHandler(async (req, res, next) => {
 
 exports.RechargeWallet = asyncHandler(async (req, res) => {
   try {
+    console.log(req.body);
     const customerId = req.customer._id;
-    const { paymentId, amount, description } = req.body;
+    const { id, amount, description } = req.body;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: "Invalid amount" });
     }
-    if (!paymentId) {
-      return res.status(400).json({ error: "Missing paymentId" });
+    if (!id) {
+      return res.status(400).json({ error: "Missing id" });
     }
 
     // التحقق من الدفع عبر API ميسر
     const authHeader =
       "Basic " + Buffer.from(process.env.MOYASAR_SECRET_KEY + ":").toString("base64");
     const response = await axios.get(
-      `https://api.moyasar.com/v1/payments/${paymentId}`,
+      `https://api.moyasar.com/v1/payments/${id}`,
       {
         headers: {
           Authorization: authHeader,
