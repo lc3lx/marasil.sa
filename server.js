@@ -32,6 +32,8 @@ const shipmentRoutes = require("./routes/shipmentRoute");
 const companyShipmentRoutes = require("./routes/shippingCompanyRoute");
 const { MoyasarWebhook } = require("./controllers/walletController");
 const bodyParser = require("body-parser");
+const Transaction = require("./models/transactionModel");
+const Wallet = require("./models/walletModel");
 // Scheduled tasks
 const { scheduleSalaryProcessing } = require("./utils/scheduler");
 scheduleSalaryProcessing();
