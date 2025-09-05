@@ -184,16 +184,17 @@ app.post("/api/wallet/webhook/moyasar", async (req, res) => {
     }
 
     const customerId = payment.metadata?.customerId;
-    const netAmount = parseFloat(payment.metadata?.netAmount || 0);
 
-    if (!customerId || !netAmount) {
-      return res.status(400).json({ error: "بيانات ناقصة" });
+    if (!customerId) {
+      return res.status(400).json({ error: "بيانات ناقصة - customerId مفقود" });
     }
+
+    const netAmount = payment.amount;
 
     // 🔹 تحديث أو إنشاء المحفظة
     const wallet = await Wallet.findOneAndUpdate(
       { customerId },
-      { $inc: { balance: netAmount } },
+      { $inc: { balance: netAmount / 100 } }, // تحويل من halalas إلى ريال
       { upsert: true, new: true }
     );
 

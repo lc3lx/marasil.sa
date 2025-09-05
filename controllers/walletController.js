@@ -53,7 +53,6 @@ exports.getAllWallet = asyncHandler(async (req, res, next) => {
 
 exports.RechargeWallet = asyncHandler(async (req, res) => {
   try {
-    console.log(req.body);
     const customerId = req.customer._id;
     const { id, amount, description } = req.body;
 
@@ -66,7 +65,8 @@ exports.RechargeWallet = asyncHandler(async (req, res) => {
 
     // التحقق من الدفع عبر API ميسر
     const authHeader =
-      "Basic " + Buffer.from(process.env.MOYASAR_SECRET_KEY + ":").toString("base64");
+      "Basic " +
+      Buffer.from(process.env.MOYASAR_SECRET_KEY + ":").toString("base64");
     const response = await axios.get(
       `https://api.moyasar.com/v1/payments/${id}`,
       {
@@ -97,7 +97,7 @@ exports.RechargeWallet = asyncHandler(async (req, res) => {
       throw new Error("Wallet not found");
     }
 
-    wallet.balance += amount;
+    wallet.balance += amount / 100; // تحويل من halalas إلى ريال
     await wallet.save();
 
     const transaction = await Transaction.create({
@@ -283,17 +283,21 @@ exports.MoyasarWebhook = asyncHandler(async (req, res) => {
     }
 
     const customerId = payment.metadata?.customerId;
-    const netAmount = parseFloat(payment.metadata?.netAmount || 0);
 
-    if (!customerId || !netAmount) {
-      return res.status(400).json({ error: "بيانات ناقصة في الإشعار" });
+    if (!customerId) {
+      return res
+        .status(400)
+        .json({ error: "بيانات ناقصة في الإشعار - customerId مفقود" });
     }
 
+    // حساب المبلغ الصافي بعد خصم الرسوم
+    const fee = (3 / 100) * payment.amount;
+    const netAmount = payment.amount - fee;
+
     // تحديث أو إنشاء المحفظة
-    const wallet = await Wallet.findOne;
-    AndUpdate(
+    const wallet = await Wallet.findOneAndUpdate(
       { customerId },
-      { $inc: { balance: netAmount } },
+      { $inc: { balance: netAmount / 100 } }, // تحويل من halalas إلى ريال
       { upsert: true, new: true }
     );
 
@@ -302,7 +306,7 @@ exports.MoyasarWebhook = asyncHandler(async (req, res) => {
       type: "credit",
       customerId: customerId,
       description: "Recharge Wallet",
-      amount: netAmount / 100,
+      amount: netAmount / 100, // حفظ المبلغ بالريال في المعاملة
       status: "completed",
       method: "moyasar",
       moyasarPaymentId: payment.id,
