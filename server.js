@@ -172,9 +172,27 @@ app.post("/api/wallet/webhook/moyasar", async (req, res) => {
 
     // ✅ تحقق من حالة الدفع
     if (payment.status !== "paid") {
-      return res
-        .status(200)
-        .json({ message: "تم الاستلام لكن الحالة ليست مدفوعة" });
+      console.log("⚠️ Payment failed - Status:", payment.status);
+
+      // تسجيل المعاملة الفاشلة إذا كان هناك customerId
+      if (payment.metadata?.customerId) {
+        const failedTransaction = await Transaction.findOneAndUpdate(
+          { moyasarPaymentId: payment.id },
+          {
+            type: "credit",
+            customerId: payment.metadata.customerId,
+            description: `فشل الدفع - ${payment.description || "شحن المحفظة"}`,
+            amount: payment.amount / 100,
+            status: "failed",
+            method: "moyasar",
+            moyasarPaymentId: payment.id,
+          },
+          { upsert: true, new: true }
+        );
+        console.log("✅ Failed payment logged:", failedTransaction._id);
+      }
+
+      return res.status(200).json({ message: "تم استلام إشعار فشل الدفع" });
     }
 
     // ✅ تحقق من التكرار (idempotency)
@@ -189,6 +207,7 @@ app.post("/api/wallet/webhook/moyasar", async (req, res) => {
       return res.status(400).json({ error: "بيانات ناقصة - customerId مفقود" });
     }
 
+    // المبلغ الصافي بدون رسوم
     const netAmount = payment.amount;
 
     // 🔹 تحديث أو إنشاء المحفظة
