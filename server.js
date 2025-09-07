@@ -182,7 +182,14 @@ app.post(
         currency: payment.currency,
         metadata: payment.metadata,
         webhookType: webhookType,
+        message: payment.source?.message,
       });
+
+      console.log("🔍 Webhook Analysis:");
+      console.log(`   - Type: ${webhookType}`);
+      console.log(`   - Status: ${payment.status}`);
+      console.log(`   - CustomerId: ${payment.metadata?.customerId}`);
+      console.log(`   - Message: ${payment.source?.message}`);
 
       // ✅ التحقق من customerId في metadata
       const customerId = payment.metadata?.customerId;
@@ -198,6 +205,7 @@ app.post(
         console.log("❌ معالجة دفعة فاشلة");
 
         // تحديث حالة المعاملة إلى failed
+        console.log(`🔄 تحديث معاملة فاشلة: ${payment.id}`);
         const failedTransaction = await Transaction.findOneAndUpdate(
           { moyasarPaymentId: payment.id },
           {
@@ -211,6 +219,7 @@ app.post(
 
         console.log("❌ تم تسجيل معاملة فاشلة:", failedTransaction._id);
         console.log("📝 سبب الفشل:", payment.source?.message || "غير محدد");
+        console.log("📊 حالة المعاملة الجديدة:", failedTransaction.status);
 
         return res.status(200).json({
           success: false,
@@ -221,7 +230,11 @@ app.post(
       }
 
       // ✅ معالجة الدفعات الناجحة
-      if (webhookType === "payment_paid" || payment.status === "paid") {
+      if (
+        webhookType === "payment_completed" ||
+        webhookType === "payment_paid" ||
+        payment.status === "paid"
+      ) {
         console.log("✅ معالجة دفعة ناجحة");
 
         // 🔍 التحقق من الدفع عبر API ميسر
@@ -278,6 +291,22 @@ app.post(
           return res.status(200).json({ message: "تمت المعالجة سابقًا" });
         }
 
+        console.log(`🔄 البحث عن معاملة موجودة: ${payment.id}`);
+        const pendingTransaction = await Transaction.findOne({
+          moyasarPaymentId: payment.id,
+          status: "pending",
+        });
+
+        if (pendingTransaction) {
+          console.log(
+            "📝 وُجدت معاملة معلقة:",
+            pendingTransaction._id,
+            "- سيتم تحديثها"
+          );
+        } else {
+          console.log("📝 لم توجد معاملة معلقة - سيتم إنشاء جديدة");
+        }
+
         // 🔹 تحديث أو إنشاء المحفظة
         const wallet = await Wallet.findOneAndUpdate(
           { customerId },
@@ -286,6 +315,7 @@ app.post(
         );
 
         // 🔹 تحديث المعاملة الموجودة أو إنشاء جديدة
+        console.log(`💾 إنشاء/تحديث المعاملة: ${payment.id}`);
         const transaction = await Transaction.findOneAndUpdate(
           { moyasarPaymentId: payment.id },
           {
@@ -303,6 +333,10 @@ app.post(
             new: true,
           }
         );
+
+        console.log("✅ تم إنشاء/تحديث المعاملة:", transaction._id);
+        console.log("📊 حالة المعاملة:", transaction.status);
+        console.log("💰 مبلغ المعاملة:", transaction.amount);
 
         // 🔹 ربط المعاملة بالمحفظة
         await Wallet.findByIdAndUpdate(wallet._id, {
