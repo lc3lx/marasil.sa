@@ -8,6 +8,7 @@ const mongoose = require("mongoose");
 const crypto = require("crypto");
 require("dotenv").config();
 const axios = require("axios");
+const asyncHandler = require("express-async-handler");
 
 // Middlewares
 const globalError = require("./middlewares/errormiddleware");
