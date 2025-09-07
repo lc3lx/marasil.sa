@@ -7,6 +7,7 @@ const MongoStore = require("connect-mongo");
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 require("dotenv").config();
+const axios = require("axios");
 
 // Middlewares
 const globalError = require("./middlewares/errormiddleware");
@@ -155,184 +156,188 @@ app.set("activeUsers", activeUsers);
 app.use(express.json());
 // API Routes
 
-app.post("/api/wallet/webhook/moyasar", async (req, res) => {
-  try {
-    const secret = process.env.MOYASAR_SECRET_TOKEN;
-    const payload = req.body;
+app.post(
+  "/api/wallet/webhook/moyasar",
+  asyncHandler(async (req, res) => {
+    try {
+      const secret = process.env.MOYASAR_SECRET_TOKEN;
+      const payload = req.body;
 
-    console.log("📥 Webhook Payload:", JSON.stringify(payload, null, 2));
+      console.log("📥 Webhook Payload:", JSON.stringify(payload, null, 2));
 
-    // ✅ تحقق من السر (secret_token)
-    if (!payload.secret_token || payload.secret_token !== secret) {
-      console.error("❌ فشل التحقق من التوقيع (secret_token غير صحيح)");
-      return res.status(400).json({ error: "Invalid secret_token" });
-    }
+      // ✅ تحقق من السر (secret_token)
+      if (!payload.secret_token || payload.secret_token !== secret) {
+        console.error("❌ فشل التحقق من التوقيع (secret_token غير صحيح)");
+        return res.status(400).json({ error: "Invalid secret_token" });
+      }
 
-    const payment = payload.data;
-    const webhookType = payload.type;
+      const payment = payload.data;
+      const webhookType = payload.type;
 
-    console.log("💳 Payment Data:", {
-      id: payment.id,
-      status: payment.status,
-      amount: payment.amount,
-      currency: payment.currency,
-      metadata: payment.metadata,
-      webhookType: webhookType,
-    });
-
-    // ✅ التحقق من customerId في metadata
-    const customerId = payment.metadata?.customerId;
-    if (!customerId) {
-      console.error("❌ customerId مفقود في metadata");
-      return res
-        .status(400)
-        .json({ error: "بيانات ناقصة - customerId مفقود في metadata" });
-    }
-
-    // 🔄 التحقق من نوع الـ webhook
-    if (webhookType === "payment_failed" || payment.status === "failed") {
-      console.log("❌ معالجة دفعة فاشلة");
-
-      // تحديث حالة المعاملة إلى failed
-      const failedTransaction = await Transaction.findOneAndUpdate(
-        { moyasarPaymentId: payment.id },
-        {
-          status: "failed",
-          description: `فشل الدفع - ${
-            payment.source?.message || "سبب غير محدد"
-          }`,
-        },
-        { upsert: true, new: true }
-      );
-
-      console.log("❌ تم تسجيل معاملة فاشلة:", failedTransaction._id);
-      console.log("📝 سبب الفشل:", payment.source?.message || "غير محدد");
-
-      return res.status(200).json({
-        success: false,
-        message: "تم تسجيل فشل الدفع",
-        failureReason: payment.source?.message || "سبب غير محدد",
-        transactionId: failedTransaction._id,
-      });
-    }
-
-    // ✅ معالجة الدفعات الناجحة
-    if (webhookType === "payment_completed" || payment.status === "paid") {
-      console.log("✅ معالجة دفعة ناجحة");
-
-      // 🔍 التحقق من الدفع عبر API ميسر
-      console.log("🔍 Verifying payment with Moyasar API...");
-      const authHeader =
-        "Basic " +
-        Buffer.from(process.env.MOYASAR_SECRET_KEY + ":").toString("base64");
-
-      const moyasarResponse = await axios.get(
-        `https://api.moyasar.com/v1/payments/${payment.id}`,
-        {
-          headers: {
-            Authorization: authHeader,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const verifiedPayment = moyasarResponse.data;
-      console.log("✅ Moyasar API Response:", {
-        status: verifiedPayment.status,
-        amount: verifiedPayment.amount,
-        currency: verifiedPayment.currency,
+      console.log("💳 Payment Data:", {
+        id: payment.id,
+        status: payment.status,
+        amount: payment.amount,
+        currency: payment.currency,
+        metadata: payment.metadata,
+        webhookType: webhookType,
       });
 
-      // ✅ التحقق من حالة الدفع من API ميسر
-      if (verifiedPayment.status !== "paid") {
-        console.log("❌ Payment not paid according to Moyasar API");
+      // ✅ التحقق من customerId في metadata
+      const customerId = payment.metadata?.customerId;
+      if (!customerId) {
+        console.error("❌ customerId مفقود في metadata");
+        return res
+          .status(400)
+          .json({ error: "بيانات ناقصة - customerId مفقود في metadata" });
+      }
 
-        // تحديث حالة المعاملة إلى failed إذا كانت موجودة
-        await Transaction.findOneAndUpdate(
+      // 🔄 التحقق من نوع الـ webhook
+      if (webhookType === "payment_failed" || payment.status === "failed") {
+        console.log("❌ معالجة دفعة فاشلة");
+
+        // تحديث حالة المعاملة إلى failed
+        const failedTransaction = await Transaction.findOneAndUpdate(
           { moyasarPaymentId: payment.id },
           {
             status: "failed",
             description: `فشل الدفع - ${
-              verifiedPayment.source?.message || "Unknown error"
+              payment.source?.message || "سبب غير محدد"
             }`,
+          },
+          { upsert: true, new: true }
+        );
+
+        console.log("❌ تم تسجيل معاملة فاشلة:", failedTransaction._id);
+        console.log("📝 سبب الفشل:", payment.source?.message || "غير محدد");
+
+        return res.status(200).json({
+          success: false,
+          message: "تم تسجيل فشل الدفع",
+          failureReason: payment.source?.message || "سبب غير محدد",
+          transactionId: failedTransaction._id,
+        });
+      }
+
+      // ✅ معالجة الدفعات الناجحة
+      if (webhookType === "payment_paid" || payment.status === "paid") {
+        console.log("✅ معالجة دفعة ناجحة");
+
+        // 🔍 التحقق من الدفع عبر API ميسر
+        console.log("🔍 Verifying payment with Moyasar API...");
+        const authHeader =
+          "Basic " +
+          Buffer.from(process.env.MOYASAR_SECRET_KEY + ":").toString("base64");
+
+        const moyasarResponse = await axios.get(
+          `https://api.moyasar.com/v1/payments/${payment.id}`,
+          {
+            headers: {
+              Authorization: authHeader,
+              "Content-Type": "application/json",
+            },
           }
         );
 
-        return res.status(200).json({ message: "تم التحقق - الدفع غير مكتمل" });
-      }
+        const verifiedPayment = moyasarResponse.data;
+        console.log("✅ Moyasar API Response:", {
+          status: verifiedPayment.status,
+          amount: verifiedPayment.amount,
+          currency: verifiedPayment.currency,
+        });
 
-      // ✅ التحقق من التكرار (idempotency)
-      const existingTransaction = await Transaction.findOne({
-        moyasarPaymentId: payment.id,
-        status: "completed",
-      });
+        // ✅ التحقق من حالة الدفع من API ميسر
+        if (verifiedPayment.status !== "paid") {
+          console.log("❌ Payment not paid according to Moyasar API");
 
-      if (existingTransaction) {
-        console.log("⚠️ Payment already processed:", existingTransaction._id);
-        return res.status(200).json({ message: "تمت المعالجة سابقًا" });
-      }
+          // تحديث حالة المعاملة إلى failed إذا كانت موجودة
+          await Transaction.findOneAndUpdate(
+            { moyasarPaymentId: payment.id },
+            {
+              status: "failed",
+              description: `فشل الدفع - ${
+                verifiedPayment.source?.message || "Unknown error"
+              }`,
+            }
+          );
 
-      // 🔹 تحديث أو إنشاء المحفظة
-      const wallet = await Wallet.findOneAndUpdate(
-        { customerId },
-        { $inc: { balance: verifiedPayment.amount / 100 } }, // تحويل من halalas إلى ريال
-        { upsert: true, new: true }
-      );
-
-      // 🔹 تحديث المعاملة الموجودة أو إنشاء جديدة
-      const transaction = await Transaction.findOneAndUpdate(
-        { moyasarPaymentId: payment.id },
-        {
-          type: "credit",
-          customerId,
-          description: verifiedPayment.description || "شحن المحفظة",
-          amount: verifiedPayment.amount / 100,
-          status: "completed",
-          method: "moyasar",
-          moyasarPaymentId: payment.id,
-          walletId: wallet._id,
-        },
-        {
-          upsert: true,
-          new: true,
+          return res
+            .status(200)
+            .json({ message: "تم التحقق - الدفع غير مكتمل" });
         }
-      );
 
-      // 🔹 ربط المعاملة بالمحفظة
-      await Wallet.findByIdAndUpdate(wallet._id, {
-        $addToSet: { transactions: transaction._id },
-      });
+        // ✅ التحقق من التكرار (idempotency)
+        const existingTransaction = await Transaction.findOne({
+          moyasarPaymentId: payment.id,
+          status: "completed",
+        });
 
-      console.log(
-        `✅ تم شحن محفظة ${customerId} بمبلغ ${
-          verifiedPayment.amount / 100
-        } ريال`
-      );
-      console.log(`📊 رصيد المحفظة الجديد: ${wallet.balance}`);
+        if (existingTransaction) {
+          console.log("⚠️ Payment already processed:", existingTransaction._id);
+          return res.status(200).json({ message: "تمت المعالجة سابقًا" });
+        }
 
+        // 🔹 تحديث أو إنشاء المحفظة
+        const wallet = await Wallet.findOneAndUpdate(
+          { customerId },
+          { $inc: { balance: verifiedPayment.amount / 100 } }, // تحويل من هللة إلى ريال
+          { upsert: true, new: true }
+        );
+
+        // 🔹 تحديث المعاملة الموجودة أو إنشاء جديدة
+        const transaction = await Transaction.findOneAndUpdate(
+          { moyasarPaymentId: payment.id },
+          {
+            type: "credit",
+            customerId,
+            description: verifiedPayment.description || "شحن المحفظة",
+            amount: verifiedPayment.amount / 100,
+            status: "completed",
+            method: "moyasar",
+            moyasarPaymentId: payment.id,
+            walletId: wallet._id,
+          },
+          {
+            upsert: true,
+            new: true,
+          }
+        );
+
+        // 🔹 ربط المعاملة بالمحفظة
+        await Wallet.findByIdAndUpdate(wallet._id, {
+          $addToSet: { transactions: transaction._id },
+        });
+
+        console.log(
+          `✅ تم شحن محفظة ${customerId} بمبلغ ${
+            verifiedPayment.amount / 100
+          } ريال`
+        );
+        console.log(`📊 رصيد المحفظة الجديد: ${wallet.balance}`);
+
+        return res.status(200).json({
+          success: true,
+          message: "تم شحن المحفظة بنجاح",
+          amount: verifiedPayment.amount / 100,
+          walletBalance: wallet.balance,
+          transactionId: transaction._id,
+        });
+      }
+
+      // 🔄 نوع webhook غير معروف
+      console.log("⚠️ Unknown webhook type:", webhookType);
       return res.status(200).json({
-        success: true,
-        message: "تم شحن المحفظة بنجاح",
-        amount: verifiedPayment.amount / 100,
-        walletBalance: wallet.balance,
-        transactionId: transaction._id,
+        message: `تم استلام webhook من نوع غير معروف: ${webhookType}`,
       });
+    } catch (err) {
+      console.error("❌ Webhook Error:", err.message, err.stack);
+      if (err.response) {
+        console.error("Moyasar API Error:", err.response.data);
+      }
+      return res.status(500).json({ error: "حدث خطأ في المعالجة" });
     }
-
-    // 🔄 نوع webhook غير معروف
-    console.log("⚠️ Unknown webhook type:", webhookType);
-    return res.status(200).json({
-      message: `تم استلام webhook من نوع غير معروف: ${webhookType}`,
-    });
-  } catch (err) {
-    console.error("❌ Webhook Error:", err);
-    if (err.response) {
-      console.error("Moyasar API Error:", err.response.data);
-    }
-    res.status(500).json({ error: "حدث خطأ في المعالجة" });
-  }
-});
-
+  })
+);
 app.use("/api/auth", authRoutes);
 app.use("/api/customer", customerRoutes);
 app.use("/api/order", orderRoutes);

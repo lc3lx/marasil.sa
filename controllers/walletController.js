@@ -65,13 +65,13 @@ exports.RechargeWallet = asyncHandler(async (req, res) => {
     if (!id) {
       return res.status(400).json({ error: "Missing payment id" });
     }
-
+    console.log("tm 1");
     // التحقق من وجود معاملة سابقة
     const existingTransaction = await Transaction.findOne({
       moyasarPaymentId: id,
       customerId: customerId,
     });
-
+    console.log("tm 2");
     if (existingTransaction) {
       console.log("⚠️ Transaction already exists:", existingTransaction._id);
       return res.status(200).json({
@@ -80,7 +80,7 @@ exports.RechargeWallet = asyncHandler(async (req, res) => {
         transactionId: existingTransaction._id,
       });
     }
-
+    console.log("tm 3");
     // إنشاء معاملة مؤقتة في انتظار الـ webhook
     const transaction = await Transaction.create({
       type: "credit",
@@ -91,7 +91,7 @@ exports.RechargeWallet = asyncHandler(async (req, res) => {
       method: "moyasar",
       moyasarPaymentId: id,
     });
-
+    console.log("tm 4");
     console.log("⏳ Created pending transaction:", transaction._id);
 
     return res.json({
