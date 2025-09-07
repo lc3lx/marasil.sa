@@ -56,7 +56,7 @@ exports.RechargeWallet = asyncHandler(async (req, res) => {
     const customerId = req.customer._id;
     const { id, amount, description } = req.body;
 
-    if (!amount || amount <= 0) {
+    if (!amount || amount < 0) {
       return res.status(400).json({ error: "Invalid amount" });
     }
     if (!id) {
