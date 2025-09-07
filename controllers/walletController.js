@@ -55,82 +55,53 @@ exports.RechargeWallet = asyncHandler(async (req, res) => {
   try {
     const customerId = req.customer._id;
     const { id, amount, description } = req.body;
-    console.log(req.body);
+
+    console.log("📥 RechargeWallet Request:", { id, amount, customerId });
+
     if (!amount || amount < 0) {
       return res.status(400).json({ error: "Invalid amount" });
     }
-    console.log("tm 1");
+
     if (!id) {
-      return res.status(400).json({ error: "Missing id" });
+      return res.status(400).json({ error: "Missing payment id" });
     }
-    console.log("tm 2");
 
-    // التحقق من الدفع عبر API ميسر
-    const authHeader =
-      "Basic " +
-      Buffer.from(process.env.MOYASAR_SECRET_KEY + ":").toString("base64");
-    const response = await axios.get(
-      `https://api.moyasar.com/v1/payments/${id}`,
-      {
-        headers: {
-          Authorization: authHeader,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-    console.log("tm 3");
-    const payment = response.data;
+    // التحقق من وجود معاملة سابقة
+    const existingTransaction = await Transaction.findOne({
+      moyasarPaymentId: id,
+      customerId: customerId,
+    });
 
-    // تحقق من حالة الدفع والمبلغ والعملة
-    if (
-      payment.status !== "paid" ||
-      payment.amount !== amount * 100 ||
-      payment.currency !== "SAR"
-    ) {
-      console.log("tm 4");
-      return res.status(400).json({
-        error: "Payment not verified or invalid amount/currency",
-        payment,
+    if (existingTransaction) {
+      console.log("⚠️ Transaction already exists:", existingTransaction._id);
+      return res.status(200).json({
+        success: true,
+        message: "Payment already processed",
+        transactionId: existingTransaction._id,
       });
     }
-    console.log("tm 5");
-    // شحن الرصيد وتسجيل العملية
-    const wallet = await Wallet.findOne({ customerId });
-    if (!wallet) {
-      throw new Error("Wallet not found");
-    }
-    console.log("tm 6");
 
-    wallet.balance += amount; // المبلغ بالفعل بالريال من الفرونت
-    await wallet.save();
-
+    // إنشاء معاملة مؤقتة في انتظار الـ webhook
     const transaction = await Transaction.create({
       type: "credit",
       customerId,
-      description: description || "Wallet recharge",
-      amount: amount, // حفظ المبلغ بالريال في قاعدة البيانات
-      status: "completed",
+      description: description || "Wallet recharge - pending webhook",
+      amount: amount,
+      status: "pending",
       method: "moyasar",
-      moyasarPaymentId: payment.id,
-      walletId: wallet._id,
+      moyasarPaymentId: id,
     });
-    console.log("tm 7");
-    await Wallet.findByIdAndUpdate(wallet._id, {
-      $push: { transactions: transaction._id },
-    });
-    console.log("tm 8");
+
+    console.log("⏳ Created pending transaction:", transaction._id);
+
     return res.json({
       success: true,
-      message: "Wallet recharged successfully",
-      balance: wallet.balance,
+      message: "Payment initiated - waiting for webhook confirmation",
+      transactionId: transaction._id,
+      status: "pending",
     });
   } catch (err) {
-    // دعم رسائل الخطأ من ميسر
-    if (err.response && err.response.data) {
-      console.error(err.response.data);
-      return res.status(400).json({ error: err.response.data });
-    }
-    console.error(err.message);
+    console.error("❌ RechargeWallet Error:", err.message);
     res.status(400).json({ error: err.message });
   }
 });
