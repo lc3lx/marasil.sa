@@ -87,18 +87,19 @@ exports.RechargeWallet = asyncHandler(async (req, res) => {
       payment.amount !== amount * 100 ||
       payment.currency !== "SAR"
     ) {
+      console.log("tm 4");
       return res.status(400).json({
         error: "Payment not verified or invalid amount/currency",
         payment,
       });
     }
-    console.log("tm 4");
+    console.log("tm 5");
     // شحن الرصيد وتسجيل العملية
     const wallet = await Wallet.findOne({ customerId });
     if (!wallet) {
       throw new Error("Wallet not found");
     }
-    console.log("tm 5");
+    console.log("tm 6");
 
     wallet.balance += amount; // المبلغ بالفعل بالريال من الفرونت
     await wallet.save();
@@ -113,11 +114,11 @@ exports.RechargeWallet = asyncHandler(async (req, res) => {
       moyasarPaymentId: payment.id,
       walletId: wallet._id,
     });
-    console.log("tm 6");
+    console.log("tm 7");
     await Wallet.findByIdAndUpdate(wallet._id, {
       $push: { transactions: transaction._id },
     });
-    console.log("tm 7");
+    console.log("tm 8");
     return res.json({
       success: true,
       message: "Wallet recharged successfully",
