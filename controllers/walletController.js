@@ -59,9 +59,11 @@ exports.RechargeWallet = asyncHandler(async (req, res) => {
     if (!amount || amount < 0) {
       return res.status(400).json({ error: "Invalid amount" });
     }
+    console.log("tm 1");
     if (!id) {
       return res.status(400).json({ error: "Missing id" });
     }
+    console.log("tm 2");
 
     // التحقق من الدفع عبر API ميسر
     const authHeader =
@@ -76,7 +78,7 @@ exports.RechargeWallet = asyncHandler(async (req, res) => {
         },
       }
     );
-
+    console.log("tm 3");
     const payment = response.data;
 
     // تحقق من حالة الدفع والمبلغ والعملة
@@ -90,12 +92,13 @@ exports.RechargeWallet = asyncHandler(async (req, res) => {
         payment,
       });
     }
-
+    console.log("tm 4");
     // شحن الرصيد وتسجيل العملية
     const wallet = await Wallet.findOne({ customerId });
     if (!wallet) {
       throw new Error("Wallet not found");
     }
+    console.log("tm 5");
 
     wallet.balance += amount; // المبلغ بالفعل بالريال من الفرونت
     await wallet.save();
@@ -110,11 +113,11 @@ exports.RechargeWallet = asyncHandler(async (req, res) => {
       moyasarPaymentId: payment.id,
       walletId: wallet._id,
     });
-
+    console.log("tm 6");
     await Wallet.findByIdAndUpdate(wallet._id, {
       $push: { transactions: transaction._id },
     });
-
+    console.log("tm 7");
     return res.json({
       success: true,
       message: "Wallet recharged successfully",
