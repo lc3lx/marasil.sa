@@ -69,7 +69,7 @@ exports.shipmentdata = (
     shipping_price_currency: "SAR",
 
     // معلومات إضافية
-    original_tracking_number: order.tracking_number || "",
+    original_tracking_number: order._id || "",
 
     // تفاصيل المنتجات
     items:
@@ -78,7 +78,7 @@ exports.shipmentdata = (
         quantity: item.quantity || 1,
         price: parseFloat(item.price) || 0,
         sku: item.sku || "",
-        description: item.description || "",
+        description: order.description || "",
       })) || [],
   };
   console.log(shipmentdata);

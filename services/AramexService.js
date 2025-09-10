@@ -36,7 +36,7 @@ exports.formatParty = (partyData) => {
 
     Reference1: partyData._id || "Ref1",
     PartyAddress: {
-      Line1: partyData.city+partyData.country,
+      Line1: partyData.city + partyData.country,
       Line2: partyData.addressLine2 || "",
       Line3: partyData.addressLine3 || "",
       City: partyData.city,
@@ -118,7 +118,7 @@ exports.shipmentData = (
         Reference2: order.order_number || "",
         Reference3: order.platform || "",
         Shipper: exports.formatParty(shipperAddress),
-        Consignee: exports.formatParty(order.customer ),
+        Consignee: exports.formatParty(order.customer),
         ShippingDateTime: exports.formatAramexDate(now), // استخدام التنسيق الجديد
         DueDate: exports.formatAramexDate(dueDate), // استخدام التنسيق الجديد
         ThirdParty: {
@@ -161,8 +161,7 @@ exports.shipmentData = (
             Value: weight,
             Unit: "KG",
           },
-          DescriptionOfGoods:
-            orderDescription || order.description || "منتجات عامة",
+          DescriptionOfGoods: order.description || "منتجات عامة",
           GoodsOriginCountry: "SA",
           NumberOfPieces: 6,
           ProductGroup: "DOM",
@@ -218,7 +217,7 @@ exports.deliveryData = (deliveryData) => {
     ),
     address: exports.formatAddress(deliveryData.address),
     contactName: deliveryData.full_name || "customer marasil ",
-    companyName: deliveryData.full_name|| "Marasil",
+    companyName: deliveryData.full_name || "Marasil",
     phone: deliveryData.mobile || "0000000000",
     mobile: deliveryData.mobile || "0000000000",
     email: deliveryData.email || "test@example.com",
