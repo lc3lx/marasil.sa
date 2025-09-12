@@ -20,9 +20,6 @@ const customerSchema = new mongoose.Schema(
       unique: [true, "email is unique"],
       lowercase: true,
     },
-    phone: {
-      type: String,
-    },
 
     brand_color: {
       type: String,

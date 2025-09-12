@@ -70,7 +70,7 @@ exports.getCompanyInfo = asyncHandler(async (req, res, next) => {
     brand_email: customer.brand_email,
     brand_website: customer.brand_website,
     commercial_registration_number: customer.commercial_registration_number,
-    additional_info: customer.additional_info
+    additional_info: customer.additional_info,
   };
   res.status(200).json({ company: info });
 });
@@ -142,7 +142,7 @@ exports.updateLoggedCustomerPassword = asyncHandler(async (req, res, next) => {
       new: true,
     }
   );
-  const token = createToken(customer._id);  // gernerate token
+  const token = createToken(customer._id); // gernerate token
 
   res.status(200).json({ data: customer, token });
 });
