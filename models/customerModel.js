@@ -6,7 +6,6 @@ const customerSchema = new mongoose.Schema(
     lastName: { type: String },
     phone: {
       type: String,
-      required: true,
     },
 
     slug: {
