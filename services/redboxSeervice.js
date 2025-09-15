@@ -78,7 +78,7 @@ exports.shipmentdata = (
         quantity: item.quantity || 1,
         price: parseFloat(item.price) || 0,
         sku: item.sku || "",
-        description: order.description || "",
+        description: orderDescription || "",
       })) || [],
   };
   console.log(shipmentdata);

@@ -62,8 +62,15 @@ THIS MOTHOD FOR CREATE SHIPMENT
 */
 module.exports.createShapment = asyncHandler(async (req, res, next) => {
   try {
-    const { company, order, shipperAddress, weight, Parcels, shapmentingType } =
-      req.body;
+    const {
+      company,
+      order,
+      orderDescription,
+      shipperAddress,
+      weight,
+      Parcels,
+      shapmentingType,
+    } = req.body;
 
     // 1. التحقق من البيانات المطلوبة
     if (
@@ -218,6 +225,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           shipperAddress,
           weight,
           Parcels,
+          orderDescription,
           shippingCompany.code
         );
         trackingInfo = await smsaExxpress.createShipment(shipmentData);
@@ -225,6 +233,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
       case "redbox":
         shipmentData = redboxServers.shipmentdata(
           orderToUse,
+          orderDescription,
           shipperAddress,
           weight,
           Parcels
@@ -248,6 +257,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
         shipmentData = aramxServers.shipmentData(
           orderToUse,
           shipperAddress,
+          orderDescription,
           weight,
           Parcels
         );
@@ -268,6 +278,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           shipmentData = await ominServers.shipmentData(
             orderToUse,
             shipperAddress,
+            orderDescription,
             weight,
             Parcels
           );

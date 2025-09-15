@@ -27,7 +27,7 @@ exports.Shapmentdata = (
     CODAmount: order.total.amount,
     ConsigneeAddress: exports.formatAddress(order.customer),
     ShipperAddress: exports.formatAddress(shipperAddress),
-    ContentDescription: order.description || "",
+    ContentDescription: orderDescription,
     DeclaredValue: Math.max(parseFloat(order.total.amount || 0.1), 0.1),
     DutyPaid: false,
     OrderNumber: String(order._id),

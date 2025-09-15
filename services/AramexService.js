@@ -161,7 +161,7 @@ exports.shipmentData = (
             Value: weight,
             Unit: "KG",
           },
-          DescriptionOfGoods: order.description || "منتجات عامة",
+          DescriptionOfGoods: orderDescription,
           GoodsOriginCountry: "SA",
           NumberOfPieces: 6,
           ProductGroup: "DOM",
