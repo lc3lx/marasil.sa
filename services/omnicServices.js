@@ -82,7 +82,7 @@ exports.shipmentData = async (
               height: parseInt(dimension.high || 0),
               length: parseInt(dimension.length || 230),
               marking: `cnivun-${Date.now()}`,
-              name: order.items?.[0]?.name || "منتج عام",
+              name: orderDescription,
               provider_inn: order.provider?.inn || "74162944192",
               provider_name: order.provider?.name || "TechnoPolis",
               quantity: parseInt(order.items?.[0]?.quantity || 1),
