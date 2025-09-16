@@ -24,7 +24,7 @@ exports.Shapmentdata = (
 ) => {
   console.log(order.total.amount);
   const shipmentData = {
-    CODAmount: order.payment_method === "COD" ? order.total.amount : 0,
+    CODAmount: order.paymentMethod === "COD" ? order.total.amount : 0,
     ConsigneeAddress: exports.formatAddress(order.customer),
     ShipperAddress: exports.formatAddress(shipperAddress),
     ContentDescription: orderDescription,
