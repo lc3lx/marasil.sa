@@ -258,9 +258,8 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           orderToUse,
           shipperAddress,
           weight,
-          orderDescription,
-
-          Parcels
+          Parcels,
+          orderDescription
         );
         try {
           trackingInfo = await aramex.createShipment(shipmentData);
