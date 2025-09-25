@@ -257,8 +257,9 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
         shipmentData = aramxServers.shipmentData(
           orderToUse,
           shipperAddress,
-          orderDescription,
           weight,
+          orderDescription,
+
           Parcels
         );
         try {
