@@ -22,9 +22,15 @@ exports.Shapmentdata = (
   serviceCode,
   retailID
 ) => {
-  console.log(order.total.amount);
+  console.log("Order total amount:", order.total.amount);
+  console.log("Payment method (paymentMethod):", order.paymentMethod);
+  console.log("Payment method (payment_method):", order.payment_method);
+
+  const isCOD = order.paymentMethod === "COD" || order.payment_method === "COD";
+  console.log("Is COD payment:", isCOD);
+
   const shipmentData = {
-    CODAmount: order.paymentMethod === "COD" ? order.total.amount : 0,
+    CODAmount: isCOD ? order.total.amount : 0,
     ConsigneeAddress: exports.formatAddress(order.customer),
     ShipperAddress: exports.formatAddress(shipperAddress),
     ContentDescription: orderDescription,
@@ -41,6 +47,8 @@ exports.Shapmentdata = (
     Weight: Weight,
     WeightUnit: "KG",
   };
+
+  console.log("Final CODAmount:", shipmentData.CODAmount);
   return shipmentData;
 };
 
