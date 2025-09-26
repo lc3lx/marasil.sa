@@ -211,9 +211,26 @@ exports.updateLoggedCustomerdataValidator = [
   check("company_name_en").optional(),
   check("brand_email")
     .optional()
-    .isEmail()
+    .custom((value) => {
+      // السماح بالقيم الفارغة أو null أو undefined
+      if (!value || value === "" || value === null || value === undefined) {
+        return true;
+      }
+      // التحقق من صحة الإيميل فقط إذا كان له قيمة
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    })
     .withMessage("Invalid brand email address"),
-  check("brand_website").optional().isURL().withMessage("Invalid website URL"),
+  check("brand_website")
+    .optional()
+    .custom((value) => {
+      // السماح بالقيم الفارغة أو null أو undefined
+      if (!value || value === "" || value === null || value === undefined) {
+        return true;
+      }
+      // التحقق من صحة الرابط فقط إذا كان له قيمة
+      return /^https?:\/\/.+/.test(value);
+    })
+    .withMessage("Invalid website URL"),
   check("commercial_registration_number").optional(),
   check("tax_number").optional(),
   check("additional_info").optional(),
