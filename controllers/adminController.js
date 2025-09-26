@@ -16,7 +16,7 @@ exports.UploadCustomerImage = UploadArrayofImages([
 exports.ResizeImage = asyncHandler(async (req, res, next) => {
   console.log("📁 الملفات المستلمة:", req.files);
   console.log("📝 البيانات المستلمة:", req.body);
-  
+
   if (req.files && req.files.profileImage) {
     const filename = `profileImage-${uuidv4()}-${Date.now()}.jpeg`;
 
@@ -28,7 +28,7 @@ exports.ResizeImage = asyncHandler(async (req, res, next) => {
     req.body.profileImage = filename;
     console.log("✅ تم حفظ صورة البروفيل:", filename);
   }
-  
+
   if (req.files && req.files.brand_logo) {
     const filename = `brand_logo-${uuidv4()}-${Date.now()}.jpeg`;
     await sharp(req.files.brand_logo[0].buffer)
@@ -131,6 +131,22 @@ exports.getLoggedCustomerData = asyncHandler(async (req, res, next) => {
   next();
 });
 
+// دالة مخصصة لـ getMe بدون كلمة المرور
+exports.getMe = asyncHandler(async (req, res, next) => {
+  const customer = await Customer.findById(req.customer._id);
+
+  if (!customer) {
+    return next(new ApiError("العميل غير موجود", 404));
+  }
+
+  // إزالة كلمة المرور من الاستجابة
+  customer.password = undefined;
+
+  res.status(200).json({
+    data: customer,
+  });
+});
+
 // @desc updpatelogged Customer password
 // @route delate /api/Customers/change
 // @acess private/protected
@@ -158,32 +174,37 @@ exports.updateLoggedCustomerPassword = asyncHandler(async (req, res, next) => {
 exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   // إنشاء object للتحديث مع التحقق من وجود القيم
   const updateData = {};
-  
+
   // تحديث البيانات الأساسية
   if (req.body.firstName) updateData.firstName = req.body.firstName;
   if (req.body.lastName) updateData.lastName = req.body.lastName;
   if (req.body.email) updateData.email = req.body.email;
   if (req.body.phone) updateData.phone = req.body.phone;
-  
+
   // تحديث صورة البروفيل (إذا تم رفعها)
   if (req.body.profileImage) {
     updateData.profileImage = req.body.profileImage;
   }
-  
+
   // تحديث شعار الشركة (إذا تم رفعه)
   if (req.body.brand_logo) {
     updateData.brand_logo = req.body.brand_logo;
   }
-  
+
   // تحديث معلومات الشركة
   if (req.body.brand_color) updateData.brand_color = req.body.brand_color;
-  if (req.body.company_name_ar) updateData.company_name_ar = req.body.company_name_ar;
-  if (req.body.company_name_en) updateData.company_name_en = req.body.company_name_en;
+  if (req.body.company_name_ar)
+    updateData.company_name_ar = req.body.company_name_ar;
+  if (req.body.company_name_en)
+    updateData.company_name_en = req.body.company_name_en;
   if (req.body.brand_email) updateData.brand_email = req.body.brand_email;
   if (req.body.brand_website) updateData.brand_website = req.body.brand_website;
-  if (req.body.commercial_registration_number) updateData.commercial_registration_number = req.body.commercial_registration_number;
+  if (req.body.commercial_registration_number)
+    updateData.commercial_registration_number =
+      req.body.commercial_registration_number;
   if (req.body.tax_number) updateData.tax_number = req.body.tax_number;
-  if (req.body.additional_info) updateData.additional_info = req.body.additional_info;
+  if (req.body.additional_info)
+    updateData.additional_info = req.body.additional_info;
 
   console.log("📝 البيانات المرسلة:", req.body);
   console.log("📝 بيانات التحديث:", updateData);
@@ -195,13 +216,16 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
       new: true,
     }
   );
-  
+
   if (!customer) {
     return next(new ApiError("العميل غير موجود", 404));
   }
-  
-  res.status(200).json({ 
+
+  // إزالة كلمة المرور من الاستجابة
+  customer.password = undefined;
+
+  res.status(200).json({
     status: "success",
-    data: customer 
+    data: customer,
   });
 });

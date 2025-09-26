@@ -10,6 +10,7 @@ const {
   UploadCustomerImage,
   ResizeImage,
   getLoggedCustomerData,
+  getMe,
   updateLoggedCustomerPassword,
   updateLoggedCustomerdata,
 } = require("../controllers/adminController");
@@ -32,7 +33,7 @@ router.use(auth.Protect); // apply protect  for all routes (admin and users)
 //router.use(auth.protcetactive); // apply protect active for all routes
 
 // Customers routes
-router.get("/getMe", getLoggedCustomerData, getCustomer);
+router.get("/getMe", getMe);
 router.put(
   "/changeMyPassword",
   changeLoggedCustomerPasswordValidator,
