@@ -36,7 +36,7 @@ exports.formatParty = (partyData) => {
 
     Reference1: partyData._id || "Ref1",
     PartyAddress: {
-      Line1: partyData.city + partyData.country,
+      Line1: partyData.city + partyData.country + (partyData.district || ""),
       Line2: partyData.addressLine2 || "",
       Line3: partyData.addressLine3 || "",
       City: partyData.city,
@@ -49,7 +49,7 @@ exports.formatParty = (partyData) => {
       PhoneNumber1: partyData.mobile,
       PhoneNumber2: partyData.phone2 || "",
       Type: partyData.type || "Business",
-      CellPhone: partyData.phone || "0000000000",
+      CellPhone: partyData.mobile || "0000000000",
       EmailAddress: partyData.email || "test@example.com",
     },
   };

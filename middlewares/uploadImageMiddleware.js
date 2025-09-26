@@ -25,11 +25,19 @@ const multerOptions = () => {
   };
 
   // Create multer instance with the defined storage and filter
-  const upload = multer({ storage: multerStorage, fileFilter: multerFilter });
+  const upload = multer({
+    storage: multerStorage,
+    fileFilter: multerFilter,
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB limit
+      files: 10, // Maximum 10 files
+    },
+  });
 
   return upload;
 };
 
 // Export middleware for uploading a single file
 exports.uploadSingleImage = (fieldName) => multerOptions().single(fieldName);
-exports.UploadArrayofImages = (ArrayofFields)=>multerOptions().fields(ArrayofFields)
+exports.UploadArrayofImages = (ArrayofFields) =>
+  multerOptions().fields(ArrayofFields);

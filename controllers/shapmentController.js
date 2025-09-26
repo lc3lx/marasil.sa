@@ -502,7 +502,12 @@ THIS MOTHOD FOR CANCEL SHIPMENT
 
 */
 // مساعد لمعالجة استرجاع المبلغ لمحفظة الزبون
-const processRefundToWallet = async (customerId, amount, shipmentId) => {
+const processRefundToWallet = async (
+  customerId,
+  amount,
+  shipmentId,
+  trackingNumber
+) => {
   try {
     // 1. البحث عن محفظة الزبون
     let wallet = await Wallet.findOne({ customerId });
@@ -519,12 +524,12 @@ const processRefundToWallet = async (customerId, amount, shipmentId) => {
     // 2. تحديث رصيد المحفظة
     wallet.balance += amount;
 
-    // 3. تسجيل المعاملة
+    // 3. تسجيل المعاملة مع رقم الشحنة
     const transaction = await Transaction.create({
       customerId,
       type: "credit",
       amount,
-      description: `استرداد مبلغ الشحنة الملغاة ${shipmentId}`,
+      description: `استرداد مبلغ الشحنة الملغاة - رقم الشحنة: ${trackingNumber} - معرف الشحنة: ${shipmentId}`,
       status: "completed",
       method: "manual_addition", // استخدام قيمة مسموح بها من enum
       walletId: wallet._id,
@@ -633,12 +638,14 @@ module.exports.cancelShipment = asyncHandler(async (req, res, next) => {
       };
     }
 
-    // 6. استرداد المبلغ إلى محفظة الزبون إذا كانت الدفع مسبقاً
-    if (shipment.paymentMathod === "Prepaid" && shipment.shapmentPrice > 0) {
+    // 6. استرداد المبلغ إلى محفظة الزبون (سواء كانت الدفع مسبقاً أو عند التسليم)
+    const refundAmount = shipment.totalprice || 0;
+    if (refundAmount > 0) {
       const refundResult = await processRefundToWallet(
         shipment.customerId,
-        shipment.shapmentPrice,
-        shipment._id
+        refundAmount,
+        shipment._id,
+        trackingNumber
       );
 
       if (!refundResult.success) {
@@ -647,12 +654,9 @@ module.exports.cancelShipment = asyncHandler(async (req, res, next) => {
       }
     }
 
-    // 7. تحديث حالة الشحنة في قاعدة البيانات وحذفها
+    // 7. تحديث حالة الشحنة إلى "ملغاة" بدلاً من حذفها
     shipment.shipmentstates = "Canceled";
     await shipment.save();
-
-    // حذف الشحنة من قاعدة البيانات
-    await Shapment.deleteOne({ _id: shipment._id });
 
     // إرسال بريد إلكتروني عند إلغاء شحنة أرامكس أو سمسا
     if (["aramex"].includes(company.toLowerCase())) {
@@ -676,8 +680,12 @@ module.exports.cancelShipment = asyncHandler(async (req, res, next) => {
       message: "تم إلغاء الشحنة بنجاح واسترداد المبلغ إلى محفظة الزبون",
       data: {
         cancellation: cancellationResult,
-        refunded:
-          shipment.paymentMathod === "Prepaid" ? shipment.shapmentPrice : 0,
+        shipment: {
+          id: shipment._id,
+          trackingNumber: trackingNumber,
+          status: "Canceled",
+        },
+        refunded: refundAmount,
       },
     });
   } catch (error) {

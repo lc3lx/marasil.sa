@@ -59,15 +59,15 @@ exports.shipmentData = async (
       length: dimension.length || 10,
       location_from: {
         city: shipperAddress.city,
-        street: shipperAddress.street || " ksa",
-        address: ` ${shipperAddress.city}, ${shipperAddress.country}`,
+        street: shipperAddress.district || " ksa",
+        address: shipperAddress.address,
         country_code: "SA",
       },
 
       location_to: {
         city: order.customer.city,
         street: order.customer.street || "ksa ",
-        address: ` ${order.customer.city}, ${order.customer.country}`,
+        address: order.customer.address,
         country_code: "SA",
       },
 

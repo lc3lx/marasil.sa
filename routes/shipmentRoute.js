@@ -13,7 +13,7 @@ const {
   searchShipments,
   getShipmentStatistics,
   acountingShipmentPrice,
-  printShipmentInvoice
+  printShipmentInvoice,
 } = require("../controllers/shapmentController");
 const auth = require("../controllers/authController");
 const shipmentReturnController = require("../controllers/shipmentReturenController");
@@ -28,8 +28,50 @@ router.get("/my-shipment/:id", auth.Protect, getShipment);
 router.get("/search", auth.Protect, searchShipments);
 
 // Webhook: update shipment status from shipping company
-const { webhookUpdateShipmentStatus } = require("../controllers/shapmentController");
+const {
+  webhookUpdateShipmentStatus,
+} = require("../controllers/shapmentController");
 router.post("/webhook-update-shipment-status", webhookUpdateShipmentStatus);
+
+// SMSA specific webhook
+const {
+  smsaWebhookHandler,
+  testSMSAWebhook,
+  validateSMSAWebhook,
+} = require("../controllers/smsaWebhookController");
+router.post("/webhook-smsa", smsaWebhookHandler);
+router.post("/webhook-smsa/test", testSMSAWebhook);
+router.post("/webhook-smsa/validate", validateSMSAWebhook);
+
+// RedBox specific webhook
+const {
+  redboxWebhookHandler,
+  testRedBoxWebhook,
+  validateRedBoxWebhook,
+} = require("../controllers/redboxWebhookController");
+router.post("/webhook-redbox", redboxWebhookHandler);
+router.post("/webhook-redbox/test", testRedBoxWebhook);
+router.post("/webhook-redbox/validate", validateRedBoxWebhook);
+
+// OmniLama specific webhook
+const {
+  omnilamaWebhookHandler,
+  testOmniLamaWebhook,
+  validateOmniLamaWebhook,
+} = require("../controllers/omnilamaWebhookController");
+router.post("/webhook-omnilama", omnilamaWebhookHandler);
+router.post("/webhook-omnilama/test", testOmniLamaWebhook);
+router.post("/webhook-omnilama/validate", validateOmniLamaWebhook);
+
+// Aramex specific webhook
+const {
+  aramexWebhookHandler,
+  testAramexWebhook,
+  validateAramexWebhook,
+} = require("../controllers/aramexWebhookController");
+router.post("/webhook-aramex", aramexWebhookHandler);
+router.post("/webhook-aramex/test", testAramexWebhook);
+router.post("/webhook-aramex/validate", validateAramexWebhook);
 
 router.post("/createshipment", auth.Protect, createShapment);
 router.post("/traking", auth.Protect, trackingShipment);
@@ -40,7 +82,10 @@ router.post("/printShipmentInvoice", auth.Protect, printShipmentInvoice);
 // مسارات نظام الاسترجاع (بدون تسجيل دخول)
 router.post("/return/request-otp", shipmentReturnController.requestEmailOTP);
 router.post("/return/verify-otp", shipmentReturnController.verifyEmailOTP);
-router.get("/return/shipments", shipmentReturnController.getShipmentsByReceiver);
+router.get(
+  "/return/shipments",
+  shipmentReturnController.getShipmentsByReceiver
+);
 router.post(
   "/return/create-request",
   shipmentReturnController.createReturnRequest
@@ -81,6 +126,5 @@ router.delete(
   deleteShipment
 );
 router.get("/admin/search", searchShipments);
-
 
 module.exports = router;
