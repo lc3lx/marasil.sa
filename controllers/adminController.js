@@ -14,7 +14,10 @@ exports.UploadCustomerImage = UploadArrayofImages([
 ]);
 
 exports.ResizeImage = asyncHandler(async (req, res, next) => {
-  if (req.files.profileImage) {
+  console.log("📁 الملفات المستلمة:", req.files);
+  console.log("📝 البيانات المستلمة:", req.body);
+  
+  if (req.files && req.files.profileImage) {
     const filename = `profileImage-${uuidv4()}-${Date.now()}.jpeg`;
 
     await sharp(req.files.profileImage[0].buffer)
@@ -23,8 +26,10 @@ exports.ResizeImage = asyncHandler(async (req, res, next) => {
       .jpeg({ quality: 95 })
       .toFile(`uploads/customers/${filename}`);
     req.body.profileImage = filename;
+    console.log("✅ تم حفظ صورة البروفيل:", filename);
   }
-  if (req.files.brand_logo) {
+  
+  if (req.files && req.files.brand_logo) {
     const filename = `brand_logo-${uuidv4()}-${Date.now()}.jpeg`;
     await sharp(req.files.brand_logo[0].buffer)
       .resize(200, 200)
@@ -33,8 +38,8 @@ exports.ResizeImage = asyncHandler(async (req, res, next) => {
       .toFile(`uploads/Logo/${filename}`);
 
     req.body.brand_logo = filename;
+    console.log("✅ تم حفظ شعار الشركة:", filename);
   }
-  // console.log(req.files);
 
   next();
 });
@@ -151,27 +156,52 @@ exports.updateLoggedCustomerPassword = asyncHandler(async (req, res, next) => {
 // @route delate /api/customer/Updateme
 // @acess private/protected
 exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
+  // إنشاء object للتحديث مع التحقق من وجود القيم
+  const updateData = {};
+  
+  // تحديث البيانات الأساسية
+  if (req.body.firstName) updateData.firstName = req.body.firstName;
+  if (req.body.lastName) updateData.lastName = req.body.lastName;
+  if (req.body.email) updateData.email = req.body.email;
+  if (req.body.phone) updateData.phone = req.body.phone;
+  
+  // تحديث صورة البروفيل (إذا تم رفعها)
+  if (req.body.profileImage) {
+    updateData.profileImage = req.body.profileImage;
+  }
+  
+  // تحديث شعار الشركة (إذا تم رفعه)
+  if (req.body.brand_logo) {
+    updateData.brand_logo = req.body.brand_logo;
+  }
+  
+  // تحديث معلومات الشركة
+  if (req.body.brand_color) updateData.brand_color = req.body.brand_color;
+  if (req.body.company_name_ar) updateData.company_name_ar = req.body.company_name_ar;
+  if (req.body.company_name_en) updateData.company_name_en = req.body.company_name_en;
+  if (req.body.brand_email) updateData.brand_email = req.body.brand_email;
+  if (req.body.brand_website) updateData.brand_website = req.body.brand_website;
+  if (req.body.commercial_registration_number) updateData.commercial_registration_number = req.body.commercial_registration_number;
+  if (req.body.tax_number) updateData.tax_number = req.body.tax_number;
+  if (req.body.additional_info) updateData.additional_info = req.body.additional_info;
+
+  console.log("📝 البيانات المرسلة:", req.body);
+  console.log("📝 بيانات التحديث:", updateData);
+
   const customer = await Customer.findByIdAndUpdate(
     req.customer._id,
-    {
-      firstName: req.body.firstName,
-      lastName: req.body.lastName,
-      email: req.body.email,
-      profileImage: req.body.profileImage,
-      phone: req.body.phone,
-      brand_color: req.body.brand_color,
-      brand_logo: req.body.brand_logo,
-      company_name_ar: req.body.company_name_ar,
-      company_name_en: req.body.company_name_en,
-      brand_email: req.body.brand_email,
-      brand_website: req.body.brand_website,
-      commercial_registration_number: req.body.commercial_registration_number,
-      tax_number: req.body.tax_number,
-      additional_info: req.body.additional_info,
-    },
+    updateData,
     {
       new: true,
     }
   );
-  res.status(200).json({ data: customer });
+  
+  if (!customer) {
+    return next(new ApiError("العميل غير موجود", 404));
+  }
+  
+  res.status(200).json({ 
+    status: "success",
+    data: customer 
+  });
 });

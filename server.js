@@ -154,7 +154,7 @@ io.on("connection", (socket) => {
 // Expose io and activeUsers to routes
 app.set("io", io);
 app.set("activeUsers", activeUsers);
-app.use(express.json());
+// تم إزالة express.json() المكرر
 // API Routes
 
 app.post(

@@ -91,16 +91,16 @@ testAramexWebhook();
 
 ## 📊 أنواع الـ Status Codes المدعومة
 
-| Status Code | الوصف | الحالة في النظام |
-|-------------|--------|------------------|
-| `PICKED_UP` | تم الاستلام | `IN_TRANSIT` |
-| `IN_TRANSIT` | في الطريق | `IN_TRANSIT` |
-| `OUT_FOR_DELIVERY` | جاهزة للتسليم | `OUT_FOR_DELIVERY` |
-| `DELIVERED` | تم التسليم | `Delivered` |
-| `FAILED_DELIVERY` | فشل في التسليم | `FAILED_DELIVERY` |
-| `RETURNED` | مرتجعة | `Returned` |
-| `CANCELLED` | ملغاة | `Canceled` |
-| `EXCEPTION` | استثناء | `EXCEPTION` |
+| Status Code        | الوصف          | الحالة في النظام   |
+| ------------------ | -------------- | ------------------ |
+| `PICKED_UP`        | تم الاستلام    | `IN_TRANSIT`       |
+| `IN_TRANSIT`       | في الطريق      | `IN_TRANSIT`       |
+| `OUT_FOR_DELIVERY` | جاهزة للتسليم  | `OUT_FOR_DELIVERY` |
+| `DELIVERED`        | تم التسليم     | `Delivered`        |
+| `FAILED_DELIVERY`  | فشل في التسليم | `FAILED_DELIVERY`  |
+| `RETURNED`         | مرتجعة         | `Returned`         |
+| `CANCELLED`        | ملغاة          | `Canceled`         |
+| `EXCEPTION`        | استثناء        | `EXCEPTION`        |
 
 ## 🔍 معالجة البيانات
 
@@ -332,5 +332,6 @@ app.use(
 4. التواصل مع فريق التطوير
 
 ---
+
 **آخر تحديث:** $(date)
 **الإصدار:** 1.0.0

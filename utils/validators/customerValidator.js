@@ -205,6 +205,18 @@ exports.updateLoggedCustomerdataValidator = [
     ),
   check("phone").optional().isMobilePhone().withMessage("Invalid phone number"),
   check("profileImage").optional(),
+  check("brand_logo").optional(),
+  check("brand_color").optional(),
+  check("company_name_ar").optional(),
+  check("company_name_en").optional(),
+  check("brand_email")
+    .optional()
+    .isEmail()
+    .withMessage("Invalid brand email address"),
+  check("brand_website").optional().isURL().withMessage("Invalid website URL"),
+  check("commercial_registration_number").optional(),
+  check("tax_number").optional(),
+  check("additional_info").optional(),
 
   validatorMiddleware,
 ];
