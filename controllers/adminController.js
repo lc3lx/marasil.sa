@@ -139,6 +139,17 @@ exports.getMe = asyncHandler(async (req, res, next) => {
     return next(new ApiError("العميل غير موجود", 404));
   }
 
+  console.log("🔍 Customer data from database:");
+  console.log("profileImage:", customer.profileImage);
+  console.log("brand_logo:", customer.brand_logo);
+  console.log("All fields:", Object.keys(customer.toObject()));
+
+  // التحقق من الـ raw data من الـ database
+  const rawCustomer = await Customer.findById(req.customer._id).lean();
+  console.log("🔍 Raw customer data from database:");
+  console.log("raw profileImage:", rawCustomer.profileImage);
+  console.log("raw brand_logo:", rawCustomer.brand_logo);
+
   // إزالة كلمة المرور من الاستجابة
   customer.password = undefined;
 
@@ -172,6 +183,8 @@ exports.updateLoggedCustomerPassword = asyncHandler(async (req, res, next) => {
 // @route delate /api/customer/Updateme
 // @acess private/protected
 exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
+  console.log("📝 البيانات المستلمة في updateLoggedCustomerdata:", req.body);
+
   // إنشاء object للتحديث مع التحقق من وجود القيم
   const updateData = {};
 
@@ -184,6 +197,7 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   // تحديث صورة البروفيل (إذا تم رفعها)
   if (req.body.profileImage) {
     updateData.profileImage = req.body.profileImage;
+    console.log("✅ تم العثور على profileImage:", req.body.profileImage);
   }
 
   // تحديث شعار الشركة (إذا تم رفعه)
@@ -209,6 +223,8 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   console.log("📝 البيانات المرسلة:", req.body);
   console.log("📝 بيانات التحديث:", updateData);
 
+  console.log("📝 بيانات التحديث:", updateData);
+
   const customer = await Customer.findByIdAndUpdate(
     req.customer._id,
     updateData,
@@ -220,6 +236,10 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   if (!customer) {
     return next(new ApiError("العميل غير موجود", 404));
   }
+
+  console.log("✅ العميل بعد التحديث:");
+  console.log("profileImage:", customer.profileImage);
+  console.log("brand_logo:", customer.brand_logo);
 
   // إزالة كلمة المرور من الاستجابة
   customer.password = undefined;
