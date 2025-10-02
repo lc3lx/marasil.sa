@@ -8,10 +8,35 @@ const { UploadArrayofImages } = require("../middlewares/uploadImageMiddleware");
 const Customer = require("../models/customerModel");
 const factory = require("./handlersFactory");
 // middleware
-exports.UploadCustomerImage = UploadArrayofImages([
-  { name: "profileImage", maxCount: 1 },
-  { name: "brand_logo", maxCount: 1 },
-]);
+exports.UploadCustomerImage = (req, res, next) => {
+  console.log("🔧 UploadCustomerImage middleware called");
+  console.log("🔧 Content-Type:", req.headers["content-type"]);
+  console.log("🔧 Content-Length:", req.headers["content-length"]);
+
+  // التحقق من أن الـ request يحتوي على multipart data
+  if (
+    !req.headers["content-type"] ||
+    !req.headers["content-type"].includes("multipart/form-data")
+  ) {
+    console.log("❌ Content-Type is not multipart/form-data");
+    return next();
+  }
+
+  const uploadMiddleware = UploadArrayofImages([
+    { name: "profileImage", maxCount: 1 },
+    { name: "brand_logo", maxCount: 1 },
+  ]);
+
+  uploadMiddleware(req, res, (err) => {
+    if (err) {
+      console.error("❌ UploadCustomerImage error:", err);
+      return next(err);
+    }
+    console.log("✅ UploadCustomerImage completed");
+    console.log("🔧 req.files after upload:", req.files);
+    next();
+  });
+};
 
 exports.ResizeImage = asyncHandler(async (req, res, next) => {
   console.log("📁 الملفات المستلمة:", req.files);

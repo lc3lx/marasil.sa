@@ -108,7 +108,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           amount: order.total?.amount || 0,
           currency: order.total?.currency || "SAR",
         },
-        payment_method: order.payment_method || "COD",
+        payment_method: order.paymentMethod || "COD",
         platform: order.platform || "manual",
         store_id: order.store_id || null,
         status: "pending",

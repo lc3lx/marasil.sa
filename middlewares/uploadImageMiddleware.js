@@ -39,5 +39,20 @@ const multerOptions = () => {
 
 // Export middleware for uploading a single file
 exports.uploadSingleImage = (fieldName) => multerOptions().single(fieldName);
-exports.UploadArrayofImages = (ArrayofFields) =>
-  multerOptions().fields(ArrayofFields);
+exports.UploadArrayofImages = (ArrayofFields) => {
+  console.log("🔧 UploadArrayofImages called with fields:", ArrayofFields);
+  const upload = multerOptions().fields(ArrayofFields);
+  return (req, res, next) => {
+    console.log("🔧 Multer middleware called");
+    console.log("🔧 Content-Type:", req.headers["content-type"]);
+    upload(req, res, (err) => {
+      if (err) {
+        console.error("❌ Multer error:", err);
+        return next(err);
+      }
+      console.log("✅ Multer completed");
+      console.log("🔧 req.files:", req.files);
+      next();
+    });
+  };
+};
