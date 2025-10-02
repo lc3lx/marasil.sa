@@ -70,6 +70,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
       weight,
       Parcels,
       shapmentingType,
+      dimension,
     } = req.body;
 
     // 1. التحقق من البيانات المطلوبة
@@ -273,14 +274,16 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           );
         }
         break;
+
       case "omniclama":
         try {
           shipmentData = await ominServers.shipmentData(
             orderToUse,
             shipperAddress,
-            orderDescription,
             weight,
-            Parcels
+            Parcels,
+            orderDescription,
+            dimension
           );
           trackingInfo = await omin.createShipment(shipmentData);
           // استخدام order_uid كرقم تتبع إذا كان متوفراً
