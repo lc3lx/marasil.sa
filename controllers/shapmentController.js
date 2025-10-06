@@ -97,12 +97,12 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
     if (!order._id) {
       newOrder = new Order({
         customer: {
-          full_name: order.customer?.full_name || "اسم العميل",
-          email: order.customer?.email || `${Date.now()}@example.com`,
-          mobile: order.customer?.mobile || "0500000000",
-          address: order.customer?.address || "عنوان العميل",
-          country: order.customer?.country || "السعودية",
-          city: order.customer?.city || "الرياض",
+          full_name: order.customer?.full_name,
+          email: order.customer?.email,
+          mobile: order.customer?.mobile,
+          address: order.customer?.address,
+          country: order.customer?.country,
+          city: order.customer?.city,
           district: order.customer?.district || "حي الرياض",
         },
         total: {

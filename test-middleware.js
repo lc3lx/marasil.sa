@@ -33,3 +33,5 @@ const mockNext = (err) => {
 
 console.log("🔧 اختبار الـ middleware...");
 uploadMiddleware(mockReq, mockRes, mockNext);
+
+

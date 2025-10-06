@@ -26,7 +26,7 @@ exports.shipmentdata = (
     cod_currency: "SAR",
     customer_name: order.customer?.full_name,
     customer_phone: order.customer?.mobile,
-    customer_address: order.customer?.city,
+    customer_address: order.customer?.address,
 
     // البيانات الاختيارية
     customer_address_coordinates: order.customer?.coordinates
@@ -59,10 +59,12 @@ exports.shipmentdata = (
     point_id: shipperAddress.point_id || "",
 
     // معلومات المرسل
-    sender_address: `${shipperAddress.city}, ${shipperAddress.country}`,
+    sender_address: shipperAddress.address,
     sender_email: shipperAddress.email,
     sender_name: shipperAddress.full_name,
     sender_phone: shipperAddress.mobile,
+    sender_country: shipperAddress.country,
+    sender_city: shipperAddress.city,
 
     // معلومات الشحن
     shipping_price: parseFloat(order.shipping_cost) || 0,

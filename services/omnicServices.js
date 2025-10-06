@@ -59,15 +59,15 @@ exports.shipmentData = async (
       length: dimension.length || 10,
       location_from: {
         city: shipperAddress.city,
-        street: shipperAddress.district || " ksa",
+        region: shipperAddress.city,
         address: shipperAddress.address,
         country_code: "SA",
       },
 
       location_to: {
         city: order.customer.city,
-        street: order.customer.street || "ksa ",
         address: order.customer.address,
+        region: order.customer.city,
         country_code: "SA",
       },
 
@@ -90,7 +90,7 @@ exports.shipmentData = async (
               width: parseInt(dimension.width || 130),
             },
           ],
-          barcode: `[BCD]${shipmentNumber}_01`,
+          barcode: `${shipmentNumber}`,
           height: parseInt(dimension.high || 0),
           length: parseInt(dimension.length || 230),
           number: `${shipmentNumber}_01`,
@@ -99,11 +99,11 @@ exports.shipmentData = async (
         },
       ],
       receiver: {
-        company_name: order.customer.full_name || "",
-        company_reg_number: order.customer.mobile || "",
-        email: order.customer.email || "",
-        name: order.customer.full_name || "",
-        phone: `+966${order.customer.mobile}` || "",
+        company_name: order.customer.full_name,
+        company_reg_number: order.customer.mobile,
+        email: order.customer.email,
+        name: order.customer.full_name,
+        phone: `+966${order.customer.mobile}`,
       },
       weight: Math.ceil(weight),
       width: dimension.width || 10,

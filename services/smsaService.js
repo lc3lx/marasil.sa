@@ -8,8 +8,9 @@ exports.formatAddress = (address) => {
     ContactName: address.full_name, // بين 5 و150 حرف
     ContactPhoneNumber: address.mobile, // رقم الهاتف
     Country: address.country, // رمز الدولة
-    City: address.city, // اسم المدينة
-    AddressLine1: address.address || "غير محدد",
+    City: address.city,
+    District: address.address, // اسم المدينة
+    AddressLine1: address.address,
   };
 };
 
