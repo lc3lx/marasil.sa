@@ -94,7 +94,7 @@ exports.shipmentData = async (
           height: parseInt(dimension.high || 0),
           length: parseInt(dimension.length || 230),
           number: `${shipmentNumber}_01`,
-          weight: Math.ceil(weight),
+          weight: weight,
           width: parseInt(dimension.width || 130),
         },
       ],
@@ -105,7 +105,7 @@ exports.shipmentData = async (
         name: order.customer.full_name,
         phone: `+966${order.customer.mobile}`,
       },
-      weight: Math.ceil(weight),
+      weight: weight,
       width: dimension.width || 10,
     };
 

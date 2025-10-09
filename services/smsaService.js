@@ -9,8 +9,8 @@ exports.formatAddress = (address) => {
     ContactPhoneNumber: address.mobile, // رقم الهاتف
     Country: address.country, // رمز الدولة
     City: address.city,
-    District: address.address, // اسم المدينة
     AddressLine1: address.address,
+    District: address.address, // اسم المدينة
   };
 };
 
@@ -33,6 +33,7 @@ exports.Shapmentdata = (
   const shipmentData = {
     CODAmount: isCOD ? order.total.amount : 0,
     ConsigneeAddress: exports.formatAddress(order.customer),
+
     ShipperAddress: exports.formatAddress(shipperAddress),
     ContentDescription: orderDescription,
     DeclaredValue: Math.max(parseFloat(order.total.amount || 0.1), 0.1),
@@ -48,8 +49,8 @@ exports.Shapmentdata = (
     Weight: Weight,
     WeightUnit: "KG",
   };
-
-  console.log("Final CODAmount:", shipmentData.CODAmount);
+  console.log("Formatted ConsigneeAddress:", shipmentData.ConsigneeAddress),
+    console.log("Final CODAmount:", shipmentData.CODAmount);
   return shipmentData;
 };
 
