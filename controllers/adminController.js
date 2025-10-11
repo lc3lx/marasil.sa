@@ -19,7 +19,10 @@ exports.UploadCustomerImage = (req, res, next) => {
     !req.headers["content-type"].includes("multipart/form-data")
   ) {
     console.log("❌ Content-Type is not multipart/form-data");
-    return next();
+    return res.status(400).json({
+      status: "error",
+      message: "Content-Type must be multipart/form-data",
+    });
   }
 
   const uploadMiddleware = UploadArrayofImages([
@@ -30,7 +33,10 @@ exports.UploadCustomerImage = (req, res, next) => {
   uploadMiddleware(req, res, (err) => {
     if (err) {
       console.error("❌ UploadCustomerImage error:", err);
-      return next(err);
+      return res.status(400).json({
+        status: "error",
+        message: "فشل في رفع الملف: " + err.message,
+      });
     }
     console.log("✅ UploadCustomerImage completed");
     console.log("🔧 req.files after upload:", req.files);
@@ -42,31 +48,39 @@ exports.ResizeImage = asyncHandler(async (req, res, next) => {
   console.log("📁 الملفات المستلمة:", req.files);
   console.log("📝 البيانات المستلمة:", req.body);
 
-  if (req.files && req.files.profileImage) {
-    const filename = `profileImage-${uuidv4()}-${Date.now()}.jpeg`;
+  try {
+    if (req.files && req.files.profileImage) {
+      const filename = `profileImage-${uuidv4()}-${Date.now()}.jpeg`;
 
-    await sharp(req.files.profileImage[0].buffer)
-      .resize(200, 200)
-      .toFormat("jpeg")
-      .jpeg({ quality: 95 })
-      .toFile(`uploads/customers/${filename}`);
-    req.body.profileImage = filename;
-    console.log("✅ تم حفظ صورة البروفيل:", filename);
+      await sharp(req.files.profileImage[0].buffer)
+        .resize(200, 200)
+        .toFormat("jpeg")
+        .jpeg({ quality: 95 })
+        .toFile(`uploads/customers/${filename}`);
+      req.body.profileImage = filename;
+      console.log("✅ تم حفظ صورة البروفيل:", filename);
+    }
+
+    if (req.files && req.files.brand_logo) {
+      const filename = `brand_logo-${uuidv4()}-${Date.now()}.jpeg`;
+      await sharp(req.files.brand_logo[0].buffer)
+        .resize(200, 200)
+        .toFormat("jpeg")
+        .jpeg({ quality: 95 })
+        .toFile(`uploads/Logo/${filename}`);
+
+      req.body.brand_logo = filename;
+      console.log("✅ تم حفظ شعار الشركة:", filename);
+    }
+
+    next();
+  } catch (error) {
+    console.error("❌ خطأ في معالجة الصورة:", error);
+    return res.status(400).json({
+      status: "error",
+      message: "فشل في معالجة الصورة: " + error.message,
+    });
   }
-
-  if (req.files && req.files.brand_logo) {
-    const filename = `brand_logo-${uuidv4()}-${Date.now()}.jpeg`;
-    await sharp(req.files.brand_logo[0].buffer)
-      .resize(200, 200)
-      .toFormat("jpeg")
-      .jpeg({ quality: 95 })
-      .toFile(`uploads/Logo/${filename}`);
-
-    req.body.brand_logo = filename;
-    console.log("✅ تم حفظ شعار الشركة:", filename);
-  }
-
-  next();
 });
 // @desc  createCustomer
 // @route post/api/Customers
