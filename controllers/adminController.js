@@ -178,8 +178,17 @@ exports.getMe = asyncHandler(async (req, res, next) => {
   // إزالة كلمة المرور من الاستجابة
   customer.password = undefined;
 
+  // إضافة المسار الكامل للصور
+  const customerData = customer.toObject();
+  if (customerData.profileImage) {
+    customerData.profileImage = `/uploads/customers/${customerData.profileImage}`;
+  }
+  if (customerData.brand_logo) {
+    customerData.brand_logo = `/uploads/Logo/${customerData.brand_logo}`;
+  }
+
   res.status(200).json({
-    data: customer,
+    data: customerData,
   });
 });
 
@@ -269,8 +278,17 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   // إزالة كلمة المرور من الاستجابة
   customer.password = undefined;
 
+  // إضافة المسار الكامل للصور
+  const customerData = customer.toObject();
+  if (customerData.profileImage) {
+    customerData.profileImage = `/uploads/customers/${customerData.profileImage}`;
+  }
+  if (customerData.brand_logo) {
+    customerData.brand_logo = `/uploads/Logo/${customerData.brand_logo}`;
+  }
+
   res.status(200).json({
     status: "success",
-    data: customer,
+    data: customerData,
   });
 });

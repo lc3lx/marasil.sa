@@ -19,6 +19,7 @@ exports.formatAddress = (address) => {
     Line2: address.addressLine2 || "",
     Line3: address.addressLine3 || "",
     City: address.city,
+
     PostCode: address.postCode || "",
     CountryCode: address.country ? address.country.toUpperCase() : "SA",
   };
