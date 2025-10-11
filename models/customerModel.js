@@ -92,22 +92,8 @@ customerSchema.pre("save", async function (next) {
   next();
 });
 
-const SetImageUrl = (doc) => {
-  if (doc.profileImage) {
-    doc.profileImage = `${process.env.BASE_URL}/customers/${doc.profileImage}`;
-  }
-  if (doc.brand_logo) {
-    doc.brand_logo = `${process.env.BASE_URL}/Logo/${doc.brand_logo}`;
-  }
-};
-
-customerSchema.post("init", function (doc) {
-  SetImageUrl(doc);
-});
-
-customerSchema.post("save", (doc) => {
-  SetImageUrl(doc);
-});
+// ملاحظة: تم إزالة SetImageUrl hooks لأن المسارات تُضاف في الـ Controller
+// هذا يمنع تكرار المسارات ويعطي تحكم أفضل
 
 const customer = mongoose.model("Customer", customerSchema);
 

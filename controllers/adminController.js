@@ -8,85 +8,61 @@ const { UploadArrayofImages } = require("../middlewares/uploadImageMiddleware");
 const Customer = require("../models/customerModel");
 const factory = require("./handlersFactory");
 // middleware
-exports.UploadCustomerImage = (req, res, next) => {
-  console.log("🔧 UploadCustomerImage middleware called");
-  console.log("🔧 Content-Type:", req.headers["content-type"]);
-  console.log("🔧 Content-Length:", req.headers["content-length"]);
-
-  // التحقق من أن الـ request يحتوي على multipart data
-  if (
-    !req.headers["content-type"] ||
-    !req.headers["content-type"].includes("multipart/form-data")
-  ) {
-    console.log("❌ Content-Type is not multipart/form-data");
-    return res.status(400).json({
-      status: "error",
-      message: "Content-Type must be multipart/form-data",
-    });
-  }
-
-  const uploadMiddleware = UploadArrayofImages([
-    { name: "profileImage", maxCount: 1 },
-    { name: "brand_logo", maxCount: 1 },
-  ]);
-
-  uploadMiddleware(req, res, (err) => {
-    if (err) {
-      console.error("❌ UploadCustomerImage error:", err);
-      console.error("❌ Error details:", {
-        message: err.message,
-        code: err.code,
-        field: err.field,
-        storageErrors: err.storageErrors,
-      });
-      return res.status(400).json({
-        status: "error",
-        message: "فشل في رفع الملف: " + err.message,
-        details: {
-          code: err.code,
-          field: err.field,
-        },
-      });
-    }
-    console.log("✅ UploadCustomerImage completed");
-    console.log("🔧 req.files after upload:", req.files);
-    next();
-  });
-};
+exports.UploadCustomerImage = UploadArrayofImages([
+  { name: "profileImage", maxCount: 1 },
+  { name: "brand_logo", maxCount: 1 },
+]);
 
 exports.ResizeImage = asyncHandler(async (req, res, next) => {
-  console.log("📁 الملفات المستلمة:", req.files);
-  console.log("📝 البيانات المستلمة:", req.body);
+  console.log("\n========== ResizeImage Middleware ==========");
+  console.log("📁 req.files:", req.files);
+  console.log("📝 req.body:", req.body);
   console.log("🔧 req.files type:", typeof req.files);
-  console.log(
-    "🔧 req.files keys:",
-    req.files ? Object.keys(req.files) : "no files"
-  );
+  console.log("🔧 req.files keys:", req.files ? Object.keys(req.files) : "no files");
+  console.log("🔧 Content-Type:", req.headers["content-type"]);
+  
+  // طباعة تفاصيل req.files بالكامل
+  if (req.files) {
+    console.log("🔧 Full req.files object:", JSON.stringify(req.files, null, 2));
+  }
 
   try {
     if (req.files && req.files.profileImage) {
-      console.log("🔧 profileImage found:", req.files.profileImage);
+      console.log("✅ profileImage found in req.files");
+      console.log("🔧 profileImage array:", req.files.profileImage);
       console.log("🔧 profileImage length:", req.files.profileImage.length);
-      console.log("🔧 profileImage[0]:", req.files.profileImage[0]);
-      console.log(
-        "🔧 profileImage[0].buffer:",
-        req.files.profileImage[0]?.buffer ? "exists" : "missing"
-      );
+      
+      if (req.files.profileImage[0]) {
+        console.log("🔧 profileImage[0] details:", {
+          fieldname: req.files.profileImage[0].fieldname,
+          originalname: req.files.profileImage[0].originalname,
+          encoding: req.files.profileImage[0].encoding,
+          mimetype: req.files.profileImage[0].mimetype,
+          size: req.files.profileImage[0].size,
+          buffer: req.files.profileImage[0].buffer ? `Buffer(${req.files.profileImage[0].buffer.length} bytes)` : "missing",
+        });
 
-      const filename = `profileImage-${uuidv4()}-${Date.now()}.jpeg`;
+        const filename = `profileImage-${uuidv4()}-${Date.now()}.jpeg`;
 
-      await sharp(req.files.profileImage[0].buffer)
-        .resize(200, 200)
-        .toFormat("jpeg")
-        .jpeg({ quality: 95 })
-        .toFile(`uploads/customers/${filename}`);
-      req.body.profileImage = filename;
-      console.log("✅ تم حفظ صورة البروفيل:", filename);
+        await sharp(req.files.profileImage[0].buffer)
+          .resize(200, 200)
+          .toFormat("jpeg")
+          .jpeg({ quality: 95 })
+          .toFile(`uploads/customers/${filename}`);
+        
+        req.body.profileImage = filename;
+        console.log("✅ تم حفظ صورة البروفيل:", filename);
+        console.log("✅ req.body.profileImage:", req.body.profileImage);
+      } else {
+        console.log("❌ req.files.profileImage[0] is undefined");
+      }
     } else {
       console.log("❌ لا توجد صورة بروفيل في req.files");
+      console.log("❌ req.files:", req.files);
     }
 
     if (req.files && req.files.brand_logo) {
+      console.log("✅ brand_logo found in req.files");
       const filename = `brand_logo-${uuidv4()}-${Date.now()}.jpeg`;
       await sharp(req.files.brand_logo[0].buffer)
         .resize(200, 200)
@@ -98,6 +74,7 @@ exports.ResizeImage = asyncHandler(async (req, res, next) => {
       console.log("✅ تم حفظ شعار الشركة:", filename);
     }
 
+    console.log("========== End ResizeImage Middleware ==========\n");
     next();
   } catch (error) {
     console.error("❌ خطأ في معالجة الصورة:", error);
@@ -206,9 +183,11 @@ exports.getLoggedCustomerData = asyncHandler(async (req, res, next) => {
 
 // دالة مخصصة لـ getMe بدون كلمة المرور
 exports.getMe = asyncHandler(async (req, res, next) => {
+  console.log("\n========== getMe Controller ==========");
   const customer = await Customer.findById(req.customer._id);
 
   if (!customer) {
+    console.log("❌ العميل غير موجود");
     return next(new ApiError("العميل غير موجود", 404));
   }
 
@@ -226,14 +205,34 @@ exports.getMe = asyncHandler(async (req, res, next) => {
   // إزالة كلمة المرور من الاستجابة
   customer.password = undefined;
 
-  // إضافة المسار الكامل للصور
+  // إضافة المسار الكامل للصور فقط إذا لم يكن موجوداً
   const customerData = customer.toObject();
   if (customerData.profileImage) {
-    customerData.profileImage = `/uploads/customers/${customerData.profileImage}`;
+    // التحقق إذا كان المسار يحتوي على /uploads/ أو http بالفعل
+    if (!customerData.profileImage.includes('/uploads/') && 
+        !customerData.profileImage.startsWith('http')) {
+      customerData.profileImage = `/uploads/customers/${customerData.profileImage}`;
+      console.log("✅ تم إضافة المسار الكامل - profileImage:", customerData.profileImage);
+    } else {
+      console.log("✅ المسار موجود بالفعل - profileImage:", customerData.profileImage);
+    }
+  } else {
+    console.log("❌ لا توجد profileImage في الـ database");
   }
   if (customerData.brand_logo) {
-    customerData.brand_logo = `/uploads/Logo/${customerData.brand_logo}`;
+    // التحقق إذا كان المسار يحتوي على /uploads/ أو http بالفعل
+    if (!customerData.brand_logo.includes('/uploads/') && 
+        !customerData.brand_logo.startsWith('http')) {
+      customerData.brand_logo = `/uploads/Logo/${customerData.brand_logo}`;
+      console.log("✅ تم إضافة المسار الكامل - brand_logo:", customerData.brand_logo);
+    } else {
+      console.log("✅ المسار موجود بالفعل - brand_logo:", customerData.brand_logo);
+    }
+  } else {
+    console.log("❌ لا توجد brand_logo في الـ database");
   }
+
+  console.log("========== End getMe Controller ==========\n");
 
   res.status(200).json({
     data: customerData,
@@ -265,7 +264,11 @@ exports.updateLoggedCustomerPassword = asyncHandler(async (req, res, next) => {
 // @route delate /api/customer/Updateme
 // @acess private/protected
 exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
-  console.log("📝 البيانات المستلمة في updateLoggedCustomerdata:", req.body);
+  console.log("\n========== updateLoggedCustomerdata Controller ==========");
+  console.log("📝 req.body:", req.body);
+  console.log("📝 req.files:", req.files);
+  console.log("📝 req.body.profileImage:", req.body.profileImage);
+  console.log("📝 req.body.brand_logo:", req.body.brand_logo);
 
   // إنشاء object للتحديث مع التحقق من وجود القيم
   const updateData = {};
@@ -279,12 +282,17 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   // تحديث صورة البروفيل (إذا تم رفعها)
   if (req.body.profileImage) {
     updateData.profileImage = req.body.profileImage;
-    console.log("✅ تم العثور على profileImage:", req.body.profileImage);
+    console.log("✅ سيتم تحديث profileImage في الـ database:", req.body.profileImage);
+  } else {
+    console.log("❌ لا يوجد profileImage في req.body");
   }
 
   // تحديث شعار الشركة (إذا تم رفعه)
   if (req.body.brand_logo) {
     updateData.brand_logo = req.body.brand_logo;
+    console.log("✅ سيتم تحديث brand_logo في الـ database:", req.body.brand_logo);
+  } else {
+    console.log("❌ لا يوجد brand_logo في req.body");
   }
 
   // تحديث معلومات الشركة
@@ -302,11 +310,9 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   if (req.body.additional_info)
     updateData.additional_info = req.body.additional_info;
 
-  console.log("📝 البيانات المرسلة:", req.body);
-  console.log("📝 بيانات التحديث:", updateData);
+  console.log("📝 بيانات التحديث النهائية (updateData):", updateData);
 
-  console.log("📝 بيانات التحديث:", updateData);
-
+  console.log("🔄 جاري تحديث العميل في الـ database...");
   const customer = await Customer.findByIdAndUpdate(
     req.customer._id,
     updateData,
@@ -316,24 +322,47 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   );
 
   if (!customer) {
+    console.log("❌ العميل غير موجود");
     return next(new ApiError("العميل غير موجود", 404));
   }
 
-  console.log("✅ العميل بعد التحديث:");
-  console.log("profileImage:", customer.profileImage);
-  console.log("brand_logo:", customer.brand_logo);
+  console.log("✅ تم تحديث العميل في الـ database");
+  console.log("✅ profileImage في الـ database:", customer.profileImage);
+  console.log("✅ brand_logo في الـ database:", customer.brand_logo);
+
+  // التحقق من الـ raw data
+  const rawCustomer = await Customer.findById(req.customer._id).lean();
+  console.log("🔍 Raw data من الـ database:");
+  console.log("🔍 raw profileImage:", rawCustomer.profileImage);
+  console.log("🔍 raw brand_logo:", rawCustomer.brand_logo);
 
   // إزالة كلمة المرور من الاستجابة
   customer.password = undefined;
 
-  // إضافة المسار الكامل للصور
+  // إضافة المسار الكامل للصور فقط إذا لم يكن موجوداً
   const customerData = customer.toObject();
   if (customerData.profileImage) {
-    customerData.profileImage = `/uploads/customers/${customerData.profileImage}`;
+    // التحقق إذا كان المسار يحتوي على /uploads/ أو http بالفعل
+    if (!customerData.profileImage.includes('/uploads/') && 
+        !customerData.profileImage.startsWith('http')) {
+      customerData.profileImage = `/uploads/customers/${customerData.profileImage}`;
+      console.log("✅ تم إضافة المسار الكامل - profileImage:", customerData.profileImage);
+    } else {
+      console.log("✅ المسار موجود بالفعل - profileImage:", customerData.profileImage);
+    }
   }
   if (customerData.brand_logo) {
-    customerData.brand_logo = `/uploads/Logo/${customerData.brand_logo}`;
+    // التحقق إذا كان المسار يحتوي على /uploads/ أو http بالفعل
+    if (!customerData.brand_logo.includes('/uploads/') && 
+        !customerData.brand_logo.startsWith('http')) {
+      customerData.brand_logo = `/uploads/Logo/${customerData.brand_logo}`;
+      console.log("✅ تم إضافة المسار الكامل - brand_logo:", customerData.brand_logo);
+    } else {
+      console.log("✅ المسار موجود بالفعل - brand_logo:", customerData.brand_logo);
+    }
   }
+
+  console.log("========== End updateLoggedCustomerdata Controller ==========\n");
 
   res.status(200).json({
     status: "success",
