@@ -33,9 +33,19 @@ exports.UploadCustomerImage = (req, res, next) => {
   uploadMiddleware(req, res, (err) => {
     if (err) {
       console.error("❌ UploadCustomerImage error:", err);
+      console.error("❌ Error details:", {
+        message: err.message,
+        code: err.code,
+        field: err.field,
+        storageErrors: err.storageErrors,
+      });
       return res.status(400).json({
         status: "error",
         message: "فشل في رفع الملف: " + err.message,
+        details: {
+          code: err.code,
+          field: err.field,
+        },
       });
     }
     console.log("✅ UploadCustomerImage completed");
@@ -47,9 +57,22 @@ exports.UploadCustomerImage = (req, res, next) => {
 exports.ResizeImage = asyncHandler(async (req, res, next) => {
   console.log("📁 الملفات المستلمة:", req.files);
   console.log("📝 البيانات المستلمة:", req.body);
+  console.log("🔧 req.files type:", typeof req.files);
+  console.log(
+    "🔧 req.files keys:",
+    req.files ? Object.keys(req.files) : "no files"
+  );
 
   try {
     if (req.files && req.files.profileImage) {
+      console.log("🔧 profileImage found:", req.files.profileImage);
+      console.log("🔧 profileImage length:", req.files.profileImage.length);
+      console.log("🔧 profileImage[0]:", req.files.profileImage[0]);
+      console.log(
+        "🔧 profileImage[0].buffer:",
+        req.files.profileImage[0]?.buffer ? "exists" : "missing"
+      );
+
       const filename = `profileImage-${uuidv4()}-${Date.now()}.jpeg`;
 
       await sharp(req.files.profileImage[0].buffer)
@@ -59,6 +82,8 @@ exports.ResizeImage = asyncHandler(async (req, res, next) => {
         .toFile(`uploads/customers/${filename}`);
       req.body.profileImage = filename;
       console.log("✅ تم حفظ صورة البروفيل:", filename);
+    } else {
+      console.log("❌ لا توجد صورة بروفيل في req.files");
     }
 
     if (req.files && req.files.brand_logo) {
@@ -76,9 +101,18 @@ exports.ResizeImage = asyncHandler(async (req, res, next) => {
     next();
   } catch (error) {
     console.error("❌ خطأ في معالجة الصورة:", error);
+    console.error("❌ Error details:", {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
     return res.status(400).json({
       status: "error",
       message: "فشل في معالجة الصورة: " + error.message,
+      details: {
+        name: error.name,
+        code: error.code,
+      },
     });
   }
 });

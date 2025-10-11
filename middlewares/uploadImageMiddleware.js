@@ -45,13 +45,30 @@ exports.UploadArrayofImages = (ArrayofFields) => {
   return (req, res, next) => {
     console.log("🔧 Multer middleware called");
     console.log("🔧 Content-Type:", req.headers["content-type"]);
+    console.log("🔧 Content-Length:", req.headers["content-length"]);
     upload(req, res, (err) => {
       if (err) {
         console.error("❌ Multer error:", err);
+        console.error("❌ Multer error message:", err.message);
+        console.error("❌ Multer error code:", err.code);
         return next(err);
       }
       console.log("✅ Multer completed");
       console.log("🔧 req.files:", req.files);
+      console.log("🔧 req.files type:", typeof req.files);
+      if (req.files) {
+        console.log("🔧 req.files keys:", Object.keys(req.files));
+        if (req.files.profileImage) {
+          console.log(
+            "🔧 profileImage array length:",
+            req.files.profileImage.length
+          );
+          console.log(
+            "🔧 profileImage[0] exists:",
+            !!req.files.profileImage[0]
+          );
+        }
+      }
       next();
     });
   };
