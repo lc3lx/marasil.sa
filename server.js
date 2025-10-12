@@ -16,6 +16,7 @@ const globalError = require("./middlewares/errormiddleware");
 // Routes
 const authRoutes = require("./routes/authRoutes");
 const customerRoutes = require("./routes/adminRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const cityRoutes = require("./routes/cityRoutes");
 const walletRoutes = require("./routes/walletRoutes");
@@ -375,6 +376,7 @@ app.post(
 );
 app.use("/api/auth", authRoutes);
 app.use("/api/customer", customerRoutes);
+app.use("/api/admin", dashboardRoutes);
 app.use("/api/order", orderRoutes);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/transactions", transactionsRoutes);

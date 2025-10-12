@@ -1,0 +1,310 @@
+const asyncHandler = require("express-async-handler");
+const Customer = require("../models/customerModel");
+const ApiError = require("../utils/apiError");
+
+// @desc    Add Balance to User Wallet (Admin Only)
+// @route   POST /api/admin/wallets/:userId/add-balance
+// @access  Private/Admin
+exports.addBalanceToUser = asyncHandler(async (req, res, next) => {
+  const { userId } = req.params;
+  const { amount, reason } = req.body;
+
+  if (!amount || amount <= 0) {
+    return next(new ApiError('المبلغ يجب أن يكون أكبر من صفر', 400));
+  }
+
+  // التحقق من وجود المستخدم
+  const user = await Customer.findById(userId);
+  if (!user) {
+    return next(new ApiError(`لا يوجد مستخدم بهذا المعرف ${userId}`, 404));
+  }
+
+  try {
+    const Wallet = require("../models/walletModel");
+    const Transaction = require("../models/transactionModel");
+
+    // البحث عن محفظة المستخدم أو إنشاء واحدة جديدة
+    let wallet = await Wallet.findOne({ customerId: userId });
+    if (!wallet) {
+      wallet = new Wallet({
+        customerId: userId,
+        balance: 0
+      });
+    }
+
+    // إضافة المبلغ للمحفظة
+    wallet.balance += amount;
+    await wallet.save();
+
+    // إنشاء سجل معاملة
+    const transaction = new Transaction({
+      customerId: userId,
+      walletId: wallet._id,
+      type: 'deposit',
+      amount: amount,
+      status: 'completed',
+      description: reason || `إضافة رصيد من الإدارة`,
+      paymentMethod: 'admin_add',
+      adminId: req.customer._id
+    });
+    await transaction.save();
+
+    res.status(200).json({
+      success: true,
+      message: `تم إضافة ${amount} ريال لمحفظة ${user.firstName} ${user.lastName}`,
+      data: {
+        wallet,
+        transaction
+      }
+    });
+  } catch (error) {
+    return next(new ApiError('خطأ في إضافة الرصيد', 500));
+  }
+});
+
+// @desc    Get User Wallet Details (Admin Only)
+// @route   GET /api/admin/users/:userId/wallet
+// @access  Private/Admin
+exports.getUserWallet = asyncHandler(async (req, res, next) => {
+  const { userId } = req.params;
+
+  // التحقق من وجود المستخدم
+  const user = await Customer.findById(userId).select('-password');
+  if (!user) {
+    return next(new ApiError(`لا يوجد مستخدم بهذا المعرف ${userId}`, 404));
+  }
+
+  try {
+    const Wallet = require("../models/walletModel");
+    const Transaction = require("../models/transactionModel");
+
+    // جلب محفظة المستخدم
+    const wallet = await Wallet.findOne({ customerId: userId });
+    
+    // جلب آخر المعاملات
+    const transactions = await Transaction.find({ customerId: userId })
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user: {
+          id: user._id,
+          name: `${user.firstName} ${user.lastName}`,
+          email: user.email,
+          phone: user.phone,
+          active: user.active
+        },
+        wallet: wallet || { balance: 0, customerId: userId },
+        transactions
+      }
+    });
+  } catch (error) {
+    res.status(200).json({
+      success: true,
+      data: {
+        user: {
+          id: user._id,
+          name: `${user.firstName} ${user.lastName}`,
+          email: user.email,
+          phone: user.phone,
+          active: user.active
+        },
+        wallet: { balance: 0, customerId: userId },
+        transactions: []
+      }
+    });
+  }
+});
+
+// @desc    Delete User (Admin Only)
+// @route   DELETE /api/admin/users/:userId
+// @access  Private/Admin
+exports.deleteUser = asyncHandler(async (req, res, next) => {
+  const { userId } = req.params;
+
+  const user = await Customer.findById(userId);
+  if (!user) {
+    return next(new ApiError(`لا يوجد مستخدم بهذا المعرف ${userId}`, 404));
+  }
+
+  // منع حذف المديرين
+  if (user.role === 'admin') {
+    return next(new ApiError('لا يمكن حذف المديرين', 403));
+  }
+
+  try {
+    // حذف المستخدم والبيانات المرتبطة به
+    await Customer.findByIdAndDelete(userId);
+
+    // حذف المحفظة إن وجدت
+    const Wallet = require("../models/walletModel");
+    await Wallet.deleteOne({ customerId: userId });
+
+    // حذف المعاملات
+    const Transaction = require("../models/transactionModel");
+    await Transaction.deleteMany({ customerId: userId });
+
+    res.status(200).json({
+      success: true,
+      message: `تم حذف المستخدم ${user.firstName} ${user.lastName} وجميع بياناته`
+    });
+  } catch (error) {
+    await Customer.findByIdAndDelete(userId);
+    res.status(200).json({
+      success: true,
+      message: `تم حذف المستخدم ${user.firstName} ${user.lastName}`
+    });
+  }
+});
+
+// @desc    Get User Orders and Shipments (Admin Only)
+// @route   GET /api/admin/users/:userId/activity
+// @access  Private/Admin
+exports.getUserActivity = asyncHandler(async (req, res, next) => {
+  const { userId } = req.params;
+
+  // التحقق من وجود المستخدم
+  const user = await Customer.findById(userId).select('-password');
+  if (!user) {
+    return next(new ApiError(`لا يوجد مستخدم بهذا المعرف ${userId}`, 404));
+  }
+
+  const activity = {
+    orders: [],
+    shipments: []
+  };
+
+  try {
+    // جلب طلبات المستخدم
+    const Order = require("../models/orderModel");
+    activity.orders = await Order.find({ customerId: userId })
+      .sort({ createdAt: -1 })
+      .limit(10);
+  } catch (error) {
+    console.log('Order model not found');
+  }
+
+  try {
+    // جلب شحنات المستخدم
+    const Shipment = require("../models/shipmentModel");
+    activity.shipments = await Shipment.find({ customerId: userId })
+      .sort({ createdAt: -1 })
+      .limit(10);
+  } catch (error) {
+    console.log('Shipment model not found');
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      user: {
+        id: user._id,
+        name: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        phone: user.phone
+      },
+      activity
+    }
+  });
+});
+
+// @desc    Approve Bank Transfer (Admin Only)
+// @route   PUT /api/admin/wallets/approve-bank-transfer/:transactionId
+// @access  Private/Admin
+exports.approveBankTransfer = asyncHandler(async (req, res, next) => {
+  const { transactionId } = req.params;
+  const { approved, notes } = req.body;
+
+  try {
+    const Transaction = require("../models/transactionModel");
+    const Wallet = require("../models/walletModel");
+
+    // البحث عن المعاملة
+    const transaction = await Transaction.findById(transactionId)
+      .populate('customerId', 'firstName lastName email');
+
+    if (!transaction) {
+      return next(new ApiError(`لا توجد معاملة بهذا المعرف ${transactionId}`, 404));
+    }
+
+    if (transaction.status !== 'pending') {
+      return next(new ApiError('هذه المعاملة تم معالجتها مسبقاً', 400));
+    }
+
+    if (approved) {
+      // الموافقة على المعاملة
+      transaction.status = 'completed';
+      transaction.approvedBy = req.customer._id;
+      transaction.approvedAt = new Date();
+      transaction.notes = notes || '';
+
+      // إضافة المبلغ للمحفظة
+      let wallet = await Wallet.findOne({ customerId: transaction.customerId });
+      if (!wallet) {
+        wallet = new Wallet({
+          customerId: transaction.customerId,
+          balance: 0
+        });
+      }
+      wallet.balance += transaction.amount;
+      await wallet.save();
+
+      await transaction.save();
+
+      res.status(200).json({
+        success: true,
+        message: `تم الموافقة على المعاملة وإضافة ${transaction.amount} ريال لمحفظة ${transaction.customerId.firstName}`,
+        data: {
+          transaction,
+          wallet
+        }
+      });
+    } else {
+      // رفض المعاملة
+      transaction.status = 'rejected';
+      transaction.rejectedBy = req.customer._id;
+      transaction.rejectedAt = new Date();
+      transaction.notes = notes || 'تم رفض المعاملة من قبل الإدارة';
+
+      await transaction.save();
+
+      res.status(200).json({
+        success: true,
+        message: `تم رفض المعاملة`,
+        data: {
+          transaction
+        }
+      });
+    }
+  } catch (error) {
+    return next(new ApiError('خطأ في معالجة المعاملة', 500));
+  }
+});
+
+// @desc    Get Pending Bank Transfers (Admin Only)
+// @route   GET /api/admin/wallets/pending-transfers
+// @access  Private/Admin
+exports.getPendingBankTransfers = asyncHandler(async (req, res, next) => {
+  try {
+    const Transaction = require("../models/transactionModel");
+
+    const pendingTransfers = await Transaction.find({
+      paymentMethod: 'bank_transfer',
+      status: 'pending'
+    })
+    .populate('customerId', 'firstName lastName email phone')
+    .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: pendingTransfers
+    });
+  } catch (error) {
+    res.status(200).json({
+      success: true,
+      data: []
+    });
+  }
+});
