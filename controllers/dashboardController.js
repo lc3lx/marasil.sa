@@ -16,10 +16,15 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
   try {
     const Shipment = require("../models/shipmentModel");
     totalShipments = await Shipment.countDocuments();
-    pendingShipments = await Shipment.countDocuments({ status: 'pending' });
-    inTransitShipments = await Shipment.countDocuments({ status: 'in_transit' });
-    deliveredShipments = await Shipment.countDocuments({ status: 'delivered' });
-    cancelledShipments = await Shipment.countDocuments({ status: 'cancelled' });
+    // Map بطاقات الواجهة:
+    // pending  -> READY_FOR_PICKUP
+    // inTransit -> IN_TRANSIT
+    // delivered -> Delivered
+    // cancelled -> Canceled
+    pendingShipments = await Shipment.countDocuments({ shipmentstates: 'READY_FOR_PICKUP' });
+    inTransitShipments = await Shipment.countDocuments({ shipmentstates: 'IN_TRANSIT' });
+    deliveredShipments = await Shipment.countDocuments({ shipmentstates: 'Delivered' });
+    cancelledShipments = await Shipment.countDocuments({ shipmentstates: 'Canceled' });
   } catch (error) {
     console.log('Shipment model not found, using default values');
   }
@@ -296,19 +301,15 @@ exports.getAllShipments = asyncHandler(async (req, res) => {
   if (req.query.search) {
     searchQuery = {
       $or: [
-        { trackingNumber: { $regex: req.query.search, $options: 'i' } },
-        { recipientName: { $regex: req.query.search, $options: 'i' } }
+        { trackingId: { $regex: req.query.search, $options: 'i' } },
+        { companyshipmentid: { $regex: req.query.search, $options: 'i' } }
       ]
     };
   }
 
   if (req.query.status) {
-    searchQuery.status = req.query.status;
-  }
-
-  // filter by specific user if provided
-  if (req.query.userId) {
-    searchQuery.customerId = req.query.userId;
+    // model uses 'shipmentstates' enum: Delivered, IN_TRANSIT, READY_FOR_PICKUP, Canceled
+    searchQuery.shipmentstates = req.query.status;
   }
 
   // filter by specific user if provided
@@ -369,6 +370,11 @@ exports.getAllOrders = asyncHandler(async (req, res) => {
 
   if (req.query.status) {
     searchQuery.status = req.query.status;
+  }
+
+  // filter by specific user if provided
+  if (req.query.userId) {
+    searchQuery.customerId = req.query.userId;
   }
 
   try {

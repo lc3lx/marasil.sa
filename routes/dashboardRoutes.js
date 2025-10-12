@@ -18,6 +18,8 @@ const {
   getPendingBankTransfers
 } = require("../controllers/adminWalletController");
 
+const { updateShipmentStatus } = require("../controllers/adminShipmentController");
+
 const auth = require("../controllers/authController");
 
 const router = express.Router();
@@ -47,6 +49,7 @@ router.put("/wallets/approve-bank-transfer/:transactionId", approveBankTransfer)
 
 // Shipments Management
 router.get("/shipments", getAllShipments);
+router.patch("/shipments/:shipmentId/status", updateShipmentStatus);
 
 // Orders Management
 router.get("/orders", getAllOrders);
