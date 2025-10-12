@@ -1,0 +1,13 @@
+# AI Model Requirements
+transformers==4.36.0
+torch==2.1.0
+flask==3.0.0
+flask-cors==4.0.0
+flask-socketio==5.3.5
+python-socketio==5.10.0
+accelerate==0.25.0
+bitsandbytes==0.41.0
+peft==0.7.0
+datasets==2.15.0
+sentencepiece==0.1.99
+protobuf==4.25.0
