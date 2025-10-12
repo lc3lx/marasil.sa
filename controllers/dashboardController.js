@@ -306,6 +306,16 @@ exports.getAllShipments = asyncHandler(async (req, res) => {
     searchQuery.status = req.query.status;
   }
 
+  // filter by specific user if provided
+  if (req.query.userId) {
+    searchQuery.customerId = req.query.userId;
+  }
+
+  // filter by specific user if provided
+  if (req.query.userId) {
+    searchQuery.customerId = req.query.userId;
+  }
+
   try {
     const Shipment = require("../models/shipmentModel");
     const shipments = await Shipment.find(searchQuery)
