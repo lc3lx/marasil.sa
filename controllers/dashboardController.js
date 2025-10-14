@@ -351,6 +351,180 @@ exports.getAllShipments = asyncHandler(async (req, res) => {
   }
 });
 
+exports.getCarrierStats = asyncHandler(async (req, res) => {
+  const { startDate, endDate } = req.query;
+  const dateFilter = {};
+  if (startDate) dateFilter.$gte = new Date(startDate);
+  if (endDate) dateFilter.$lte = new Date(endDate);
+
+  const Shipment = require("../models/shipmentModel");
+  const ShippingCompany = require("../models/shipping_company");
+
+  const companies = await ShippingCompany.find().lean();
+  const companyTypeMaxMap = new Map();
+  for (const c of companies) {
+    const map = {};
+    for (const t of (c.shippingTypes || [])) map[t.type] = t.maxWeight;
+    companyTypeMaxMap.set(c.company, map);
+  }
+
+  const query = {};
+  if (dateFilter.$gte || dateFilter.$lte) {
+    query.createdAt = {};
+    if (dateFilter.$gte) query.createdAt.$gte = dateFilter.$gte;
+    if (dateFilter.$lte) query.createdAt.$lte = dateFilter.$lte;
+  }
+
+  const shipments = await Shipment.find(query)
+    .select(
+      "shapmentCompany shapmentingType weight paymentMathod shipmentstates totalprice shapmentPrice shapmentType isReturnShipment createdAt"
+    )
+    .lean();
+
+  const stats = {};
+  const ensure = (k) => {
+    if (!stats[k]) {
+      stats[k] = {
+        total: 0,
+        delivered: 0,
+        inTransit: 0,
+        readyForPickup: 0,
+        canceled: 0,
+        returns: 0,
+        overweightKg: 0,
+        overweightChargesBase: 0,
+        overweightProfit: 0,
+        codCount: 0,
+        codBaseFeesTotal: 0,
+        codProfitTotal: 0,
+        totalRevenue: 0,
+        payableToCarrier: 0,
+        ourProfit: 0,
+      };
+    }
+    return stats[k];
+  };
+
+  const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+  for (const s of shipments) {
+    const company = s.shapmentCompany || "unknown";
+    const st = ensure(company);
+    st.total += 1;
+    if (s.shipmentstates === "Delivered") st.delivered += 1;
+    if (s.shipmentstates === "IN_TRANSIT") st.inTransit += 1;
+    if (s.shipmentstates === "READY_FOR_PICKUP") st.readyForPickup += 1;
+    if (s.shipmentstates === "Canceled" || s.shipmentstates === "CANCELLED") st.canceled += 1;
+
+    const isReturn = Boolean(s.isReturnShipment) || s.shapmentType === "reverse";
+    if (isReturn) st.returns += 1;
+
+    const typeMaxMap = companyTypeMaxMap.get(company) || {};
+    const maxWeight = typeMaxMap[s.shapmentingType] || 0;
+    const weight = Number(s.weight) || 0;
+    const overweightKg = maxWeight > 0 ? Math.max(0, Math.ceil(weight - maxWeight)) : 0;
+    st.overweightKg += overweightKg;
+
+    const sp = s.shapmentPrice || {};
+    const baseAdditional = Number(sp.baseAdditionalweigth) || 0;
+    const profitAdditional = Number(sp.profitAdditionalweigth) || 0;
+    const basePrice = Number(sp.basePrice) || 0;
+    const profitPrice = Number(sp.profitPrice) || 0;
+    const baseCOD = Number(sp.baseCODfees) || 0;
+    const profitCOD = Number(sp.profitCODfees) || 0;
+    const baseRTO = Number(sp.baseRTOprice) || 0;
+    const profitRTO = Number(sp.profitRTOprice) || 0;
+
+    let payable = basePrice + overweightKg * baseAdditional;
+    let profit = profitPrice + overweightKg * profitAdditional;
+
+    if (s.paymentMathod === "COD") {
+      payable += baseCOD;
+      profit += profitCOD;
+      st.codCount += 1;
+      st.codBaseFeesTotal += baseCOD;
+      st.codProfitTotal += profitCOD;
+    }
+
+    if (isReturn) {
+      payable += baseRTO;
+      profit += profitRTO;
+    }
+
+    st.overweightChargesBase += overweightKg * baseAdditional;
+    st.overweightProfit += overweightKg * profitAdditional;
+
+    const total = Number(s.totalprice) || payable + profit;
+    st.totalRevenue += total;
+    st.payableToCarrier += payable;
+    st.ourProfit += profit;
+  }
+
+  const byCarrier = Object.entries(stats).map(([company, v]) => ({
+    company,
+    totals: {
+      total: v.total,
+      delivered: v.delivered,
+      inTransit: v.inTransit,
+      readyForPickup: v.readyForPickup,
+      canceled: v.canceled,
+      returns: v.returns,
+    },
+    financials: {
+      totalRevenue: r2(v.totalRevenue),
+      payableToCarrier: r2(v.payableToCarrier),
+      ourProfit: r2(v.ourProfit),
+      overweightKg: v.overweightKg,
+      overweightChargesBase: r2(v.overweightChargesBase),
+      overweightProfit: r2(v.overweightProfit),
+      codCount: v.codCount,
+      codBaseFeesTotal: r2(v.codBaseFeesTotal),
+      codProfitTotal: r2(v.codProfitTotal),
+    },
+  }));
+
+  const overall = byCarrier.reduce(
+    (acc, c) => {
+      acc.totals.total += c.totals.total;
+      acc.totals.delivered += c.totals.delivered;
+      acc.totals.inTransit += c.totals.inTransit;
+      acc.totals.readyForPickup += c.totals.readyForPickup;
+      acc.totals.canceled += c.totals.canceled;
+      acc.totals.returns += c.totals.returns;
+      acc.financials.totalRevenue = r2(acc.financials.totalRevenue + c.financials.totalRevenue);
+      acc.financials.payableToCarrier = r2(acc.financials.payableToCarrier + c.financials.payableToCarrier);
+      acc.financials.ourProfit = r2(acc.financials.ourProfit + c.financials.ourProfit);
+      acc.financials.overweightKg += c.financials.overweightKg;
+      acc.financials.overweightChargesBase = r2(acc.financials.overweightChargesBase + c.financials.overweightChargesBase);
+      acc.financials.overweightProfit = r2(acc.financials.overweightProfit + c.financials.overweightProfit);
+      acc.financials.codCount += c.financials.codCount;
+      acc.financials.codBaseFeesTotal = r2(acc.financials.codBaseFeesTotal + c.financials.codBaseFeesTotal);
+      acc.financials.codProfitTotal = r2(acc.financials.codProfitTotal + c.financials.codProfitTotal);
+      return acc;
+    },
+    {
+      totals: { total: 0, delivered: 0, inTransit: 0, readyForPickup: 0, canceled: 0, returns: 0 },
+      financials: {
+        totalRevenue: 0,
+        payableToCarrier: 0,
+        ourProfit: 0,
+        overweightKg: 0,
+        overweightChargesBase: 0,
+        overweightProfit: 0,
+        codCount: 0,
+        codBaseFeesTotal: 0,
+        codProfitTotal: 0,
+      },
+    }
+  );
+
+  res.status(200).json({
+    success: true,
+    data: { byCarrier, overall },
+    filters: { startDate: startDate || null, endDate: endDate || null },
+  });
+});
+
 // @desc    Get All Orders
 // @route   GET /api/admin/orders
 // @access  Private/Admin

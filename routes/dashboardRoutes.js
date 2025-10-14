@@ -6,7 +6,8 @@ const {
   updateUserStatus,
   updateUserRole,
   getAllShipments,
-  getAllOrders
+  getAllOrders,
+  getCarrierStats
 } = require("../controllers/dashboardController");
 
 const {
@@ -30,6 +31,7 @@ router.use(auth.allowedTo("admin"));
 
 // Dashboard Statistics
 router.get("/stats", getDashboardStats);
+router.get("/carriers/stats", getCarrierStats);
 
 // Recent Activity
 router.get("/activity", getRecentActivity);
