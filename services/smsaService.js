@@ -9,7 +9,7 @@ exports.formatAddress = (address) => {
     ContactPhoneNumber: address.mobile, // رقم الهاتف
     Country: address.country, // رمز الدولة
     City: address.city,
-    AddressLine1: address.address,
+    AddressLine1:`${address.address}        `,
     District: address.address, // اسم المدينة
   };
 };
