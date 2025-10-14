@@ -10,6 +10,10 @@ const notificationSchema = new mongoose.Schema({
     required: true,
     enum: ['broadcast', 'targeted', 'order']
   },
+  title: {
+    type: String,
+    default: 'إشعار'
+  },
   message: {
     type: String,
     required: true
@@ -21,6 +25,11 @@ const notificationSchema = new mongoose.Schema({
   timestamp: {
     type: Date,
     default: Date.now
+  },
+  createdBy: {
+    type: mongoose.Schema.ObjectId,
+    ref: "User",
+    default: null
   }
 });
 

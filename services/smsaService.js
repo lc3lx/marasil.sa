@@ -10,7 +10,7 @@ exports.formatAddress = (address) => {
     Country: address.country, // رمز الدولة
     City: address.city,
     AddressLine1:`${address.address}        `,
-    District: address.address, // اسم المدينة
+    // District: address.address, // اسم المدينة
   };
 };
 
