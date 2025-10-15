@@ -1,10 +1,5 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
-// Advanced Coupon schema supports:
-// - code (unique), date range, active flag
-// - discount types: percentage, fixed amount, wallet_credit
-// - assignment to specific users and/or shipping companies
-// - usage limits total and per user, and redemptions tracking
 const couponSchema = new mongoose.Schema(
   {
     code: {
@@ -20,7 +15,7 @@ const couponSchema = new mongoose.Schema(
 
     discountType: {
       type: String,
-      enum: ["percentage", "fixed", "wallet_credit"],
+      enum: ['percentage', 'fixed', 'wallet_credit'],
       required: true,
     },
     // percentage: 0-100, fixed/wallet_credit: currency amount (SAR)
@@ -32,9 +27,9 @@ const couponSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
 
     // Optional assignment rules
-    applicableUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "Customer" }],
+    applicableUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Customer' }],
     applicableShippingCompanies: [
-      { type: mongoose.Schema.Types.ObjectId, ref: "ShippingCompany" },
+      { type: mongoose.Schema.Types.ObjectId, ref: 'ShippingCompany' },
     ],
 
     usageLimit: { type: Number, default: 0, min: 0 }, // 0 = unlimited
@@ -44,13 +39,13 @@ const couponSchema = new mongoose.Schema(
     // Track redemptions per user
     redemptions: [
       {
-        user: { type: mongoose.Schema.Types.ObjectId, ref: "Customer", required: true },
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
         usedAt: { type: Date, default: Date.now },
         metadata: { type: Object },
       },
     ],
 
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Customer" }, // admin
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' }, // admin
   },
   { timestamps: true }
 );
@@ -58,4 +53,4 @@ const couponSchema = new mongoose.Schema(
 couponSchema.index({ code: 1 }, { unique: true });
 couponSchema.index({ isActive: 1, startDate: 1, endDate: 1 });
 
-module.exports = mongoose.model("Coupon", couponSchema);
+module.exports = mongoose.model('Coupon', couponSchema);

@@ -33,6 +33,8 @@ const addressRotues = require("./routes/addressRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const shipmentRoutes = require("./routes/shipmentRoute");
 const companyShipmentRoutes = require("./routes/shippingCompanyRoute");
+const announcementRoutes = require("./routes/announcementRoutes");
+const couponRoutes = require("./routes/couponRoutes");
 const { MoyasarWebhook } = require("./controllers/walletController");
 const bodyParser = require("body-parser");
 const Transaction = require("./models/transactionModel");
@@ -392,6 +394,8 @@ app.use("/api/addresses", addressRotues);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/shipment", shipmentRoutes);
 app.use("/api/shipmentcompany", companyShipmentRoutes);
+app.use("/api/announcements", announcementRoutes);
+app.use("/api/coupons", couponRoutes);
 app.use("/api/cities", cityRoutes);
 
 // Global error handler
