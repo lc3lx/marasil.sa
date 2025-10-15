@@ -9,14 +9,14 @@ const {
   deleteAnnouncement,
   toggleAnnouncementStatus
 } = require('../controllers/announcementController');
-const { protect, admin } = require('../middleware/authMiddleware');
+const { Protect, allowedTo } = require('../controllers/authController');
 
 // Public routes
 router.get('/active', getActiveAnnouncements);
 
 // Protected admin routes
-router.use(protect);
-router.use(admin);
+router.use(Protect);
+router.use(allowedTo('admin'));
 
 router.route('/')
   .get(getAllAnnouncements)
