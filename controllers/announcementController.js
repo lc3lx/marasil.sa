@@ -4,7 +4,7 @@ const Announcement = require('../models/announcement');
 const getAllAnnouncements = async (req, res) => {
   try {
     const announcements = await Announcement.find()
-      .populate('createdBy', 'name email')
+      .populate('createdBy', 'firstName lastName email')
       .sort({ priority: -1, createdAt: -1 });
     
     res.json(announcements);
@@ -38,7 +38,7 @@ const getActiveAnnouncements = async (req, res) => {
 const getAnnouncement = async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id)
-      .populate('createdBy', 'name email');
+      .populate('createdBy', 'firstName lastName email');
     
     if (!announcement) {
       return res.status(404).json({ message: 'الإعلان غير موجود' });
@@ -71,6 +71,7 @@ const createAnnouncement = async (req, res) => {
       return res.status(400).json({ message: 'العنوان والمحتوى مطلوبان' });
     }
 
+    const creatorId = (req.customer && req.customer._id) || (req.user && (req.user._id || req.user.id));
     const announcement = new Announcement({
       title,
       content,
@@ -81,11 +82,11 @@ const createAnnouncement = async (req, res) => {
       priority,
       startDate,
       endDate,
-      createdBy: req.user.id
+      createdBy: creatorId
     });
 
     const savedAnnouncement = await announcement.save();
-    await savedAnnouncement.populate('createdBy', 'name email');
+    await savedAnnouncement.populate('createdBy', 'firstName lastName email');
     
     res.status(201).json(savedAnnouncement);
   } catch (error) {
@@ -127,7 +128,7 @@ const updateAnnouncement = async (req, res) => {
     if (endDate !== undefined) announcement.endDate = endDate;
 
     const updatedAnnouncement = await announcement.save();
-    await updatedAnnouncement.populate('createdBy', 'name email');
+    await updatedAnnouncement.populate('createdBy', 'firstName lastName email');
     
     res.json(updatedAnnouncement);
   } catch (error) {
