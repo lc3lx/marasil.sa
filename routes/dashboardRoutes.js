@@ -16,7 +16,8 @@ const {
   deleteUser,
   getUserActivity,
   approveBankTransfer,
-  getPendingBankTransfers
+  getPendingBankTransfers,
+  subtractBalanceFromUser,
 } = require("../controllers/adminWalletController");
 
 const { updateShipmentStatus } = require("../controllers/adminShipmentController");
@@ -46,6 +47,7 @@ router.get("/users/:userId/activity", getUserActivity);
 
 // Wallet Management (Admin)
 router.post("/wallets/:userId/add-balance", addBalanceToUser);
+router.post("/wallets/:userId/subtract-balance", subtractBalanceFromUser);
 router.get("/wallets/pending-transfers", getPendingBankTransfers);
 router.put("/wallets/approve-bank-transfer/:transactionId", approveBankTransfer);
 

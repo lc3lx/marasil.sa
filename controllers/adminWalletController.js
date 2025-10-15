@@ -13,7 +13,6 @@ exports.addBalanceToUser = asyncHandler(async (req, res, next) => {
     return next(new ApiError('المبلغ يجب أن يكون أكبر من صفر', 400));
   }
 
-  // التحقق من وجود المستخدم
   const user = await Customer.findById(userId);
   if (!user) {
     return next(new ApiError(`لا يوجد مستخدم بهذا المعرف ${userId}`, 404));
@@ -23,25 +22,19 @@ exports.addBalanceToUser = asyncHandler(async (req, res, next) => {
     const Wallet = require("../models/walletModel");
     const Transaction = require("../models/transactionModel");
 
-    // البحث عن محفظة المستخدم أو إنشاء واحدة جديدة
     let wallet = await Wallet.findOne({ customerId: userId });
     if (!wallet) {
-      wallet = new Wallet({
-        customerId: userId,
-        balance: 0
-      });
+      wallet = new Wallet({ customerId: userId, balance: 0 });
     }
 
-    // إضافة المبلغ للمحفظة
-    wallet.balance += amount;
+    wallet.balance += Number(amount);
     await wallet.save();
 
-    // إنشاء سجل معاملة
     const transaction = new Transaction({
       customerId: userId,
       walletId: wallet._id,
       type: 'deposit',
-      amount: amount,
+      amount: Number(amount),
       status: 'completed',
       description: reason || `إضافة رصيد من الإدارة`,
       paymentMethod: 'admin_add',
@@ -52,13 +45,64 @@ exports.addBalanceToUser = asyncHandler(async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: `تم إضافة ${amount} ريال لمحفظة ${user.firstName} ${user.lastName}`,
-      data: {
-        wallet,
-        transaction
-      }
+      data: { wallet, transaction }
     });
   } catch (error) {
     return next(new ApiError('خطأ في إضافة الرصيد', 500));
+  }
+});
+
+// @desc    Subtract Balance from User Wallet (Admin Only)
+// @route   POST /api/admin/wallets/:userId/subtract-balance
+// @access  Private/Admin
+exports.subtractBalanceFromUser = asyncHandler(async (req, res, next) => {
+  const { userId } = req.params;
+  const { amount, reason } = req.body;
+
+  if (!amount || amount <= 0) {
+    return next(new ApiError('المبلغ يجب أن يكون أكبر من صفر', 400));
+  }
+
+  const user = await Customer.findById(userId);
+  if (!user) {
+    return next(new ApiError(`لا يوجد مستخدم بهذا المعرف ${userId}`, 404));
+  }
+
+  try {
+    const Wallet = require("../models/walletModel");
+    const Transaction = require("../models/transactionModel");
+
+    let wallet = await Wallet.findOne({ customerId: userId });
+    if (!wallet) {
+      wallet = new Wallet({ customerId: userId, balance: 0 });
+    }
+
+    if (Number(wallet.balance) < Number(amount)) {
+      return next(new ApiError('الرصيد غير كافٍ', 400));
+    }
+
+    wallet.balance -= Number(amount);
+    await wallet.save();
+
+    const transaction = new Transaction({
+      customerId: userId,
+      walletId: wallet._id,
+      type: 'withdrawal',
+      amount: Number(amount),
+      status: 'completed',
+      description: reason || 'خصم رصيد من الإدارة',
+      paymentMethod: 'admin_deduct',
+      adminId: req.customer._id
+    });
+    await transaction.save();
+
+    res.status(200).json({
+      success: true,
+      message: `تم خصم ${amount} ريال من محفظة ${user.firstName} ${user.lastName}`,
+      data: { wallet, transaction }
+    });
+  } catch (error) {
+    return next(new ApiError('خطأ في خصم الرصيد', 500));
   }
 });
 

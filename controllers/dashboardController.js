@@ -145,13 +145,30 @@ exports.getAllUsers = asyncHandler(async (req, res) => {
     searchQuery.active = req.query.status === 'active';
   }
 
-  const users = await Customer.find(searchQuery)
+  const userDocs = await Customer.find(searchQuery)
     .select('-password')
     .skip(skip)
     .limit(limit)
     .sort({ createdAt: -1 });
 
   const total = await Customer.countDocuments(searchQuery);
+
+  let users = userDocs;
+  try {
+    const Wallet = require("../models/walletModel");
+    const ids = userDocs.map((u) => u._id);
+    const wallets = await Wallet.find({ customerId: { $in: ids } })
+      .select('customerId balance')
+      .lean();
+    const balanceMap = new Map(wallets.map((w) => [String(w.customerId), Number(w.balance) || 0]));
+    users = userDocs.map((u) => {
+      const o = u.toObject();
+      o.balance = balanceMap.get(String(u._id)) || 0;
+      return o;
+    });
+  } catch (e) {
+    users = userDocs.map((u) => ({ ...u.toObject(), balance: 0 }));
+  }
 
   res.status(200).json({
     success: true,
