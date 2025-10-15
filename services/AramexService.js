@@ -16,9 +16,10 @@ exports.formatAramexDate = (date) => {
 exports.formatAddress = (address) => {
   return {
     Line1: address.address,
-    Line2: address.addressLine2 || "",
+    Line2: address.district,
     Line3: address.addressLine3 || "",
     City: address.city,
+    
 
     PostCode: address.postCode || "",
     CountryCode: address.country ? address.country.toUpperCase() : "SA",
