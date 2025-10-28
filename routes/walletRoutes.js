@@ -13,6 +13,7 @@ const {
   updatestatus,
   uplaodBankreceiptImage,
   paymentCallback,
+  getWalletSummary,
 } = require("../controllers/walletController");
 
 const auth = require("../controllers/authController");
@@ -23,6 +24,7 @@ router.use(auth.Protect);
 
 router.get("/myWallet", getMyWallet);
 router.get("/myBalance", getCustomerBalance);
+router.get("/summary", getWalletSummary);
 router.get("/:id", getOneWallet);
 router.get("/", getAllWallet);
 

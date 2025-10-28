@@ -228,6 +228,92 @@ exports.getPaymentStatus = asyncHandler(async (req, res, next) => {
   }
 });
 
+exports.getWalletSummary = asyncHandler(async (req, res, next) => {
+  try {
+    const customerId = req.customer._id;
+    
+    // جلب جميع المعاملات للعميل
+    const transactions = await Transaction.find({ customerId }).sort({ createdAt: -1 });
+    
+    // حساب إجمالي الإيداعات (credit)
+    const totalDeposits = transactions
+      .filter(t => t.type === 'credit')
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+    
+    // حساب إجمالي المدفوعات (debit)
+    const totalPayments = transactions
+      .filter(t => t.type === 'debit')
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+    
+    // حساب الإيداعات حسب النوع
+    const depositsByType = {
+      wallet_recharge: transactions
+        .filter(t => t.type === 'credit' && t.method === 'moyasar')
+        .reduce((sum, t) => sum + (t.amount || 0), 0),
+      shipment_cancel_refund: transactions
+        .filter(t => t.type === 'credit' && t.method === 'shipment_cancel_refund')
+        .reduce((sum, t) => sum + (t.amount || 0), 0),
+      return_shipment_refund: transactions
+        .filter(t => t.type === 'credit' && t.method === 'return_shipment_refund')
+        .reduce((sum, t) => sum + (t.amount || 0), 0),
+      coupon_credit: transactions
+        .filter(t => t.type === 'credit' && t.method === 'coupon_credit')
+        .reduce((sum, t) => sum + (t.amount || 0), 0),
+      admin_credit: transactions
+        .filter(t => t.type === 'credit' && t.method === 'admin_credit')
+        .reduce((sum, t) => sum + (t.amount || 0), 0),
+      manual_addition: transactions
+        .filter(t => t.type === 'credit' && t.method === 'manual_addition')
+        .reduce((sum, t) => sum + (t.amount || 0), 0)
+    };
+    
+    // حساب المدفوعات حسب النوع
+    const paymentsByType = {
+      shipment_payment: transactions
+        .filter(t => t.type === 'debit' && t.method === 'shipment_payment')
+        .reduce((sum, t) => sum + (t.amount || 0), 0),
+      return_shipment: transactions
+        .filter(t => t.type === 'debit' && t.method === 'return_shipment')
+        .reduce((sum, t) => sum + (t.amount || 0), 0),
+      package_purchase: transactions
+        .filter(t => t.type === 'debit' && t.method === 'package_purchase')
+        .reduce((sum, t) => sum + (t.amount || 0), 0),
+      admin_debit: transactions
+        .filter(t => t.type === 'debit' && t.method === 'admin_debit')
+        .reduce((sum, t) => sum + (t.amount || 0), 0),
+      manual_removal: transactions
+        .filter(t => t.type === 'debit' && t.method === 'manual_removal')
+        .reduce((sum, t) => sum + (t.amount || 0), 0)
+    };
+    
+    // جلب رصيد المحفظة الحالي
+    let wallet = await Wallet.findOne({ customerId });
+    if (!wallet) {
+      wallet = await Wallet.create({ customerId, balance: 0, transactions: [] });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        currentBalance: wallet.balance,
+        totalDeposits,
+        totalPayments,
+        depositsByType,
+        paymentsByType,
+        totalTransactions: transactions.length,
+        recentTransactions: transactions.slice(0, 10) // آخر 10 معاملات
+      }
+    });
+  } catch (error) {
+    console.error("Error getting wallet summary:", error);
+    res.status(500).json({
+      success: false,
+      message: "حدث خطأ أثناء جلب ملخص المحفظة",
+      error: error.message
+    });
+  }
+});
+
 exports.refundBalance = asyncHandler(async (req, res, next) => {
   const { refundAmount, customer } = req.body;
   const { paymentId } = req.params;

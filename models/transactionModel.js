@@ -20,7 +20,21 @@ const transactionSchema = new mongoose.Schema({
   refundableAmount: { type: Number },
   method: {
     type: String,
-    enum: ["bank_transfer", "moyasar", "manual_addition", "manual_removal"],
+    enum: [
+      "bank_transfer",
+      "moyasar",
+      "manual_addition",
+      "manual_removal",
+      "shipment_payment",
+      "shipment_cancel_refund",
+      "return_shipment",
+      "return_shipment_refund",
+      "package_purchase",
+      "package_cancel_refund",
+      "coupon_credit",
+      "admin_credit",
+      "admin_debit",
+    ],
     default: "moyasar",
     required: true,
   },
@@ -33,23 +47,35 @@ const transactionSchema = new mongoose.Schema({
       "refunded",
       "partially_refunded",
       "rejected",
-      "approved"
+      "approved",
     ],
     default: "pending",
   },
   bankReceipt: String, // للتحويل البنكي
   moyasarPaymentId: String, // معرف الدفع في Moyasar
+  referenceId: { type: String }, // معرف المرجع (shipmentId, orderId, packageId)
+  referenceType: {
+    type: String,
+    enum: [
+      "shipment",
+      "return_shipment",
+      "package",
+      "admin_credit",
+      "wallet_recharge",
+      "shipment_cancel_refund",
+      "coupon",
+      "order",
+    ],
+  }, // نوع المرجع
   createdAt: { type: Date, default: Date.now },
   walletId: { type: String, ref: "Wallet" },
 });
 
-
 const SetImageUrl = (doc) => {
-   if (doc.bankReceipt) {
+  if (doc.bankReceipt) {
     const ImageUrl = `${process.env.BASE_URL}/bankReceipt/${doc.bankReceipt}`;
     doc.bankReceipt = ImageUrl;
   }
-
 };
 
 transactionSchema.post("init", function (doc) {

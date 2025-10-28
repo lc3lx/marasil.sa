@@ -384,6 +384,23 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
       `تم خصم ${pricing.total} ريال من رصيد المحفظة. الرصيد الجديد: ${wallet.balance} ريال`
     );
 
+    // إنشاء معاملة خصم للشحنة
+    const transaction = await Transaction.create({
+      customerId: req.customer._id,
+      type: "debit",
+      amount: pricing.total,
+      description: `دفع مقابل شحنة - رقم التتبع: ${trackingInfo.trackingNumber}`,
+      status: "completed",
+      method: "shipment_payment",
+      referenceId: shipment._id.toString(),
+      referenceType: "shipment",
+      walletId: wallet._id,
+    });
+
+    // إضافة المعاملة إلى سجل المعاملات في المحفظة
+    wallet.transactions.push(transaction._id);
+    await wallet.save();
+
     // تحديث حالة الطلب إذا كان موجوداً
     if (order._id) {
       await Order.findByIdAndUpdate(order._id, { status: "shipped" });
@@ -534,7 +551,9 @@ const processRefundToWallet = async (
       amount,
       description: `استرداد مبلغ الشحنة الملغاة - رقم الشحنة: ${trackingNumber} - معرف الشحنة: ${shipmentId}`,
       status: "completed",
-      method: "manual_addition", // استخدام قيمة مسموح بها من enum
+      method: "shipment_cancel_refund",
+      referenceId: shipmentId,
+      referenceType: "shipment",
       walletId: wallet._id,
     });
 

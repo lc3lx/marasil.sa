@@ -192,7 +192,8 @@ const _createReturnShipmentInternal = async (shipmentId, customerId) => {
     type: "debit",
     description: `خصم تكلفة شحنة إرجاع - ${returnShipmentResult.trackingNumber}`,
     status: "completed",
-    referenceId: returnShipmentResult.trackingNumber,
+    method: "return_shipment",
+    referenceId: newReturnShipment._id.toString(),
     referenceType: "return_shipment",
   });
   await transaction.save();
@@ -291,6 +292,8 @@ const processReturnShipmentRefund = async (customerId, amount, shipmentId) => {
       description: `استرداد مبلغ شحنة الإرجاع الملغاة ${shipmentId}`,
       status: "completed",
       method: "return_shipment_refund",
+      referenceId: shipmentId,
+      referenceType: "return_shipment",
       walletId: wallet._id,
     });
 

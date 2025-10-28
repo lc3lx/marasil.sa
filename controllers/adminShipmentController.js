@@ -34,8 +34,13 @@ exports.updateShipmentStatus = asyncHandler(async (req, res, next) => {
     }
 
     // منع الإلغاء إلا إذا كانت الشحنة READY_FOR_PICKUP
-    if (status === "Canceled" && existing.shipmentstates !== "READY_FOR_PICKUP") {
-      return next(new ApiError("لا يمكن إلغاء الشحنة إلا إذا كانت READY_FOR_PICKUP", 400));
+    if (
+      status === "Canceled" &&
+      existing.shipmentstates !== "READY_FOR_PICKUP"
+    ) {
+      return next(
+        new ApiError("لا يمكن إلغاء الشحنة إلا إذا كانت READY_FOR_PICKUP", 400)
+      );
     }
 
     // نفّذ التحديث باستخدام findOneAndUpdate لتفعيل ال-hooks
@@ -57,9 +62,15 @@ exports.updateShipmentStatus = asyncHandler(async (req, res, next) => {
           method: "shipment_cancel_refund",
         });
         if (!existingTx) {
-          let wallet = await Wallet.findOne({ customerId: existing.customerId });
+          let wallet = await Wallet.findOne({
+            customerId: existing.customerId,
+          });
           if (!wallet) {
-            wallet = await Wallet.create({ customerId: existing.customerId, balance: 0, transactions: [] });
+            wallet = await Wallet.create({
+              customerId: existing.customerId,
+              balance: 0,
+              transactions: [],
+            });
           }
           wallet.balance += amount;
           await wallet.save();
@@ -71,7 +82,8 @@ exports.updateShipmentStatus = asyncHandler(async (req, res, next) => {
             amount,
             method: "shipment_cancel_refund",
             status: "completed",
-            referenceId: existing._id,
+            referenceId: existing._id.toString(),
+            referenceType: "shipment",
             walletId: wallet._id,
           });
           try {
@@ -83,12 +95,20 @@ exports.updateShipmentStatus = asyncHandler(async (req, res, next) => {
 
           // إشعار + بريد إلكتروني اختياري
           const message = `تم إلغاء شحنتك رقم ${existing._id} وتم استرجاع مبلغ ${amount} ريال إلى محفظتك`;
-          await Notification.create({ customerId: existing.customerId, type: "order", message });
+          await Notification.create({
+            customerId: existing.customerId,
+            type: "order",
+            message,
+          });
           try {
             const customer = await Customer.findById(existing.customerId);
             const email = customer?.email;
             if (email) {
-              sendmail({ to: email, subject: "إلغاء الشحنة واسترجاع المبلغ", text: message });
+              sendmail({
+                to: email,
+                subject: "إلغاء الشحنة واسترجاع المبلغ",
+                text: message,
+              });
             }
           } catch (_) {}
 
