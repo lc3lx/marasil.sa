@@ -209,21 +209,21 @@ const _createReturnShipmentInternal = async (shipmentId, customerId) => {
     isReturnShipment: true,
     originalShipmentId: originalShipment._id,
     shapmentPrice: shippingCost,
-    shipmentstates: 'READY_FOR_PICKUP',
-    shapmentingType: originalShipment.shapmentingType || 'Dry',
-    paymentMathod: 'Prepaid',
+    shipmentstates: "READY_FOR_PICKUP",
+    shapmentingType: originalShipment.shapmentingType || "Dry",
+    paymentMathod: "Prepaid",
     trackingId: returnShipmentResult.trackingNumber,
     trackingURL: returnShipmentResult.trackingURL,
-    status: 'pending_return',
+    status: "pending_return",
     createdAt: new Date(),
     updatedAt: new Date(),
     // Clear these fields as they will be regenerated
-    __v: undefined
+    __v: undefined,
   };
-  
+
   // Remove the original _id to ensure a new document is created
   delete returnShipmentData._id;
-  
+
   const newReturnShipment = await Shapment.create(returnShipmentData);
 
   // Create a response object with the new return shipment details
@@ -231,14 +231,14 @@ const _createReturnShipmentInternal = async (shipmentId, customerId) => {
     newReturnShipment,
     returnShipmentResult: {
       success: true,
-      message: 'تم إنشاء شحنة الإرجاع بنجاح',
+      message: "تم إنشاء شحنة الإرجاع بنجاح",
       trackingNumber: newReturnShipment.trackingId,
       shippingCost: shippingCost,
       remainingBalance: wallet.balance,
     },
   };
-  
-  console.log('Return shipment created successfully:', response);
+
+  console.log("Return shipment created successfully:", response);
   return response;
 };
 
@@ -323,14 +323,17 @@ module.exports.cancelReturnShipment = asyncHandler(async (req, res, next) => {
     }
 
     // 2. جلب بيانات الشحنة المرتجعة والتحقق من حالتها
-    const returnShipment = await Shapment.findOne({ 
+    const returnShipment = await Shapment.findOne({
       trackingId: trackingNumber,
-      isReturnShipment: true 
+      isReturnShipment: true,
     });
 
     if (!returnShipment) {
       return next(
-        new ApiEror(`شحنة الإرجاع برقم التتبع ${trackingNumber} غير موجودة`, 404)
+        new ApiEror(
+          `شحنة الإرجاع برقم التتبع ${trackingNumber} غير موجودة`,
+          404
+        )
       );
     }
 
@@ -375,7 +378,9 @@ module.exports.cancelReturnShipment = asyncHandler(async (req, res, next) => {
 
         case "omniclama":
           // Omni: استخدام API الخاص بهم للإلغاء إذا كان مدعوماً
-          cancellationResult = await omnidPlatform.cancelShipment(trackingNumber);
+          cancellationResult = await omnidPlatform.cancelShipment(
+            trackingNumber
+          );
           break;
 
         default:
@@ -393,7 +398,10 @@ module.exports.cancelReturnShipment = asyncHandler(async (req, res, next) => {
     }
 
     // 6. استعادة المبلغ إلى محفظة العميل إذا كانت الشحنة مدفوعة مسبقاً
-    if (returnShipment.paymentMathod === "Prepaid" && returnShipment.shapmentPrice > 0) {
+    if (
+      returnShipment.paymentMathod === "Prepaid" &&
+      returnShipment.shapmentPrice > 0
+    ) {
       const refundResult = await processReturnShipmentRefund(
         returnShipment.customerId,
         returnShipment.shapmentPrice,
@@ -401,7 +409,10 @@ module.exports.cancelReturnShipment = asyncHandler(async (req, res, next) => {
       );
 
       if (!refundResult.success) {
-        console.error("فشل في استعادة المبلغ إلى محفظة العميل:", refundResult.error);
+        console.error(
+          "فشل في استعادة المبلغ إلى محفظة العميل:",
+          refundResult.error
+        );
         // نستمر في العملية رغم فشل استعادة المبلغ
       }
     }
@@ -409,11 +420,11 @@ module.exports.cancelReturnShipment = asyncHandler(async (req, res, next) => {
     // 7. تحديث حالة الشحنة المرتجعة في قاعدة البيانات
     await Shapment.findByIdAndUpdate(
       returnShipment._id,
-      { 
-        shipmentstates: "CANCELLED",
+      {
+        shipmentstates: "Canceled",
         status: "cancelled",
         cancelledAt: new Date(),
-        cancellationReason: "تم الإلغاء من قبل المستخدم"
+        cancellationReason: "تم الإلغاء من قبل المستخدم",
       },
       { new: true }
     );
@@ -421,18 +432,21 @@ module.exports.cancelReturnShipment = asyncHandler(async (req, res, next) => {
     // 8. إرجاع نتيجة الإلغاء
     res.status(200).json({
       status: "success",
-      message: "تم إلغاء شحنة الإرجاع بنجاح" + 
+      message:
+        "تم إلغاء شحنة الإرجاع بنجاح" +
         (cancellationResult.cancelledLocally ? " (إلغاء محلي)" : ""),
       data: {
         ...cancellationResult,
-        refundProcessed: returnShipment.paymentMathod === "Prepaid" && returnShipment.shapmentPrice > 0
-      }
+        refundProcessed:
+          returnShipment.paymentMathod === "Prepaid" &&
+          returnShipment.shapmentPrice > 0,
+      },
     });
   } catch (error) {
     console.error(`خطأ في إلغاء شحنة الإرجاع:`, error);
     return next(
       new ApiEror(
-        `فشل في إلغاء شحنة الإرجاع: ${error.message || 'حدث خطأ غير متوقع'}`,
+        `فشل في إلغاء شحنة الإرجاع: ${error.message || "حدث خطأ غير متوقع"}`,
         500
       )
     );

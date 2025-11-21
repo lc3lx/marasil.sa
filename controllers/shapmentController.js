@@ -850,6 +850,7 @@ module.exports.getShipment = asyncHandler(async (req, res, next) => {
 METHOD: GET (ADMIN ONLY)
 GET ALL SHIPMENTS FOR ALL CUSTOMERS
 */
+
 module.exports.getAllShipments = asyncHandler(async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
