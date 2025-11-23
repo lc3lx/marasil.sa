@@ -83,6 +83,37 @@ const customerSchema = new mongoose.Schema(
         detalis: String,
       },
     ],
+    // Notification preferences
+    notificationPreferences: {
+      shipmentUpdates: { type: Boolean, default: true },
+      deliveryNotifications: { type: Boolean, default: true },
+      delayNotifications: { type: Boolean, default: true },
+      paymentNotifications: { type: Boolean, default: true },
+      securityNotifications: { type: Boolean, default: true },
+      marketingNotifications: { type: Boolean, default: false },
+      emailNotifications: { type: Boolean, default: true },
+      smsNotifications: { type: Boolean, default: true },
+      pushNotifications: { type: Boolean, default: true },
+    },
+    // Security settings
+    securitySettings: {
+      twoFactorEnabled: { type: Boolean, default: false },
+    },
+    // Tracking page customization settings
+    trackingSettings: {
+      companyName: { type: String, default: "" },
+      logo: { type: String, default: "/wtshn.jpg" },
+      primaryColor: { type: String, default: "#3498db" },
+      secondaryColor: { type: String, default: "#f8f9fa" },
+      showHeader: { type: Boolean, default: true },
+      showFooter: { type: Boolean, default: true },
+      showMap: { type: Boolean, default: true },
+      showTimeline: { type: Boolean, default: true },
+      language: { type: String, default: "ar" },
+      customCss: { type: String, default: "" },
+      customJs: { type: String, default: "" },
+      embedCode: { type: String, default: "<div id='shipexpress-tracking' data-tracking-id='YOUR_TRACKING_ID'></div><script src='https://tracking.shipexpress.com/embed.js'></script>" },
+    },
   },
   { timestamps: true }
 );

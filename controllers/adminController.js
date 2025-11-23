@@ -310,6 +310,24 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   if (req.body.additional_info)
     updateData.additional_info = req.body.additional_info;
 
+  // تحديث إعدادات الإشعارات
+  if (req.body.notificationPreferences) {
+    updateData.notificationPreferences = req.body.notificationPreferences;
+    console.log("✅ سيتم تحديث notificationPreferences:", req.body.notificationPreferences);
+  }
+
+  // تحديث إعدادات الأمان
+  if (req.body.securitySettings) {
+    updateData.securitySettings = req.body.securitySettings;
+    console.log("✅ سيتم تحديث securitySettings:", req.body.securitySettings);
+  }
+
+  // تحديث إعدادات تخصيص التتبع
+  if (req.body.trackingSettings) {
+    updateData.trackingSettings = req.body.trackingSettings;
+    console.log("✅ سيتم تحديث trackingSettings:", req.body.trackingSettings);
+  }
+
   console.log("📝 بيانات التحديث النهائية (updateData):", updateData);
 
   console.log("🔄 جاري تحديث العميل في الـ database...");
@@ -367,5 +385,65 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     status: "success",
     data: customerData,
+  });
+});
+
+// @desc Update notification preferences
+// @route PUT /api/customer/updateNotificationPreferences
+// @access private/protected
+exports.updateNotificationPreferences = asyncHandler(async (req, res, next) => {
+  const customer = await Customer.findByIdAndUpdate(
+    req.customer._id,
+    { notificationPreferences: req.body.notificationPreferences },
+    { new: true }
+  );
+
+  if (!customer) {
+    return next(new ApiError("العميل غير موجود", 404));
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: customer.notificationPreferences,
+  });
+});
+
+// @desc Update security settings
+// @route PUT /api/customer/updateSecuritySettings
+// @access private/protected
+exports.updateSecuritySettings = asyncHandler(async (req, res, next) => {
+  const customer = await Customer.findByIdAndUpdate(
+    req.customer._id,
+    { securitySettings: req.body.securitySettings },
+    { new: true }
+  );
+
+  if (!customer) {
+    return next(new ApiError("العميل غير موجود", 404));
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: customer.securitySettings,
+  });
+});
+
+// @desc Update tracking page customization settings
+// @route PUT /api/customer/updateTrackingSettings
+// @access private/protected
+exports.updateTrackingSettings = asyncHandler(async (req, res, next) => {
+  const customer = await Customer.findByIdAndUpdate(
+    req.customer._id,
+    { trackingSettings: req.body.trackingSettings },
+    { new: true }
+  );
+
+  if (!customer) {
+    return next(new ApiError("العميل غير موجود", 404));
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: customer.trackingSettings,
   });
 });

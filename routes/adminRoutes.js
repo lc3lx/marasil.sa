@@ -13,6 +13,9 @@ const {
   getMe,
   updateLoggedCustomerPassword,
   updateLoggedCustomerdata,
+  updateNotificationPreferences,
+  updateSecuritySettings,
+  updateTrackingSettings,
 } = require("../controllers/adminController");
 const {
   createCustomerValidator,
@@ -45,6 +48,18 @@ router.put(
   UploadCustomerImage,
   ResizeImage,
   updateLoggedCustomerdata
+);
+router.put(
+  "/updateNotificationPreferences",
+  updateNotificationPreferences
+);
+router.put(
+  "/updateSecuritySettings",
+  updateSecuritySettings
+);
+router.put(
+  "/updateTrackingSettings",
+  updateTrackingSettings
 );
 
 // Admin routes

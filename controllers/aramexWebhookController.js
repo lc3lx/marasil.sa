@@ -20,37 +20,64 @@ module.exports.aramexWebhookHandler = asyncHandler(async (req, res, next) => {
       });
     }
 
-    const {
-      tracking_number,
-      awb_number,
-      status,
-      status_description,
-      status_code,
-      location,
-      timestamp,
-      event_type,
-      shipment_id,
-    } = req.body;
+    // دعم الـ format الجديد (Key/Value) والقديم
+    let webhookData = {};
+
+    // التحقق من الـ format الجديد (Key/Value)
+    if (req.body.Key && req.body.Value) {
+      const { Key, Value } = req.body;
+      
+      // استخراج البيانات من الـ format الجديد
+      webhookData = {
+        waybill_number: Value.WaybillNumber || Key,
+        update_code: Value.UpdateCode,
+        update_date_time: Value.UpdateDateTime,
+        comments: Value.Comments,
+        update_location: Value.UpdateLocation,
+        problem_code: Value.ProblemCode || "",
+        // تحويل UpdateCode إلى status_code
+        status_code: mapUpdateCodeToStatus(Value.UpdateCode),
+        status_description: Value.Comments || Value.UpdateCode,
+        location: Value.UpdateLocation,
+        timestamp: Value.UpdateDateTime,
+      };
+    } else {
+      // الـ format القديم
+      const {
+        tracking_number,
+        awb_number,
+        status,
+        status_description,
+        status_code,
+        location,
+        timestamp,
+        event_type,
+        shipment_id,
+      } = req.body;
+
+      webhookData = {
+        tracking_number,
+        awb_number,
+        waybill_number: awb_number || tracking_number,
+        status,
+        status_description,
+        status_code,
+        location,
+        timestamp,
+        event_type,
+        shipment_id,
+      };
+    }
 
     // التحقق من المعاملات المطلوبة
-    if (!tracking_number && !awb_number && !shipment_id) {
+    if (!webhookData.waybill_number && !webhookData.tracking_number && !webhookData.awb_number && !webhookData.shipment_id) {
       return res.status(400).json({
         error: "Missing required fields",
-        message: "tracking_number, awb_number, or shipment_id is required",
+        message: "WaybillNumber, tracking_number, awb_number, or shipment_id is required",
       });
     }
 
-    const result = await processAramexWebhook({
-      tracking_number,
-      awb_number,
-      status,
-      status_description,
-      status_code,
-      location,
-      timestamp,
-      event_type,
-      shipment_id,
-    });
+    const result = await processAramexWebhook(webhookData);
 
     // إرجاع النتيجة
     res.status(200).json({
@@ -66,31 +93,72 @@ module.exports.aramexWebhookHandler = asyncHandler(async (req, res, next) => {
   }
 });
 
+// دالة لتحويل UpdateCode إلى status_code
+function mapUpdateCodeToStatus(updateCode) {
+  if (!updateCode) return null;
+  
+  // Aramex UpdateCode mapping
+  // SH001 = Shipment Created
+  // SH002 = Picked Up
+  // SH003 = In Transit
+  // SH004 = Out for Delivery
+  // SH005 = Delivered
+  // SH006 = Failed Delivery
+  // SH007 = Returned
+  // SH008 = Cancelled
+  // SH009 = Exception
+  
+  const codeMap = {
+    "SH001": "READY_FOR_PICKUP",
+    "SH002": "PICKED_UP",
+    "SH003": "IN_TRANSIT",
+    "SH004": "OUT_FOR_DELIVERY",
+    "SH005": "DELIVERED",
+    "SH006": "FAILED_DELIVERY",
+    "SH007": "RETURNED",
+    "SH008": "CANCELLED",
+    "SH009": "EXCEPTION",
+  };
+
+  return codeMap[updateCode] || updateCode;
+}
+
 // معالجة webhook Aramex
 async function processAramexWebhook(webhookData) {
   const {
     tracking_number,
     awb_number,
+    waybill_number,
     status,
     status_description,
     status_code,
     location,
+    update_location,
     timestamp,
+    update_date_time,
     event_type,
     shipment_id,
+    update_code,
+    comments,
+    problem_code,
   } = webhookData;
 
+  // استخدام waybill_number كأولوية إذا كان موجوداً
+  const searchNumber = waybill_number || awb_number || tracking_number;
+
   console.log(
-    `🔍 البحث عن الشحنة: tracking_number=${tracking_number}, awb_number=${awb_number}, shipment_id=${shipment_id}`
+    `🔍 البحث عن الشحنة: waybill_number=${waybill_number}, tracking_number=${tracking_number}, awb_number=${awb_number}, shipment_id=${shipment_id}`
   );
 
-  // البحث عن الشحنة باستخدام tracking_number أو awb_number أو shipment_id
+  // البحث عن الشحنة باستخدام waybill_number أو tracking_number أو awb_number أو shipment_id
   let shipment = await Shapment.findOne({
     $or: [
-      { trackingId: tracking_number },
+      { trackingId: waybill_number },
       { trackingId: awb_number },
-      { orderId: tracking_number },
+      { trackingId: tracking_number },
+      { orderId: waybill_number },
       { orderId: awb_number },
+      { orderId: tracking_number },
       { _id: shipment_id },
     ],
     shapmentCompany: "aramex",
@@ -98,64 +166,88 @@ async function processAramexWebhook(webhookData) {
 
   if (!shipment) {
     console.log(
-      `⚠️  الشحنة غير موجودة: tracking_number=${tracking_number}, awb_number=${awb_number}, shipment_id=${shipment_id}`
+      `⚠️  الشحنة غير موجودة: waybill_number=${waybill_number}, tracking_number=${tracking_number}, awb_number=${awb_number}, shipment_id=${shipment_id}`
     );
     throw new Error(
-      `Shipment not found: tracking_number=${tracking_number}, awb_number=${awb_number}, shipment_id=${shipment_id}`
+      `Shipment not found: waybill_number=${waybill_number}, tracking_number=${tracking_number}, awb_number=${awb_number}, shipment_id=${shipment_id}`
     );
   }
 
   console.log(`✅ تم العثور على الشحنة: ${shipment._id}`);
 
-  // تحديد الحالة الجديدة بناءً على status أو status_code
+  // تحديد الحالة الجديدة بناءً على status_code أو update_code أو status
   let newStatus = shipment.shipmentstates; // الحالة الحالية
-  let statusMessage = status_description || status || "تم تحديث حالة الشحنة";
+  let statusMessage = comments || status_description || status || "تم تحديث حالة الشحنة";
+  
+  // استخدام location من update_location إذا كان موجوداً
+  const finalLocation = update_location || location;
 
-  // تحويل status إلى حالة النظام
-  switch (status_code || status) {
+  // تحويل status_code أو update_code إلى حالة النظام
+  const codeToCheck = status_code || update_code || status;
+  
+  switch (codeToCheck) {
+    case "READY_FOR_PICKUP":
+    case "SH001":
+      newStatus = "READY_FOR_PICKUP";
+      statusMessage = comments || "الشحنة جاهزة للاستلام";
+      break;
     case "PICKED_UP":
     case "Picked Up":
+    case "SH002":
       newStatus = "IN_TRANSIT";
-      statusMessage = "تم استلام الشحنة";
+      statusMessage = comments || "تم استلام الشحنة";
       break;
     case "IN_TRANSIT":
     case "In Transit":
+    case "SH003":
       newStatus = "IN_TRANSIT";
-      statusMessage = "الشحنة في الطريق";
+      statusMessage = comments || "الشحنة في الطريق";
       break;
     case "OUT_FOR_DELIVERY":
     case "Out for Delivery":
+    case "SH004":
       newStatus = "OUT_FOR_DELIVERY";
-      statusMessage = "الشحنة جاهزة للتسليم";
+      statusMessage = comments || "الشحنة جاهزة للتسليم";
       break;
     case "DELIVERED":
     case "Delivered":
+    case "SH005":
       newStatus = "Delivered";
-      statusMessage = "تم التسليم بنجاح";
+      statusMessage = comments || "تم التسليم بنجاح";
       break;
     case "FAILED_DELIVERY":
     case "Failed Delivery":
+    case "SH006":
       newStatus = "FAILED_DELIVERY";
-      statusMessage = "فشل في التسليم";
+      statusMessage = comments || "فشل في التسليم";
       break;
     case "RETURNED":
     case "Returned":
+    case "SH007":
       newStatus = "Returned";
-      statusMessage = "تم إرجاع الشحنة";
+      statusMessage = comments || "تم إرجاع الشحنة";
       break;
     case "CANCELLED":
     case "Cancelled":
+    case "SH008":
       newStatus = "Canceled";
-      statusMessage = "تم إلغاء الشحنة";
+      statusMessage = comments || "تم إلغاء الشحنة";
       break;
     case "EXCEPTION":
     case "Exception":
+    case "SH009":
       newStatus = "EXCEPTION";
-      statusMessage = "استثناء في الشحنة";
+      statusMessage = comments || "استثناء في الشحنة";
       break;
     default:
       newStatus = "IN_TRANSIT";
-      statusMessage = status_description || status || "تم تحديث حالة الشحنة";
+      statusMessage = comments || status_description || status || "تم تحديث حالة الشحنة";
+  }
+  
+  // إذا كان هناك ProblemCode، نضيفه للرسالة
+  if (problem_code && problem_code.trim() !== "") {
+    statusMessage += ` (مشكلة: ${problem_code})`;
+    newStatus = "EXCEPTION";
   }
 
   // تحديث حالة الشحنة إذا تغيرت
@@ -167,13 +259,19 @@ async function processAramexWebhook(webhookData) {
 
     // حفظ معلومات الـ webhook
     shipment.aramexWebhookData = {
+      waybill_number,
       tracking_number,
       awb_number,
       status,
       status_description,
       status_code,
-      location,
-      timestamp,
+      update_code,
+      update_date_time: update_date_time || timestamp,
+      comments,
+      update_location: finalLocation,
+      location: finalLocation,
+      timestamp: update_date_time || timestamp,
+      problem_code,
       event_type,
       shipment_id,
     };
@@ -203,15 +301,18 @@ async function processAramexWebhook(webhookData) {
   return {
     shipmentId: shipment._id,
     trackingId: shipment.trackingId,
+    waybill_number,
     tracking_number,
     awb_number,
     oldStatus: shipment.shipmentstates,
     newStatus: newStatus,
     statusMessage: statusMessage,
+    update_code,
     status_code,
     status,
-    location,
-    timestamp,
+    location: finalLocation,
+    timestamp: update_date_time || timestamp,
+    problem_code,
   };
 }
 

@@ -1,23 +1,26 @@
 """
-AI Service API - خدمة الذكاء الاصطناعي
-نموذج Phi-3 Mini مع Fine-tuning لخدمات الشحن
+AI Service API - مساعد ذكي للشحن
+نموذج Qwen2.5 قوي بالعربية مع توليد API calls تلقائياً
 """
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import json
 import os
+import re
+import requests
 
 app = Flask(__name__)
 CORS(app)
 
-# تحميل النموذج (مرة واحدة عند بدء التشغيل) مع اختيار تلقائي للأسرع
-# - GPU: Qwen2.5-1.5B FP16
-# - CPU: Qwen2.5-0.5B FP32 (أسرع بكثير على المعالج)
-DEFAULT_GPU_MODEL = os.getenv('AI_MODEL', 'Qwen/Qwen2.5-1.5B-Instruct')
-DEFAULT_CPU_MODEL = os.getenv('AI_MODEL_CPU', 'Qwen/Qwen2.5-0.5B-Instruct')
+# تحميل النموذج - استخدام نموذج قوي بالعربية
+# Qwen2.5-7B-Instruct: نموذج قوي جداً بالعربية (يحتاج GPU قوي)
+# Qwen2.5-3B-Instruct: متوازن (يعمل على GPU متوسط)
+# Qwen2.5-1.5B-Instruct: سريع (يعمل على CPU/GPU ضعيف)
+DEFAULT_GPU_MODEL = os.getenv('AI_MODEL', 'Qwen/Qwen2.5-3B-Instruct')
+DEFAULT_CPU_MODEL = os.getenv('AI_MODEL_CPU', 'Qwen/Qwen2.5-1.5B-Instruct')
 
 try:
     if torch.cuda.is_available():
@@ -29,29 +32,32 @@ try:
         MODEL_NAME = DEFAULT_CPU_MODEL
         device_map = 'cpu'
         dtype = torch.float32
-        print(f"🔄 تحميل نموذج سريع للـ CPU: {MODEL_NAME} (fp32)")
+        print(f"🔄 تحميل نموذج للـ CPU: {MODEL_NAME} (fp32)")
 
-    # استخدام tokenizer سريع
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
+    
+    # إضافة pad_token إذا لم يكن موجوداً
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
 
-    # تحميل النموذج
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
         device_map=device_map,
         torch_dtype=dtype,
         low_cpu_mem_usage=True,
+        trust_remote_code=True,
     )
     model.eval()
 
-    # Warmup صغير لتسريع أول طلب
+    # Warmup
     try:
         warm_inputs = tokenizer("مرحبا", return_tensors="pt").to(model.device)
         with torch.inference_mode():
-            _ = model.generate(**warm_inputs, max_new_tokens=1)
+            _ = model.generate(**warm_inputs, max_new_tokens=5)
     except Exception:
         pass
 
-    print("✅ تم تحميل النموذج وجاهز!", f"الموديل: {MODEL_NAME}")
+    print(f"✅ تم تحميل النموذج: {MODEL_NAME}")
 except Exception as e:
     print(f"❌ خطأ في تحميل النموذج: {e}")
     print("💡 جرب: pip install --upgrade transformers torch")
@@ -59,294 +65,474 @@ except Exception as e:
     tokenizer = None
 
 # API Base URL
-API_BASE_URL = "https://www.marasil.site/api"
+API_BASE_URL = os.getenv('API_BASE_URL', 'https://www.marasil.site/api')
 
-# System Prompt للمساعد الذكي الطبيعي
-SYSTEM_PROMPT = """أنت مراسيل ai - مساعدة خدمة العملاء في مراسل للشحن. أنت إنسانة ودودة ومتفهمة، تحبين مساعدة الناس وحل مشاكلهم.
+# قائمة APIs المتاحة للمساعد
+AVAILABLE_APIS = {
+    "shipments": {
+        "get_all": {"method": "GET", "url": "/shipment/my-shipments", "description": "جلب جميع شحنات المستخدم"},
+        "get_one": {"method": "GET", "url": "/shipment/my-shipment/{id}", "description": "جلب شحنة محددة"},
+        "track": {"method": "POST", "url": "/shipment/traking", "body": {"trackingNumber": "string"}, "description": "تتبع شحنة برقم التتبع"},
+        "create": {"method": "POST", "url": "/shipment/createshipment", "description": "إنشاء شحنة جديدة"},
+        "cancel": {"method": "POST", "url": "/shipment/cancel/{trackingNumber}", "description": "إلغاء شحنة"},
+        "search": {"method": "GET", "url": "/shipment/search", "description": "بحث في الشحنات"},
+        "stats": {"method": "GET", "url": "/shipment/stats", "description": "إحصائيات الشحنات"},
+        "get_price": {"method": "POST", "url": "/shipment/accountingshipmentprice", "description": "حساب سعر الشحنة"},
+    },
+    "wallet": {
+        "get_balance": {"method": "GET", "url": "/wallet/myBalance", "description": "جلب رصيد المحفظة"},
+        "get_wallet": {"method": "GET", "url": "/wallet/myWallet", "description": "جلب تفاصيل المحفظة"},
+        "get_transactions": {"method": "GET", "url": "/transaction/my-transaction", "description": "جلب معاملات المحفظة"},
+        "recharge": {"method": "POST", "url": "/wallet/rechargeWallet", "description": "شحن المحفظة"},
+    },
+    "customer": {
+        "get_profile": {"method": "GET", "url": "/customer/getMe", "description": "جلب معلومات الحساب"},
+        "update_profile": {"method": "PUT", "url": "/customer/updateMe", "description": "تحديث معلومات الحساب"},
+        "change_password": {"method": "PUT", "url": "/customer/changeMyPassword", "description": "تغيير كلمة المرور"},
+    },
+    "orders": {
+        "get_all": {"method": "GET", "url": "/orderManually", "description": "جلب جميع الطلبات"},
+        "get_one": {"method": "GET", "url": "/orderManually/{orderId}", "description": "جلب طلب محدد"},
+        "create": {"method": "POST", "url": "/orderManually/create", "description": "إنشاء طلب جديد"},
+    },
+    "notifications": {
+        "get_all": {"method": "GET", "url": "/notification/getMynotification", "description": "جلب جميع الإشعارات"},
+        "mark_read": {"method": "PUT", "url": "/notification/{notificationId}/read", "description": "تحديد إشعار كمقروء"},
+        "unread_count": {"method": "GET", "url": "/notification/unread-count", "description": "عدد الإشعارات غير المقروءة"},
+    },
+    "companies": {
+        "get_all": {"method": "GET", "url": "/shippingCompany", "description": "جلب جميع شركات الشحن"},
+        "get_info": {"method": "GET", "url": "/shippingCompany/info", "description": "معلومات شركات الشحن"},
+    },
+    "returns": {
+        "request_otp": {"method": "POST", "url": "/shipment/return/request-otp", "description": "طلب كود OTP للاسترجاع"},
+        "verify_otp": {"method": "POST", "url": "/shipment/return/verify-otp", "description": "التحقق من كود OTP"},
+        "get_shipments": {"method": "GET", "url": "/shipment/return/shipments", "description": "جلب الشحنات القابلة للاسترجاع"},
+        "create_request": {"method": "POST", "url": "/shipment/return/create-request", "description": "إنشاء طلب استرجاع"},
+    },
+    "coupons": {
+        "validate": {"method": "POST", "url": "/coupon/validate", "description": "التحقق من صحة الكوبون"},
+        "apply": {"method": "POST", "url": "/coupon/apply", "description": "تطبيق كوبون"},
+    },
+}
 
-شخصيتك:
+# System Prompt للمساعد الذكي
+SYSTEM_PROMPT = """أنت سارة - مساعدة ذكية في منصة مراسل للشحن. أنت موظفة محترفة وذكية تساعد العملاء في جميع مهام المنصة.
+
+## شخصيتك:
 - ودودة ومرحة وصبورة
 - تتكلمين بلهجة سعودية طبيعية
-- تتفهمين مشاعر العملاء وتتعاطفين معهم
-- تحبين تقديم أفضل خدمة ممكنة
-- تسألين عن تفاصيل أكثر لو احتجتِ
-- تشرحين الأمور ببساطة ووضوح
+- ذكية وتفهمين طلبات العملاء بدقة
+- تساعدين في جميع مهام المنصة بدون استثناء
+- تردين بذكاء وليس فقط حفظ ردود
 
-خدماتك:
-- تتبع الشحنات ومعرفة مكانها
-- عرض شحنات العميل وطلباته
-- شرح خدمات الشركة وأسعارها
-- مساعدة في أي استفسار عن الشحن
-- حل المشاكل والشكاوى
+## مهمتك الأساسية:
+عندما يسألك المستخدم عن شيء يحتاج بيانات من النظام:
 
-شركات الشحن المتاحة:
-- أرامكس: سريع وموثوق
-- سمسا: تغطية واسعة في السعودية  
-- ريد بوكس: خدمة ممتازة
-- لاما بوكس: أسعار مناسبة
+1. **فهمي الطلب بدقة** - ماذا يريد المستخدم بالضبط؟
+2. **حددي API المناسب** - أي endpoint يحتاج؟
+3. **ولدي API call** - بصيغة JSON الصحيحة
+4. **اشرحي للمستخدم** - ماذا ستفعلين
 
-أسلوبك في الرد:
-1. تحدثي كإنسانة طبيعية، مش بوت
-2. استخدمي لهجة سعودية ودودة
-3. اسألي عن التفاصيل لو احتجتِ
-4. اشرحي الأمور بوضوح
-5. تعاطفي مع مشاكل العملاء
-6. أضيفي ACTION فقط لو احتجتِ تنفذي شي
+## قواعد توليد API Calls (مهم جداً):
 
-أمثلة على أسلوبك:
+### عندما يحتاج المستخدم معلومات أو إجراء:
 
-المستخدم: "هلا"
-أنت: "هلا وغلا! أهلاً وسهلاً فيك، أنا سارة من فريق مراسل 😊 كيف أقدر أساعدك اليوم؟"
+**يجب أن تخرجي API call بصيغة JSON بهذا الشكل بالضبط:**
 
-المستخدم: "وين شحنتي؟"
-أنت: "أكيد بساعدك أتتبع شحنتك! ممكن تعطيني رقم التتبع عشان أشوف وين وصلت؟ 📦"
+```json
+{
+  "api_call": {
+    "method": "GET",
+    "url": "/shipment/my-shipments",
+    "headers": {
+      "Authorization": "Bearer {{USER_TOKEN}}",
+      "Content-Type": "application/json"
+    }
+  }
+}
+```
 
-المستخدم: "شحنتي متأخرة ومتضايق"
-أنت: "آسفة كثير إنك متضايق، أفهم شعورك تماماً 😔 خليني أشوف إيش صار مع شحنتك وأحل لك المشكلة. ممكن رقم التتبع؟"
+**أو للـ POST/PUT:**
 
-المستخدم: "كم سعر الشحن؟"
-أنت: "بكل سرور أعرض لك الأسعار! بس عشان أعطيك السعر الدقيق، ممكن تقولي من وين لوين بدك تشحن؟ والوزن تقريباً كم؟ 💰"
+```json
+{
+  "api_call": {
+    "method": "POST",
+    "url": "/shipment/traking",
+    "headers": {
+      "Authorization": "Bearer {{USER_TOKEN}}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "trackingNumber": "123456"
+    }
+  }
+}
+```
 
-المستخدم: "شكراً"
-أنت: "العفو حبيبي! أي وقت تحتاج أي شي أنا هنا، لا تتردد تكلمني 😊 دايماً في خدمتك!"
+### APIs المتاحة:
+
+**الشحنات:**
+- `GET /shipment/my-shipments` - جميع الشحنات
+- `GET /shipment/my-shipment/{id}` - شحنة محددة
+- `POST /shipment/traking` - تتبع (body: {"trackingNumber": "..."})
+- `POST /shipment/createshipment` - إنشاء شحنة
+- `POST /shipment/cancel/{trackingNumber}` - إلغاء
+- `GET /shipment/search` - بحث
+- `GET /shipment/stats` - إحصائيات
+- `POST /shipment/accountingshipmentprice` - حساب السعر
+
+**المحفظة:**
+- `GET /wallet/myBalance` - الرصيد
+- `GET /wallet/myWallet` - تفاصيل المحفظة
+- `GET /transaction/my-transaction` - المعاملات
+- `POST /wallet/rechargeWallet` - شحن المحفظة
+
+**الحساب:**
+- `GET /customer/getMe` - معلومات الحساب
+- `PUT /customer/updateMe` - تحديث الحساب
+- `PUT /customer/changeMyPassword` - تغيير كلمة المرور
+
+**الطلبات:**
+- `GET /orderManually` - جميع الطلبات
+- `GET /orderManually/{orderId}` - طلب محدد
+
+**الإشعارات:**
+- `GET /notification/getMynotification` - جميع الإشعارات
+- `PUT /notification/{id}/read` - تحديد كمقروء
+- `GET /notification/unread-count` - عدد غير المقروءة
+
+**شركات الشحن:**
+- `GET /shippingCompany` - جميع الشركات
+- `GET /shippingCompany/info` - معلومات الشركات
+
+**الاسترجاع:**
+- `POST /shipment/return/request-otp` - طلب OTP
+- `POST /shipment/return/verify-otp` - التحقق
+- `GET /shipment/return/shipments` - الشحنات القابلة للاسترجاع
+- `POST /shipment/return/create-request` - إنشاء طلب
+
+**الكوبونات:**
+- `POST /coupon/validate` - التحقق
+- `POST /coupon/apply` - تطبيق
+
+## أمثلة عملية:
+
+**مثال 1: تتبع شحنة**
+المستخدم: "وين شحنتي رقم 123456"
+أنت: "حبيبي، راح أتتبع لك الشحنة الآن! 📦
+
+```json
+{
+  "api_call": {
+    "method": "POST",
+    "url": "/shipment/traking",
+    "headers": {
+      "Authorization": "Bearer {{USER_TOKEN}}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "trackingNumber": "123456"
+    }
+  }
+}
+```"
+
+**مثال 2: عرض الشحنات**
+المستخدم: "شحناتي" أو "عرض شحناتي"
+أنت: "بكل سرور! راح أجيب لك جميع شحناتك 📦
+
+```json
+{
+  "api_call": {
+    "method": "GET",
+    "url": "/shipment/my-shipments",
+    "headers": {
+      "Authorization": "Bearer {{USER_TOKEN}}",
+      "Content-Type": "application/json"
+    }
+  }
+}
+```"
+
+**مثال 3: رصيد المحفظة**
+المستخدم: "كم رصيد المحفظة؟" أو "رصيدي"
+أنت: "راح أشوف لك رصيد محفظتك الآن 💰
+
+```json
+{
+  "api_call": {
+    "method": "GET",
+    "url": "/wallet/myBalance",
+    "headers": {
+      "Authorization": "Bearer {{USER_TOKEN}}",
+      "Content-Type": "application/json"
+    }
+  }
+}
+```"
+
+**مثال 4: معلومات الحساب**
+المستخدم: "معلومات حسابي" أو "حسابي"
+أنت: "راح أجيب لك معلومات حسابك 👤
+
+```json
+{
+  "api_call": {
+    "method": "GET",
+    "url": "/customer/getMe",
+    "headers": {
+      "Authorization": "Bearer {{USER_TOKEN}}",
+      "Content-Type": "application/json"
+    }
+  }
+}
+```"
+
+**مثال 5: إلغاء شحنة**
+المستخدم: "بدي ألغي شحنة رقم ABC123"
+أنت: "تمام، راح ألغي لك الشحنة الآن ❌
+
+```json
+{
+  "api_call": {
+    "method": "POST",
+    "url": "/shipment/cancel/ABC123",
+    "headers": {
+      "Authorization": "Bearer {{USER_TOKEN}}",
+      "Content-Type": "application/json"
+    }
+  }
+}
+```"
+
+## قواعد مهمة جداً:
+
+1. **استخدمي {{USER_TOKEN}} دائماً** - لا تستخدمي token حقيقي
+2. **URLs بدون /api** - فقط المسار مثل `/shipment/my-shipments`
+3. **استخرجي المعلومات من الطلب** - مثل رقم التتبع من "وين شحنتي رقم 123"
+4. **إذا ما في token** - اطلبي تسجيل الدخول
+5. **لا تخترعي بيانات** - استخدمي API فقط
+6. **للـ POST/PUT** - أضيفي body فقط إذا كان مطلوباً
+
+## أسلوبك في الرد:
+- تحدثي كإنسانة طبيعية
+- استخدمي لهجة سعودية ودودة
+- اشرحي ماذا ستفعلين قبل API call
+- بعد النتائج، اشرحيها بوضوح
+- استخدمي إيموجي بشكل طبيعي 😊
 """
 
-def enhance_response_with_data(response, intent, api_data, user_name=""):
-    """تحسين الرد بإضافة البيانات المسترجعة بطريقة طبيعية وإنسانية"""
+def extract_api_call(text):
+    """استخراج API call من النص - محسّن"""
     try:
-        if intent == "track_shipment" and api_data.get("data"):
-            data = api_data["data"]
-            status = data.get("status", "غير معروف")
-            location = data.get("currentLocation", "غير متوفر")
-            response += f"\n\nطلعت لك المعلومات! 😊\n📍 الحالة الحين: {status}\n🚚 مكان الشحنة: {location}\n\nإذا تحتاج أي شي ثاني، أنا هنا!"
+        # تنظيف النص أولاً
+        text = text.replace('```json', '').replace('```', '').strip()
         
-        elif intent == "get_shipments" and api_data.get("data"):
-            shipments = api_data["data"]
-            count = len(shipments) if isinstance(shipments, list) else 0
-            if count > 0:
-                response += f"\n\nشفت لك الشحنات! عندك {count} شحنة 📦\nإذا تبغى تتتبع أي وحدة منها، أعطني رقم التتبع وأشوفها لك فوراً! 🔍"
-            else:
-                response += f"\n\nما عندك شحنات حالياً 📦\nإذا تبغى تسوي شحنة جديدة، أقدر أساعدك!"
+        # محاولة 1: البحث عن JSON كامل مع api_call
+        # نمط: { "api_call": { ... } }
+        pattern1 = r'\{\s*"api_call"\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}\s*\}'
+        match = re.search(pattern1, text, re.DOTALL)
+        if match:
+            json_str = match.group(0)
+            try:
+                return json.loads(json_str)
+            except:
+                pass
         
-        elif intent == "get_orders" and api_data.get("data"):
-            orders = api_data["data"]
-            count = len(orders) if isinstance(orders, list) else 0
-            if count > 0:
-                response += f"\n\nهذي طلباتك! عندك {count} طلب 📋\nأي استفسار عن أي طلب، قولي وأساعدك!"
-            else:
-                response += f"\n\nما عندك طلبات حالياً 📋\nمتى تبغى تطلب شي، أنا هنا أساعدك!"
+        # محاولة 2: البحث عن JSON متعدد الأسطر
+        # ابحث عن بداية { "api_call"
+        start_idx = text.find('"api_call"')
+        if start_idx == -1:
+            start_idx = text.find("'api_call'")
         
-        elif intent == "get_profile" and api_data.get("data"):
-            profile = api_data["data"]
-            name = profile.get("firstName", "")
-            email = profile.get("email", "")
-            response += f"\n\nهذي معلومات حسابك:"
-            if name:
-                response += f"\n👤 الاسم: {name}"
-            if email:
-                response += f"\n📧 الإيميل: {email}"
-            response += f"\n\nإذا تبغى تعدل أي شي، قولي وأساعدك! 😊"
+        if start_idx != -1:
+            # ابحث عن أقرب { قبل api_call
+            json_start = text.rfind('{', 0, start_idx)
+            if json_start != -1:
+                # ابحث عن } المقابل
+                brace_count = 0
+                json_end = json_start
+                for i in range(json_start, len(text)):
+                    if text[i] == '{':
+                        brace_count += 1
+                    elif text[i] == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            json_end = i + 1
+                            break
+                
+                json_str = text[json_start:json_end]
+                try:
+                    return json.loads(json_str)
+                except:
+                    pass
         
-        elif intent == "get_companies":
-            companies = api_data.get("companies", [])
-            response += "\n\nهذي شركات الشحن اللي نتعامل معها:\n"
-            for comp in companies:
-                response += f"• {comp['name_ar']}: {comp['description']}\n"
-            response += "\nكلها شركات موثوقة ومجربة! أي وحدة تناسبك أقدر أساعدك فيها 😊"
+        # محاولة 3: البحث عن JSON في code blocks
+        code_blocks = re.findall(r'```[a-z]*\s*(\{.*?\})\s*```', text, re.DOTALL)
+        for block in code_blocks:
+            if '"api_call"' in block or "'api_call'" in block:
+                try:
+                    return json.loads(block)
+                except:
+                    pass
         
-        elif intent == "get_prices":
-            pricing = api_data.get("pricing", {})
-            response += "\n\nهذي أسعارنا:\n"
-            response += f"• الشحن المحلي: {pricing.get('local', 'اتصلي للاستفسار')}\n"
-            response += f"• بين المدن: {pricing.get('domestic', 'اتصلي للاستفسار')}\n"
-            response += f"• الشحن الدولي: {pricing.get('international', 'اتصلي للاستفسار')}\n"
-            response += "\nأسعارنا منافسة والخدمة ممتازة! إذا تبغى تفاصيل أكثر، قولي 💰"
-        
-        return response
-    except Exception as e:
-        print(f"❌ خطأ في تحسين الرد: {e}")
-        return response
-
-def execute_action(intent, entities, token, user_name=""):
-    """تنفيذ الإجراء المطلوب عبر API"""
-    import requests
-    
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-    
-    try:
-        if intent == "track_shipment":
-            tracking_number = entities.get("trackingNumber", "")
-            if not tracking_number:
-                return {"error": "رقم التتبع مطلوب"}
-            
-            response = requests.post(
-                f"{API_BASE_URL}/shipment/traking",
-                headers=headers,
-                json={"trackingNumber": tracking_number},
-                timeout=10
-            )
-            return response.json() if response.ok else {"error": "فشل التتبع"}
-        
-        elif intent == "cancel_shipment":
-            shipment_id = entities.get("shipmentId", "")
-            company = entities.get("company", "")
-            if not shipment_id or not company:
-                return {"error": "رقم الشحنة والشركة مطلوبان"}
-            
-            response = requests.post(
-                f"{API_BASE_URL}/shipment/cancel/{shipment_id}",
-                headers=headers,
-                json={"company": company},
-                timeout=10
-            )
-            return response.json() if response.ok else {"error": "فشل الإلغاء"}
-        
-        elif intent == "get_shipments":
-            response = requests.get(
-                f"{API_BASE_URL}/shipment/my-shipments?page=1&itemsPerPage=10",
-                headers=headers,
-                timeout=10
-            )
-            return response.json() if response.ok else {"error": "فشل جلب الشحنات"}
-        
-        elif intent == "get_orders":
-            response = requests.get(
-                f"{API_BASE_URL}/orderManually",
-                headers=headers,
-                timeout=10
-            )
-            return response.json() if response.ok else {"error": "فشل جلب الطلبات"}
-        
-        elif intent == "get_profile":
-            response = requests.get(
-                f"{API_BASE_URL}/customer/profile",
-                headers=headers,
-                timeout=10
-            )
-            return response.json() if response.ok else {"error": "فشل جلب الملف الشخصي"}
-        
-        elif intent == "get_companies":
-            return {
-                "companies": [
-                    {"name": "Aramex", "name_ar": "أرامكس", "description": "شحن سريع وموثوق"},
-                    {"name": "SMSA", "name_ar": "سمسا", "description": "تغطية واسعة في السعودية"},
-                    {"name": "DHL", "name_ar": "لاما بوكس ", "description": "شحن الخزائان "},
-                    {"name": "FedEx", "name_ar": "ريد بوكس", "description": "شحن الخزائان"}
-                ]
-            }
-        
-        elif intent == "get_prices":
-            return {
-                "pricing": {
-                    "local": "من 15 ريال للشحن المحلي",
-                    "domestic": "من 25 ريال بين المدن",
-                    "international": "من 70 ريال للشحن الدولي"
-                }
-            }
+        # محاولة 4: البحث عن JSON بسيط
+        # ابحث عن أي JSON يحتوي على api_call
+        json_pattern = r'\{[^{}]*"api_call"[^{}]*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}[^{}]*\}'
+        matches = re.finditer(json_pattern, text, re.DOTALL)
+        for match in matches:
+            json_str = match.group(0)
+            try:
+                parsed = json.loads(json_str)
+                if "api_call" in parsed:
+                    return parsed
+            except:
+                continue
         
         return None
+    except Exception as e:
+        print(f"❌ خطأ في استخراج API call: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def execute_api_call(api_call_data, user_token):
+    """تنفيذ API call"""
+    try:
+        method = api_call_data.get("method", "GET")
+        url = api_call_data.get("url", "")
+        headers = api_call_data.get("headers", {})
+        body = api_call_data.get("body")
         
+        # استبدال USER_TOKEN
+        if "{{USER_TOKEN}}" in str(headers):
+            headers = json.loads(json.dumps(headers).replace("{{USER_TOKEN}}", user_token))
+        elif "Authorization" in headers:
+            headers["Authorization"] = headers["Authorization"].replace("{{USER_TOKEN}}", user_token)
+        else:
+            headers["Authorization"] = f"Bearer {user_token}"
+        
+        # إضافة Content-Type إذا لم يكن موجوداً
+        if "Content-Type" not in headers:
+            headers["Content-Type"] = "application/json"
+        
+        # بناء URL الكامل
+        full_url = f"{API_BASE_URL}{url}"
+        
+        # تنفيذ الطلب
+        if method == "GET":
+            response = requests.get(full_url, headers=headers, timeout=15)
+        elif method == "POST":
+            response = requests.post(full_url, headers=headers, json=body, timeout=15)
+        elif method == "PUT":
+            response = requests.put(full_url, headers=headers, json=body, timeout=15)
+        elif method == "DELETE":
+            response = requests.delete(full_url, headers=headers, timeout=15)
+        else:
+            return {"error": f"Method {method} not supported"}
+        
+        if response.ok:
+            return response.json()
+        else:
+            return {
+                "error": f"API Error: {response.status_code}",
+                "message": response.text[:200]
+            }
+            
     except requests.exceptions.Timeout:
         return {"error": "انتهت مهلة الاتصال"}
     except requests.exceptions.RequestException as e:
         print(f"❌ خطأ في API: {e}")
-        return {"error": "فشل الاتصال بالخادم"}
+        return {"error": f"فشل الاتصال: {str(e)}"}
     except Exception as e:
         print(f"❌ خطأ غير متوقع: {e}")
-        return {"error": "حدث خطأ غير متوقع"}
+        return {"error": f"حدث خطأ: {str(e)}"}
+
+def format_api_response(response_text, api_data, user_name=""):
+    """تنسيق الرد بناءً على بيانات API"""
+    try:
+        if not api_data or api_data.get("error"):
+            error_msg = api_data.get("error", "حدث خطأ") if api_data else "لا توجد بيانات"
+            return f"{response_text}\n\n⚠️ {error_msg}"
+        
+        # تنسيق حسب نوع البيانات
+        data = api_data.get("data") or api_data
+        
+        if isinstance(data, list):
+            count = len(data)
+            if count > 0:
+                return f"{response_text}\n\n✅ وجدت {count} نتيجة! إذا تحتاج تفاصيل أكثر عن أي واحدة، قولي وأساعدك 😊"
+            else:
+                return f"{response_text}\n\n📭 ما في نتائج حالياً. إذا تحتاج مساعدة في شيء ثاني، أنا هنا!"
+        
+        elif isinstance(data, dict):
+            # إذا كان رصيد محفظة
+            if "balance" in data or isinstance(data, (int, float)):
+                balance = data.get("balance", data) if isinstance(data, dict) else data
+                return f"{response_text}\n\n💰 رصيد محفظتك: {balance} ريال"
+            
+            # إذا كانت شحنة
+            if "trackingId" in data or "shipmentStatus" in data:
+                status = data.get("shipmentStatus", data.get("status", "غير معروف"))
+                tracking = data.get("trackingId", data.get("trackingNumber", "غير متوفر"))
+                return f"{response_text}\n\n📦 رقم التتبع: {tracking}\n📍 الحالة: {status}"
+            
+            # معلومات حساب
+            if "firstName" in data or "email" in data:
+                name = data.get("firstName", "")
+                email = data.get("email", "")
+                return f"{response_text}\n\n👤 الاسم: {name}\n📧 الإيميل: {email}"
+        
+        return f"{response_text}\n\n✅ تم بنجاح! إذا تحتاج أي شيء ثاني، أنا هنا 😊"
+        
+    except Exception as e:
+        print(f"❌ خطأ في تنسيق الرد: {e}")
+        return response_text
 
 def generate_response(user_message, conversation_history=[], token="", user_name=""):
-    """توليد رد من النموذج"""
+    """توليد رد ذكي من النموذج"""
     
-    # ردود سريعة طبيعية وإنسانية
-    quick_responses = {
+    # ردود سريعة للتحيات
+    quick_greetings = {
         "هلا": "هلا وغلا! أهلاً وسهلاً فيك، أنا سارة من فريق مراسل 😊 كيف أقدر أساعدك اليوم؟",
-        "مرحبا": "مرحبا وأهلاً وسهلاً! أنا سارة، مساعدتك في مراسل 😊 وش أقدر أسوي لك؟", 
+        "مرحبا": "مرحبا وأهلاً وسهلاً! أنا سارة، مساعدتك في مراسل 😊 وش أقدر أسوي لك؟",
         "السلام عليكم": "وعليكم السلام ورحمة الله وبركاته! أهلاً وسهلاً، أنا سارة 😊 كيف أقدر أخدمك؟",
-        "طيب": "تمام حبيبي، قولي وش تحتاج وأنا في الخدمة 😊",
         "شكرا": "العفو والله! أي وقت تحتاج أي شي لا تتردد، أنا هنا دايماً 😊",
         "شكراً": "العفو حبيبي! دايماً في خدمتك، أي شي تحتاجه تكلمني 😊",
-        "لا شكرا": "تمام، أي وقت تحتاجني أنا هنا. يعطيك العافية! 👍",
-        "لا شكراً": "تسلم، أي وقت تحتاج أي مساعدة أنا موجودة 👍",
-        "كيف حالك": "الحمدلله بخير وعافية! وأنت كيف حالك؟ 😊 وش أقدر أساعدك فيه؟",
-        "وش أخبارك": "الحمدلله تمام والأمور زينة! وأنت كيف الأحوال؟ 😊",
-        "اهلا": "أهلاً وسهلاً! نورت، أنا سارة من مراسل 😊 كيف أقدر أساعدك؟",
-        "أهلا": "أهلاً وسهلاً فيك! أنا سارة، مساعدتك اليوم 😊 وش تحتاج؟",
-        "hi": "Hi! أهلاً وسهلاً، أنا سارة من مراسل 😊 How can I help you?",
-        "hello": "Hello! مرحبا، أنا سارة 😊 كيف أقدر أساعدك؟",
-        "ok": "تمام، قولي وش تبغين وأنا جاهزة أساعدك 😊",
-        "اوك": "أوكي، وش تحتاجين؟ أنا هنا عشان أساعدك 😊",
-        "وين شحنتي": "أكيد بساعدك أتتبع شحنتك! ممكن تعطيني رقم التتبع عشان أشوف وين وصلت؟ 📦",
-        "شحناتي": "بكل سرور أجيب لك شحناتك! خليني أشوف إيش عندك 📦",
-        "وش الشركات": "عندنا شركات ممتازة: أرامكس وسمسا وريد بوكس ولاما بوكس! أي وحدة تفضل؟ 🚚",
-        "كم السعر": "بكل سرور أعرض لك الأسعار! ممكن تقولي من وين لوين تبغى تشحن؟ 💰",
     }
     
-    # فحص الردود السريعة أولاً
     user_msg_clean = user_message.strip().lower()
-    for key, response in quick_responses.items():
+    for key, response in quick_greetings.items():
         if key in user_msg_clean:
             return {
                 "response": response,
-                "intent": "info",
-                "entities": {},
-                "confidence": 0.95,
+                "api_call": None,
                 "data": None
             }
     
-    # إذا النموذج مش شغال، استخدم ردود ذكية
+    # إذا النموذج غير متوفر، استخدم منطق بسيط
     if model is None or tokenizer is None:
-        # ردود ذكية بناءً على كلمات مفتاحية
-        if any(word in user_msg_clean for word in ["تتبع", "وين", "مكان", "شحنة"]):
-            return {
-                "response": "أكيد بساعدك أتتبع شحنتك! ممكن تعطيني رقم التتبع؟ 📦",
-                "intent": "track_shipment",
-                "entities": {},
-                "confidence": 0.8,
-                "data": None
-            }
-        elif any(word in user_msg_clean for word in ["شحنات", "طرود", "طلبات"]):
-            return {
-                "response": "بكل سرور أعرض لك شحناتك! خليني أجيبها لك 📦",
-                "intent": "get_shipments", 
-                "entities": {},
-                "confidence": 0.8,
-                "data": None
-            }
-        elif any(word in user_msg_clean for word in ["شركات", "شركة", "أرامكس", "سمسا"]):
-            return {
-                "response": "عندنا شركات ممتازة: أرامكس وسمسا وريد بوكس ولاما بوكس! 🚚",
-                "intent": "get_companies",
-                "entities": {},
-                "confidence": 0.8,
-                "data": None
-            }
-        elif any(word in user_msg_clean for word in ["سعر", "أسعار", "تكلفة", "كم"]):
-            return {
-                "response": "بكل سرور أعرض لك الأسعار! ممكن تقولي من وين لوين؟ 💰",
-                "intent": "get_prices",
-                "entities": {},
-                "confidence": 0.8,
-                "data": None
-            }
-        else:
-            return {
-                "response": "أهلاً وسهلاً! أنا سارة من فريق مراسل 😊 أقدر أساعدك في تتبع الشحنات، معرفة الأسعار، أو أي استفسار عن خدماتنا. وش تحتاج؟",
-                "intent": "info",
-                "entities": {},
-                "confidence": 0.7,
-                "data": None
-            }
+        return {
+            "response": "عذراً، النموذج غير متوفر حالياً. جرب لاحقاً.",
+            "api_call": None,
+            "data": None
+        }
     
     try:
-        # بناء المحادثة بصيغة Qwen (الطريقة الصحيحة)
+        # بناء المحادثة
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_message}
         ]
+        
+        # إضافة تاريخ المحادثة
+        for hist in conversation_history[-3:]:  # آخر 3 رسائل فقط
+            if hist.get("role") == "user":
+                messages.append({"role": "user", "content": hist.get("content", "")})
+            elif hist.get("role") == "assistant":
+                messages.append({"role": "assistant", "content": hist.get("content", "")})
         
         # تحويل لـ prompt
         text = tokenizer.apply_chat_template(
@@ -361,62 +547,54 @@ def generate_response(user_message, conversation_history=[], token="", user_name
         with torch.inference_mode():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=28,  # أقصر لسرعة أعلى (~1-3 ثواني)
-                do_sample=False,    # أسرع وبدون تشتت
+                max_new_tokens=512,  # زيادة للسماح بـ API calls
+                do_sample=True,
+                temperature=0.7,
+                top_p=0.9,
                 repetition_penalty=1.2,
                 use_cache=True,
-                pad_token_id=tokenizer.eos_token_id,
+                pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
             )
         
-        # فك تشفير الرد بدقة (تجاهل التوكنات المدخلة)
+        # فك تشفير الرد
         generated_ids = outputs[0]
         input_len = inputs["input_ids"].shape[1]
         response = tokenizer.decode(generated_ids[input_len:], skip_special_tokens=True)
         response = response.strip()
         
-        # استخراج ACTION من الرد
-        intent = "info"
-        entities = {}
+        # استخراج API call
+        api_call_data = extract_api_call(response)
+        
+        # إزالة API call من الرد النهائي
+        if api_call_data:
+            # إزالة JSON من الرد
+            response = re.sub(r'```json.*?```', '', response, flags=re.DOTALL)
+            response = re.sub(r'\{[^{}]*"api_call"[^{}]*\{[^{}]*\}', '', response, flags=re.DOTALL)
+            response = response.strip()
+        
+        # تنفيذ API call إذا كان موجوداً و token متوفر
         api_data = None
+        if api_call_data and token:
+            api_data = execute_api_call(api_call_data.get("api_call", {}), token)
+            # تنسيق الرد بناءً على النتائج
+            response = format_api_response(response, api_data, user_name)
+        elif api_call_data and not token:
+            response += "\n\n⚠️ يرجى تسجيل الدخول أولاً للوصول إلى بياناتك."
+            api_call_data = None
         
-        if "ACTION:" in response:
-            try:
-                action_part = response.split("ACTION:")[1].strip()
-                action_data = json.loads(action_part.split("\n")[0])
-                intent = action_data.get("type", "info").lower()
-                entities = action_data.get("entities", {})
-                
-                # تنفيذ الإجراء إذا كان هناك توكن
-                if token and intent != "info":
-                    api_data = execute_action(intent, entities, token, user_name)
-                
-                # إزالة ACTION من الرد النهائي
-                response = response.split("ACTION:")[0].strip()
-            except Exception as e:
-                print(f"❌ خطأ في معالجة ACTION: {e}")
-        
-        # إضافة اسم المستخدم للرد إذا كان متوفراً (لهجة سعودية)
+        # إضافة اسم المستخدم
         if user_name and response:
-            response = response.replace("هلا وغلا!", f"هلا وغلا {user_name}!")
-            response = response.replace("مرحبا!", f"مرحبا {user_name}!")
-            response = response.replace("تمام،", f"تمام {user_name}،")
-            response = response.replace("أهلاً", f"أهلاً {user_name}")
+            response = response.replace("حبيبي", f"{user_name}")
+            response = response.replace("المستخدم", user_name)
         
-        # تحسين الرد بناءً على البيانات المسترجعة
-        if api_data and not api_data.get("error"):
-            response = enhance_response_with_data(response, intent, api_data, user_name)
-        
-        # إذا كان الرد فاضي أو غريب، استخدم رد افتراضي طبيعي
-        if not response or len(response.strip()) < 3 or "عذراً" in response:
+        # تنظيف الرد
+        if not response or len(response.strip()) < 3:
             response = "أهلاً وسهلاً! أنا سارة من فريق مراسل 😊 كيف أقدر أساعدك اليوم؟"
-            intent = "info"
         
         return {
             "response": response,
-            "intent": intent,
-            "entities": entities,
-            "confidence": 0.85,
+            "api_call": api_call_data,
             "data": api_data
         }
         
@@ -425,9 +603,9 @@ def generate_response(user_message, conversation_history=[], token="", user_name
         import traceback
         traceback.print_exc()
         return {
-            "response": "عذراً، حدث خطأ في معالجة طلبك",
-            "intent": "error",
-            "entities": {}
+            "response": "عذراً، حدث خطأ في معالجة طلبك. جرب مرة أخرى.",
+            "api_call": None,
+            "data": None
         }
 
 @app.route('/health', methods=['GET'])
@@ -436,7 +614,7 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "model_loaded": model is not None,
-        "model_name": MODEL_NAME
+        "model_name": MODEL_NAME if 'MODEL_NAME' in globals() else "N/A"
     })
 
 @app.route('/chat', methods=['POST'])
@@ -461,44 +639,19 @@ def chat():
         print(f"❌ خطأ في /chat: {e}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/analyze', methods=['POST'])
-def analyze():
-    """تحليل النية فقط بدون توليد رد كامل"""
-    try:
-        data = request.json
-        user_message = data.get('message', '').lower()
-        
-        # تحليل بسيط للنية
-        intent = "info"
-        entities = {}
-        
-        if any(word in user_message for word in ["إنشاء", "شحنة جديدة", "بدي شحن"]):
-            intent = "create_shipment"
-        elif any(word in user_message for word in ["تتبع", "وين شحنتي", "track"]):
-            intent = "track_shipment"
-        elif any(word in user_message for word in ["إلغاء", "الغاء", "cancel"]):
-            intent = "cancel_shipment"
-        elif "شحناتي" in user_message:
-            intent = "get_shipments"
-        elif "طلباتي" in user_message:
-            intent = "get_orders"
-        elif any(word in user_message for word in ["حسابي", "ملفي", "profile"]):
-            intent = "get_profile"
-        
-        return jsonify({
-            "intent": intent,
-            "entities": entities,
-            "confidence": 0.8
-        })
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+@app.route('/apis', methods=['GET'])
+def list_apis():
+    """قائمة APIs المتاحة"""
+    return jsonify({
+        "apis": AVAILABLE_APIS,
+        "base_url": API_BASE_URL
+    })
 
 if __name__ == '__main__':
-    print("\n" + "="*50)
-    print("🚀 AI Service جاهز للاستخدام!")
+    print("\n" + "="*60)
+    print("🚀 AI Service - مساعد ذكي للشحن")
     print(f"🌐 http://localhost:5000")
-    print(f"🤖 النموذج: {MODEL_NAME}")
+    print(f"🤖 النموذج: {MODEL_NAME if 'MODEL_NAME' in globals() else 'N/A'}")
     print("🎯 سارة - المساعدة الذكية جاهزة!")
-    print("="*50 + "\n")
+    print("="*60 + "\n")
     app.run(host='0.0.0.0', port=5000, debug=False)

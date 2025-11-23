@@ -4,9 +4,29 @@ module.exports.shipmentnorm = (shippingType, orderData) => {
     throw new Error("البيانات غير مكتملة");
   }
 
-  // حساب الوزن الزائد
-  const additionalWeight = orderData.weight > shippingType.maxWeight 
-    ? Math.ceil(orderData.weight - shippingType.maxWeight) 
+  // حساب الوزن البعدي إذا كانت الأبعاد متوفرة
+  let dimensionalWeight = 0;
+  if (orderData.dimension && 
+      orderData.dimension.length && 
+      orderData.dimension.width && 
+      orderData.dimension.height) {
+    const length = Number(orderData.dimension.length) || 0;
+    const width = Number(orderData.dimension.width) || 0;
+    const height = Number(orderData.dimension.high || orderData.dimension.height) || 0;
+    
+    // حساب الوزن البعدي: (الطول × العرض × الارتفاع) ÷ 5000
+    if (length > 0 && width > 0 && height > 0) {
+      dimensionalWeight = (length * width * height) / 5000;
+    }
+  }
+
+  // أخذ الأعلى بين الوزن الفعلي والوزن البعدي
+  const actualWeight = Number(orderData.weight) || 0;
+  const chargeableWeight = Math.max(actualWeight, dimensionalWeight);
+
+  // حساب الوزن الزائد بناءً على الوزن القابل للتحصيل
+  const additionalWeight = chargeableWeight > shippingType.maxWeight 
+    ? Math.ceil(chargeableWeight - shippingType.maxWeight) 
     : 0;
     
   // حساب التكلفة الأساسية مع الأرباح

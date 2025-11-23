@@ -31,7 +31,7 @@ const asyncHandler = require("express-async-handler");
  */
 module.exports.acountingShipmentPrice = asyncHandler(async (req, res, next) => {
   try {
-    const { company, order, shapmentingType } = req.body;
+    const { company, order, shapmentingType, dimension } = req.body;
     if (!company || !order) {
       return next(new ApiEror("All data is required", 400));
     }
@@ -45,7 +45,13 @@ module.exports.acountingShipmentPrice = asyncHandler(async (req, res, next) => {
       );
     }
 
-    const pricing = shipmentnorm(shippingType, order);
+    // إضافة dimension إلى order إذا كان موجوداً
+    const orderWithDimension = {
+      ...order,
+      dimension: dimension || null,
+    };
+
+    const pricing = shipmentnorm(shippingType, orderWithDimension);
 
     res.status(200).json({ data: pricing });
   } catch (error) {
@@ -193,6 +199,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
       ...order,
       weight: weight,
       paymentMethod: order.payment_method,
+      dimension: dimension || null, // إضافة الأبعاد لحساب الوزن البعدي
     };
     const pricing = shipmentnorm(shippingType, orderWithWeight);
 
