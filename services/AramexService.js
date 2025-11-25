@@ -16,10 +16,9 @@ exports.formatAramexDate = (date) => {
 exports.formatAddress = (address) => {
   return {
     Line1: address.address,
-    Line2: address.district,
+    Line2: address.address,
     Line3: address.addressLine3 || "",
     City: address.city,
-    
 
     PostCode: address.postCode || "",
     CountryCode: address.country ? address.country.toUpperCase() : "SA",
@@ -38,7 +37,7 @@ exports.formatParty = (partyData) => {
 
     Reference1: partyData._id || "Ref1",
     PartyAddress: {
-      Line1: partyData.city + partyData.country + (partyData.district || ""),
+      Line1: partyData.city + partyData.country + (partyData.address || ""),
       Line2: partyData.addressLine2 || "",
       Line3: partyData.addressLine3 || "",
       City: partyData.city,
