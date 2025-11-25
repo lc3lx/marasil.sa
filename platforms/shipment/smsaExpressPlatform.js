@@ -6,14 +6,19 @@ class SMSAService {
     this.baseURL = "https://ecomapis.smsaexpress.com";
   }
 
-  async createShipment(shipmentData) {
+  async createShipment(shipmentData, useOfficesKey = false) {
     try {
+      // استخدام المفتاح الثاني إذا كانت الشحنة تستخدم المكاتب
+      const apiKeyToUse = useOfficesKey 
+        ? "d0404d3468504e6e9388620ef882ed7a".toUpperCase()
+        : this.apiKey.toUpperCase();
+
       const response = await axios.post(
         `${this.baseURL}/api/shipment/b2c/new`,
         shipmentData,
         {
           headers: {
-            apikey: this.apiKey.toUpperCase(), // حسب التوثيق
+            apikey: apiKeyToUse, // حسب التوثيق
             "Content-Type": "application/json",
             Host: "ecomapis.smsaexpress.com",
           },
@@ -662,6 +667,55 @@ class SMSAService {
     } catch (error) {
       console.error(
         "SMSA Offices Error:",
+        error.response?.data || error.message
+      );
+      throw new Error(
+        `فشل في الحصول على قائمة المكاتب: ${
+          error.response?.data?.message || error.message
+        }`
+      );
+    }
+  }
+
+  /**
+   * الحصول على قائمة مكاتب SMSA (لنوع الشحن offices)
+   * يستخدم API Key مختلف
+   * @returns {Promise<Array>} قائمة المكاتب
+   */
+  async getSMSAOffices() {
+    try {
+      const officesApiKey = "d0404d3468504e6e9388620ef882ed7a".toUpperCase();
+      const response = await axios.get(
+        "https://ecomapis.smsaexpress.com/api/lookup/smsaoffices",
+        {
+          headers: {
+            ApiKey: officesApiKey,
+            "Content-Type": "application/json",
+          },
+          validateStatus: (status) => status < 500,
+        }
+      );
+
+      if (response.status !== 200) {
+        const errorDetails = response.data
+          ? response.data.message || JSON.stringify(response.data)
+          : "حدث خطأ غير معروف";
+        throw new Error(`خطأ في الحصول على قائمة المكاتب: ${errorDetails}`);
+      }
+
+      return response.data.map((office) => ({
+        code: office.code,
+        address: office.address,
+        cityName: office.cityName,
+        addressAR: office.addressAR,
+        coordinates: office.coordinates,
+        firstShift: office.firstShift,
+        secondShift: office.secondShift || "",
+        weekendShift: office.weekendShift || "",
+      }));
+    } catch (error) {
+      console.error(
+        "SMSA Offices Lookup Error:",
         error.response?.data || error.message
       );
       throw new Error(

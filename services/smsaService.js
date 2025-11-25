@@ -9,7 +9,7 @@ exports.formatAddress = (address) => {
     ContactPhoneNumber: address.mobile, // رقم الهاتف
     Country: address.country, // رمز الدولة
     City: address.city,
-    AddressLine1:`${address.address}        `,
+    AddressLine1: `${address.address}        `,
     // District: address.address, // اسم المدينة
   };
 };
@@ -21,7 +21,9 @@ exports.Shapmentdata = (
   Parcels,
   orderDescription,
   serviceCode,
-  retailID
+  retailID,
+  senderOfficeCode,
+  recipientOfficeCode
 ) => {
   console.log("Order total amount:", order.total.amount);
   console.log("Payment method (paymentMethod):", order.paymentMethod);
@@ -49,6 +51,15 @@ exports.Shapmentdata = (
     Weight: Weight,
     WeightUnit: "KG",
   };
+
+  // إضافة كود المكتب للمرسل والمستلم إذا كان متوفراً (لنوع الشحن offices)
+  if (senderOfficeCode) {
+    shipmentData.ShipperOfficeCode = senderOfficeCode;
+  }
+  if (recipientOfficeCode) {
+    shipmentData.ConsigneeOfficeCode = recipientOfficeCode;
+  }
+
   console.log("Formatted ConsigneeAddress:", shipmentData.ConsigneeAddress),
     console.log("Final CODAmount:", shipmentData.CODAmount);
   return shipmentData;

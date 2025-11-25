@@ -234,9 +234,18 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           weight,
           Parcels,
           orderDescription,
-          shippingCompany.code
+          shippingCompany.code,
+          req.body.senderOfficeCode,
+          req.body.recipientOfficeCode
         );
-        trackingInfo = await smsaExxpress.createShipment(shipmentData);
+        // استخدام المفتاح الثاني إذا كانت الشحنة تستخدم المكاتب
+        const useOfficesKey = !!(
+          req.body.senderOfficeCode || req.body.recipientOfficeCode
+        );
+        trackingInfo = await smsaExxpress.createShipment(
+          shipmentData,
+          useOfficesKey
+        );
         break;
       case "redbox":
         shipmentData = redboxServers.shipmentdata(
@@ -1271,6 +1280,25 @@ module.exports.getShipmentsStats = asyncHandler(async (req, res, next) => {
   } catch (error) {
     return next(
       new ApiEror(`فشل في جلب إحصائيات الشحنات: ${error.message}`, 500)
+    );
+  }
+});
+
+/**
+ * الحصول على قائمة مكاتب SMSA
+ * METHOD: GET
+ * PATH: /shipment/smsa-offices
+ */
+module.exports.getSMSAOffices = asyncHandler(async (req, res, next) => {
+  try {
+    const offices = await smsaExxpress.getSMSAOffices();
+    res.status(200).json({
+      status: "success",
+      data: offices,
+    });
+  } catch (error) {
+    return next(
+      new ApiEror(`فشل في جلب قائمة مكاتب SMSA: ${error.message}`, 500)
     );
   }
 });
