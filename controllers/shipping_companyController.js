@@ -7,25 +7,25 @@ exports.getShippingCompaniesInfo = asyncHandler(async (req, res) => {
     {
       $project: {
         _id: 0,
-        name: '$company',
+        name: "$company",
         deliveryTime: 1,
         shippingTypes: {
           $map: {
-            input: '$shippingTypes',
-            as: 'type',
+            input: "$shippingTypes",
+            as: "type",
             in: {
-              type: '$$type.type',
+              type: "$$type.type",
               price: {
-                $add: ['$$type.basePrice', '$$type.profitPrice']
+                $add: ["$$type.basePrice", "$$type.profitPrice"],
               },
-              deliveryTime: '$deliveryTime'
-            }
-          }
-        }
-      }
-    }
+              deliveryTime: "$deliveryTime",
+            },
+          },
+        },
+      },
+    },
   ]);
-  
+
   res.json(companies);
 });
 
@@ -72,8 +72,34 @@ exports.getShippingCompanyByNameFromBody = asyncHandler(async (req, res) => {
 
 // 🔸 Update Shipping Company
 exports.updateShippingCompany = asyncHandler(async (req, res) => {
-  const { shippingTypes } = req.body;
+  const { shippingTypes, addShippingType } = req.body;
 
+  // إذا كان هناك addShippingType (نوع جديد واحد فقط)
+  if (addShippingType) {
+    const company = await ShippingCompany.findById(req.params.id);
+    if (!company) {
+      return res.status(404).json({ message: "Company not found" });
+    }
+
+    // التحقق من عدم وجود النوع مسبقاً
+    const existingType = company.shippingTypes.find(
+      (t) => t.type === addShippingType.type
+    );
+
+    if (existingType) {
+      return res.status(400).json({
+        error: `نوع الشحن "${addShippingType.type}" موجود مسبقاً`,
+      });
+    }
+
+    // إضافة النوع الجديد للـ array الموجود
+    company.shippingTypes.push(addShippingType);
+    await company.save();
+
+    return res.json(company);
+  }
+
+  // إذا كان هناك shippingTypes (array كامل) - السلوك القديم
   if (shippingTypes) {
     const types = shippingTypes.map((t) => t.type);
     const hasDuplicates = new Set(types).size !== types.length;
@@ -141,23 +167,23 @@ module.exports.getShippingCompanies = asyncHandler(async (req, res, next) => {
   const companies = await shappingCompany.find({ status: "Enabled" });
 
   // Map the companies to only include the required fields
-  const companiesList = companies.map(company => ({
+  const companiesList = companies.map((company) => ({
     id: company._id,
     name: company.company,
-    deliveryTime: company.deliveryAt || '2-3 أيام عمل',
-    shippingTypes: company.shippingTypes.map(type => ({
+    deliveryTime: company.deliveryAt || "2-3 أيام عمل",
+    shippingTypes: company.shippingTypes.map((type) => ({
       type: type.type,
       price: type.basePrice + type.profitPrice, // Total price = base + profit
-      deliveryTime: company.deliveryAt || '2-3 أيام عمل',
+      deliveryTime: company.deliveryAt || "2-3 أيام عمل",
       codAvailable: type.COD,
       maxWeight: type.maxWeight,
-      maxCodAmount: type.maxCodAmount
-    }))
+      maxCodAmount: type.maxCodAmount,
+    })),
   }));
 
   res.status(200).json({
-    status: 'success',
+    status: "success",
     results: companiesList.length,
-    data: companiesList
+    data: companiesList,
   });
 });
