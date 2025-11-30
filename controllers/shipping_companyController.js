@@ -94,6 +94,19 @@ exports.updateShippingCompany = asyncHandler(async (req, res) => {
 
     // إضافة النوع الجديد للـ array الموجود
     company.shippingTypes.push(addShippingType);
+
+    // تحديث باقي الحقول إذا كانت موجودة (باستثناء shippingTypes)
+    const updateData = { ...req.body };
+    delete updateData.addShippingType;
+    delete updateData.shippingTypes; // منع استبدال shippingTypes
+
+    // تطبيق التحديثات الأخرى
+    Object.keys(updateData).forEach((key) => {
+      if (key !== "shippingTypes" && key !== "addShippingType") {
+        company[key] = updateData[key];
+      }
+    });
+
     await company.save();
 
     return res.json(company);
