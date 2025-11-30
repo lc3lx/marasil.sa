@@ -844,7 +844,14 @@ module.exports.getShipment = asyncHandler(async (req, res, next) => {
     const { id } = req.params;
     const customerId = req.customer._id;
 
-    const shipment = await Shapment.findOne({ _id: id, customerId }).populate(
+    // البحث عن الشحنة باستخدام _id أو trackingNumber أو trackingId
+    const shipment = await Shapment.findOne({
+      $or: [
+        { _id: id, customerId },
+        { trackingNumber: id, customerId },
+        { trackingId: id, customerId },
+      ],
+    }).populate(
       "customerId",
       "firstName lastName email phone"
     );
