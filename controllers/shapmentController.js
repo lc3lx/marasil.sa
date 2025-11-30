@@ -851,10 +851,10 @@ module.exports.getShipment = asyncHandler(async (req, res, next) => {
         { trackingNumber: id, customerId },
         { trackingId: id, customerId },
       ],
-    }).populate(
-      "customerId",
-      "firstName lastName email phone"
-    );
+    })
+      .populate("customerId", "firstName lastName email phone")
+      .populate("receiverAddress")
+      .populate("orderId");
 
     if (!shipment) {
       return next(new ApiEror("الشحنة غير موجودة", 404));
