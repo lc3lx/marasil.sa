@@ -9,7 +9,7 @@ class SMSAService {
   async createShipment(shipmentData, useOfficesKey = false) {
     try {
       // استخدام المفتاح الثاني إذا كانت الشحنة تستخدم المكاتب
-      const apiKeyToUse = useOfficesKey 
+      const apiKeyToUse = useOfficesKey
         ? "d0404d3468504e6e9388620ef882ed7a".toUpperCase()
         : this.apiKey.toUpperCase();
 
@@ -689,8 +689,9 @@ class SMSAService {
         "https://ecomapis.smsaexpress.com/api/lookup/smsaoffices",
         {
           headers: {
-            ApiKey: officesApiKey,
+            apikey: officesApiKey, // استخدام apikey بدلاً من ApiKey
             "Content-Type": "application/json",
+            Host: "ecomapis.smsaexpress.com",
           },
           validateStatus: (status) => status < 500,
         }
