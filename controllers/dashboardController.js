@@ -211,22 +211,162 @@ exports.getAllUsers = asyncHandler(async (req, res) => {
 
   const total = await Customer.countDocuments(searchQuery);
 
-  let users = userDocs;
+  const ids = userDocs.map((u) => u._id);
+
+  let balanceMap = new Map();
+  let transactionStatsMap = new Map();
+  let shipmentStatsMap = new Map();
+  let orderStatsMap = new Map();
+
   try {
     const Wallet = require("../models/walletModel");
-    const ids = userDocs.map((u) => u._id);
     const wallets = await Wallet.find({ customerId: { $in: ids } })
       .select('customerId balance')
       .lean();
-    const balanceMap = new Map(wallets.map((w) => [String(w.customerId), Number(w.balance) || 0]));
-    users = userDocs.map((u) => {
-      const o = u.toObject();
-      o.balance = balanceMap.get(String(u._id)) || 0;
-      return o;
-    });
+    balanceMap = new Map(wallets.map((w) => [String(w.customerId), Number(w.balance) || 0]));
   } catch (e) {
-    users = userDocs.map((u) => ({ ...u.toObject(), balance: 0 }));
+    balanceMap = new Map();
   }
+
+  try {
+    const Transaction = require("../models/transactionModel");
+    const transactionStats = await Transaction.aggregate([
+      { $match: { customerId: { $in: ids } } },
+      {
+        $group: {
+          _id: "$customerId",
+          rechargeCount: {
+            $sum: {
+              $cond: [
+                { $eq: [{ $toUpper: "$type" }, "CREDIT"] },
+                1,
+                0,
+              ],
+            },
+          },
+          spent: {
+            $sum: {
+              $cond: [
+                { $eq: [{ $toUpper: "$type" }, "DEBIT"] },
+                { $ifNull: ["$amount", 0] },
+                0,
+              ],
+            },
+          },
+          lastTransaction: { $max: "$createdAt" },
+        },
+      },
+    ]);
+    transactionStatsMap = new Map(
+      transactionStats.map((stat) => [String(stat._id), stat])
+    );
+  } catch (e) {
+    transactionStatsMap = new Map();
+  }
+
+  try {
+    const Shipment = require("../models/shipmentModel");
+    const shipmentStats = await Shipment.aggregate([
+      { $match: { customerId: { $in: ids } } },
+      {
+        $group: {
+          _id: "$customerId",
+          total: { $sum: 1 },
+          delivered: {
+            $sum: {
+              $cond: [
+                { $eq: [{ $toUpper: "$shipmentstates" }, "DELIVERED"] },
+                1,
+                0,
+              ],
+            },
+          },
+          inTransit: {
+            $sum: {
+              $cond: [
+                { $eq: [{ $toUpper: "$shipmentstates" }, "IN_TRANSIT"] },
+                1,
+                0,
+              ],
+            },
+          },
+          canceled: {
+            $sum: {
+              $cond: [
+                {
+                  $in: [
+                    { $toUpper: "$shipmentstates" },
+                    ["CANCELED", "CANCELLED"],
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          returns: {
+            $sum: {
+              $cond: [
+                {
+                  $or: [
+                    { $eq: [{ $toUpper: "$shapmentType" }, "REVERSE"] },
+                    { $eq: ["$isReturnShipment", true] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          lastShipmentDate: { $max: "$createdAt" },
+        },
+      },
+    ]);
+    shipmentStatsMap = new Map(
+      shipmentStats.map((stat) => [String(stat._id), stat])
+    );
+  } catch (e) {
+    shipmentStatsMap = new Map();
+  }
+
+  try {
+    const Order = require("../models/Order");
+    const orderStats = await Order.aggregate([
+      { $match: { Customer: { $in: ids } } },
+      {
+        $group: {
+          _id: "$Customer",
+          total: { $sum: 1 },
+        },
+      },
+    ]);
+    orderStatsMap = new Map(orderStats.map((stat) => [String(stat._id), stat]));
+  } catch (e) {
+    orderStatsMap = new Map();
+  }
+
+  const users = userDocs.map((u) => {
+    const id = String(u._id);
+    const base = u.toObject();
+
+    const walletStats = transactionStatsMap.get(id);
+    const shipmentStats = shipmentStatsMap.get(id);
+    const orderStats = orderStatsMap.get(id);
+
+    return {
+      ...base,
+      balance: balanceMap.get(id) || 0,
+      walletRecharges: walletStats?.rechargeCount || 0,
+      walletSpent: Number(walletStats?.spent || 0),
+      totalShipments: shipmentStats?.total || 0,
+      totalOrders: orderStats?.total || 0,
+      shipmentsSent: shipmentStats?.total || 0,
+      shipmentsReceived: shipmentStats?.delivered || 0,
+      shipmentsCancelled: shipmentStats?.canceled || 0,
+      shipmentsReturned: shipmentStats?.returns || 0,
+      lastTransaction: walletStats?.lastTransaction || shipmentStats?.lastShipmentDate || null,
+    };
+  });
 
   res.status(200).json({
     success: true,
