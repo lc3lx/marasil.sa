@@ -12,51 +12,109 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
   const adminUsers = await Customer.countDocuments({ role: 'admin' });
   
   // إحصائيات الشحنات من قاعدة البيانات
-  let totalShipments = 0, pendingShipments = 0, inTransitShipments = 0, deliveredShipments = 0, cancelledShipments = 0;
+  let totalShipments = 0,
+    pendingShipments = 0,
+    inTransitShipments = 0,
+    deliveredShipments = 0,
+    cancelledShipments = 0;
   try {
     const Shipment = require("../models/shipmentModel");
-    totalShipments = await Shipment.countDocuments();
-    // Map بطاقات الواجهة:
-    // pending  -> READY_FOR_PICKUP
-    // inTransit -> IN_TRANSIT
-    // delivered -> Delivered
-    // cancelled -> Canceled
-    pendingShipments = await Shipment.countDocuments({ shipmentstates: 'READY_FOR_PICKUP' });
-    inTransitShipments = await Shipment.countDocuments({ shipmentstates: 'IN_TRANSIT' });
-    deliveredShipments = await Shipment.countDocuments({ shipmentstates: 'Delivered' });
-    cancelledShipments = await Shipment.countDocuments({ shipmentstates: 'Canceled' });
+    const shipmentStatusCounts = await Shipment.aggregate([
+      {
+        $group: {
+          _id: { $toUpper: "$shipmentstates" },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const shipmentStatusMap = shipmentStatusCounts.reduce((acc, cur) => {
+      acc[cur._id] = cur.count;
+      return acc;
+    }, {});
+
+    totalShipments = shipmentStatusCounts.reduce((sum, cur) => sum + cur.count, 0);
+    pendingShipments =
+      shipmentStatusMap.READY_FOR_PICKUP ||
+      shipmentStatusMap.PENDING ||
+      shipmentStatusMap["READY FOR PICKUP"] ||
+      0;
+    inTransitShipments = shipmentStatusMap.IN_TRANSIT || shipmentStatusMap.TRANSIT || 0;
+    deliveredShipments = shipmentStatusMap.DELIVERED || 0;
+    cancelledShipments =
+      shipmentStatusMap.CANCELED ||
+      shipmentStatusMap.CANCELLED ||
+      shipmentStatusMap.CANCELLED ||
+      0;
   } catch (error) {
     console.log('Shipment model not found, using default values');
   }
-  
+
   // إحصائيات الطلبات من قاعدة البيانات
-  let totalOrders = 0, pendingOrders = 0, approvedOrders = 0, rejectedOrders = 0, completedOrders = 0;
+  let totalOrders = 0,
+    pendingOrders = 0,
+    approvedOrders = 0,
+    rejectedOrders = 0,
+    completedOrders = 0;
   try {
     const Order = require("../models/orderModel");
-    totalOrders = await Order.countDocuments();
-    pendingOrders = await Order.countDocuments({ status: 'pending' });
-    approvedOrders = await Order.countDocuments({ status: 'approved' });
-    rejectedOrders = await Order.countDocuments({ status: 'rejected' });
-    completedOrders = await Order.countDocuments({ status: 'completed' });
+    const orderStatusCounts = await Order.aggregate([
+      {
+        $group: {
+          _id: { $toUpper: "$status" },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const orderStatusMap = orderStatusCounts.reduce((acc, cur) => {
+      acc[cur._id] = cur.count;
+      return acc;
+    }, {});
+
+    totalOrders = orderStatusCounts.reduce((sum, cur) => sum + cur.count, 0);
+    pendingOrders = orderStatusMap.PENDING || 0;
+    approvedOrders = orderStatusMap.APPROVED || orderStatusMap.ACCEPTED || 0;
+    rejectedOrders = orderStatusMap.REJECTED || orderStatusMap.DENIED || 0;
+    completedOrders = orderStatusMap.COMPLETED || orderStatusMap.DELIVERED || 0;
   } catch (error) {
     console.log('Order model not found, using default values');
   }
-  
+
   // إحصائيات المحافظ من قاعدة البيانات
-  let totalBalance = 0, activeWallets = 0, totalTransactions = 0, totalDeposits = 0, totalWithdrawals = 0;
+  let totalBalance = 0,
+    activeWallets = 0,
+    totalTransactions = 0,
+    totalDeposits = 0,
+    totalWithdrawals = 0;
   try {
     const Wallet = require("../models/walletModel");
     const Transaction = require("../models/transactionModel");
-    
+
     const wallets = await Wallet.find();
     totalBalance = wallets.reduce((sum, wallet) => sum + (wallet.balance || 0), 0);
     activeWallets = await Wallet.countDocuments({ balance: { $gt: 0 } });
-    
+
     totalTransactions = await Transaction.countDocuments();
-    const deposits = await Transaction.find({ type: 'deposit' });
-    const withdrawals = await Transaction.find({ type: 'withdrawal' });
-    totalDeposits = deposits.reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
-    totalWithdrawals = withdrawals.reduce((sum, transaction) => sum + (transaction.amount || 0), 0);
+    const transactionSums = await Transaction.aggregate([
+      {
+        $group: {
+          _id: { $toUpper: "$type" },
+          amount: { $sum: { $ifNull: ["$amount", 0] } }
+        }
+      }
+    ]);
+
+    const transactionMap = transactionSums.reduce((acc, cur) => {
+      acc[cur._id] = cur.amount;
+      return acc;
+    }, {});
+
+    totalDeposits =
+      (transactionMap.CREDIT || 0) +
+      (transactionMap.DEPOSIT || 0) +
+      (transactionMap.APPROVED || 0); // بعض الأنظمة القديمة قد تعتمد على نوع العملية للموافقة
+    totalWithdrawals = (transactionMap.DEBIT || 0) + (transactionMap.WITHDRAWAL || 0);
   } catch (error) {
     console.log('Wallet/Transaction models not found, using default values');
   }
