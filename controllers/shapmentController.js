@@ -807,8 +807,11 @@ GET ALL SHIPMENTS FOR A SPECIFIC CUSTOMER
 module.exports.getCustomerShipments = asyncHandler(async (req, res, next) => {
   try {
     const customerId = req.customer._id;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit);
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit =
+      parseInt(req.query.limit, 10) ||
+      parseInt(req.query.itemsPerPage, 10) ||
+      10;
     const skip = (page - 1) * limit;
 
     const shipments = await Shapment.find({ customerId })
@@ -831,7 +834,12 @@ module.exports.getCustomerShipments = asyncHandler(async (req, res, next) => {
       data: shipments,
     });
   } catch (error) {
-    return next(new ApiEror(`فشل في جلب الشحنات: ${error.message}`, 500));
+    console.error("Error fetching customer shipments:", error);
+    res.status(500).json({
+      status: "error",
+      message: "حدث خطأ أثناء جلب الشحنات",
+      error: error.message,
+    });
   }
 });
 
