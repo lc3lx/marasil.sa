@@ -519,14 +519,23 @@ exports.uplaodBankreceiptImage = upload.single("bankReceipt");
 exports.RechargeWalletbyBank = asyncHandler(async (req, res, next) => {
   try {
     const { amount } = req.body;
+    const numericAmount = Number(amount);
+    if (!numericAmount || Number.isNaN(numericAmount) || numericAmount <= 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "يرجى إدخال مبلغ تحويل صحيح" });
+    }
+
     const bankReceipt = req.file ? req.file.filename : null;
 
     const transaction = new Transaction({
       customerId: req.customer._id,
-      amount,
+      amount: numericAmount,
       type: "credit",
       method: "bank_transfer",
       bankReceipt,
+      status: "pending",
+      description: "طلب شحن المحفظة عن طريق تحويل بنكي",
     });
     await transaction.save();
 

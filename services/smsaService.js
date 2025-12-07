@@ -23,7 +23,8 @@ exports.Shapmentdata = (
   serviceCode,
   retailID,
   senderOfficeCode,
-  recipientOfficeCode
+  recipientOfficeCode,
+  dimension = {}
 ) => {
   console.log("Order total amount:", order.total.amount);
   console.log("Payment method (paymentMethod):", order.paymentMethod);
@@ -31,6 +32,12 @@ exports.Shapmentdata = (
 
   const isCOD = order.paymentMethod === "COD" || order.payment_method === "COD";
   console.log("Is COD payment:", isCOD);
+
+  const parcelLength = Number(dimension.length || 0);
+  const parcelWidth = Number(dimension.width || 0);
+  const parcelHeight = Number(
+    dimension.height || dimension.high || dimension?.Height || 0
+  );
 
   const shipmentData = {
     CODAmount: isCOD ? order.total.amount : 0,
@@ -50,6 +57,15 @@ exports.Shapmentdata = (
     WaybillType: "PDF",
     Weight: Weight,
     WeightUnit: "KG",
+    Dimensions:
+      parcelLength && parcelWidth && parcelHeight
+        ? {
+            Length: parcelLength,
+            Width: parcelWidth,
+            Height: parcelHeight,
+            Unit: "CM",
+          }
+        : undefined,
   };
 
   // إضافة كود المكتب للمرسل والمستلم إذا كان متوفراً (لنوع الشحن offices)

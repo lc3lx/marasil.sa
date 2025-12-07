@@ -17,6 +17,7 @@ const {
   getUserActivity,
   approveBankTransfer,
   getPendingBankTransfers,
+  getBankTransfers,
   subtractBalanceFromUser,
 } = require("../controllers/adminWalletController");
 
@@ -50,6 +51,7 @@ router.post("/wallets/:userId/add-balance", addBalanceToUser);
 router.post("/wallets/:userId/subtract-balance", subtractBalanceFromUser);
 router.get("/wallets/pending-transfers", getPendingBankTransfers);
 router.put("/wallets/approve-bank-transfer/:transactionId", approveBankTransfer);
+router.get("/wallets/transfers", getBankTransfers);
 
 // Shipments Management
 router.get("/shipments", getAllShipments);

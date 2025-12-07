@@ -22,6 +22,36 @@ const aramxServers = require("../services/AramexService");
 // helpers import
 const ApiEror = require("../utils/apiError");
 const asyncHandler = require("express-async-handler");
+
+const normalizeDimensionInput = (dimension = {}) => {
+  const toNumber = (value) => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : 0;
+  };
+
+  const length =
+    toNumber(
+      dimension.length ??
+        dimension.Length ??
+        dimension.long ??
+        dimension.Long
+    ) || 0;
+  const width =
+    toNumber(dimension.width ?? dimension.Width ?? dimension.Wide) || 0;
+  const height =
+    toNumber(
+      dimension.height ??
+        dimension.Height ??
+        dimension.high ??
+        dimension.High
+    ) || 0;
+
+  if (!length && !width && !height) {
+    return { length: 0, width: 0, height: 0 };
+  }
+
+  return { length, width, height };
+};
 /**?
  * Mathod // Post
  *thie Mothod for accounting shipmenting price
@@ -45,10 +75,16 @@ module.exports.acountingShipmentPrice = asyncHandler(async (req, res, next) => {
       );
     }
 
+    const normalizedDimension = normalizeDimensionInput(dimension);
+    const hasValidDimension =
+      normalizedDimension.length > 0 &&
+      normalizedDimension.width > 0 &&
+      normalizedDimension.height > 0;
+
     // إضافة dimension إلى order إذا كان موجوداً
     const orderWithDimension = {
       ...order,
-      dimension: dimension || null,
+      dimension: hasValidDimension ? normalizedDimension : null,
     };
 
     const pricing = shipmentnorm(shippingType, orderWithDimension);
@@ -137,8 +173,14 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
     if (shippingCompany.status !== "Enabled") {
       return next(new ApiEror(`شركة الشحن ${company} غير مفعلة حالياً`, 400));
     }
-    if (shappingCompany == "omniclama" || shappingCompany == "redbox") {
-      if (!req.body.dimension) {
+    const normalizedDimension = normalizeDimensionInput(dimension);
+    const hasValidDimension =
+      normalizedDimension.length > 0 &&
+      normalizedDimension.width > 0 &&
+      normalizedDimension.height > 0;
+
+    if (company === "omniclama" || company === "redbox") {
+      if (!hasValidDimension) {
         return next(new ApiEror("الطول والعرض والارتفاع مطلوبة", 400));
         // أوقف التنفيذ بعد الخطأ
       }
@@ -150,8 +192,8 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
       }
       const allowed = shippingCompany.allowedBoxSizes[0];
       console.log(allowed);
-      const reqDim = req.body.dimension;
-      console.log(dimension);
+      const reqDim = normalizedDimension;
+      console.log(reqDim);
       const reqVolume =
         Number(reqDim.length) * Number(reqDim.width) * Number(reqDim.height);
       const allowedVolume =
@@ -195,13 +237,16 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
     }
 
     // 5. حساب تكلفة الشحن
+    const dimensionPayload = hasValidDimension ? normalizedDimension : null;
+
     const orderWithWeight = {
       ...order,
       weight: weight,
       paymentMethod: order.payment_method,
-      dimension: dimension || null, // إضافة الأبعاد لحساب الوزن البعدي
+      dimension: dimensionPayload, // إضافة الأبعاد لحساب الوزن البعدي
     };
     const pricing = shipmentnorm(shippingType, orderWithWeight);
+    orderToUse.dimension = dimensionPayload;
 
     // البحث عن محفظة العميل
     const wallet = await Wallet.findOne({ customerId: req.customer._id });
@@ -236,7 +281,8 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           orderDescription,
           shippingCompany.code,
           req.body.senderOfficeCode,
-          req.body.recipientOfficeCode
+          req.body.recipientOfficeCode,
+          dimensionPayload
         );
         // استخدام المفتاح الثاني إذا كانت الشحنة تستخدم المكاتب
         const useOfficesKey = !!(
@@ -276,7 +322,8 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           shipperAddress,
           weight,
           Parcels,
-          orderDescription
+          orderDescription,
+          dimensionPayload || normalizedDimension
         );
         try {
           trackingInfo = await aramex.createShipment(shipmentData);
@@ -299,7 +346,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
             weight,
             Parcels,
             orderDescription,
-            dimension
+            dimensionPayload || normalizedDimension
           );
           trackingInfo = await omin.createShipment(shipmentData);
           // استخدام order_uid كرقم تتبع إذا كان متوفراً
@@ -1235,29 +1282,77 @@ module.exports.getShipmentsStats = asyncHandler(async (req, res, next) => {
   try {
     const customerId = req.customer._id;
 
-    const stats = await Shapment.aggregate([
-      { $match: { customerId: customerId } },
+    const statsPipeline = [
+      { $match: { customerId } },
+      {
+        $addFields: {
+          statusUpper: {
+            $toUpper: {
+              $ifNull: ["$shipmentstates", ""],
+            },
+          },
+          totalValueCalc: {
+            $ifNull: [
+              "$totalprice",
+              {
+                $add: [
+                  { $ifNull: ["$shapmentPrice.basePrice", 0] },
+                  { $ifNull: ["$shapmentPrice.profitPrice", 0] },
+                  { $ifNull: ["$shapmentPrice.basepickUpPrice", 0] },
+                  { $ifNull: ["$shapmentPrice.profitpickUpPrice", 0] },
+                  { $ifNull: ["$shapmentPrice.baseCODfees", 0] },
+                  { $ifNull: ["$shapmentPrice.profitCODfees", 0] },
+                  { $ifNull: ["$shapmentPrice.baseAdditionalweigth", 0] },
+                  { $ifNull: ["$shapmentPrice.profitAdditionalweigth", 0] },
+                  { $ifNull: ["$shapmentPrice.baseRTOprice", 0] },
+                  { $ifNull: ["$shapmentPrice.profitRTOprice", 0] },
+                  { $ifNull: ["$shapmentPrice.byocPrice", 0] },
+                ],
+              },
+            ],
+          },
+          shippingCostCalc: {
+            $add: [
+              { $ifNull: ["$shapmentPrice.basePrice", 0] },
+              { $ifNull: ["$shapmentPrice.basepickUpPrice", 0] },
+              { $ifNull: ["$shapmentPrice.baseRTOprice", 0] },
+              { $ifNull: ["$shapmentPrice.baseAdditionalweigth", 0] },
+              { $ifNull: ["$shapmentPrice.baseCODfees", 0] },
+              { $ifNull: ["$shapmentPrice.byocPrice", 0] },
+            ],
+          },
+        },
+      },
       {
         $group: {
           _id: null,
           totalShipments: { $sum: 1 },
-          totalValue: { $sum: "$orderValue" },
-          totalShippingCost: { $sum: "$shippingPrice" },
+          totalValue: { $sum: "$totalValueCalc" },
+          totalShippingCost: { $sum: "$shippingCostCalc" },
           pendingShipments: {
             $sum: {
-              $cond: [{ $eq: ["$shipmentStatus", "READY_FOR_PICKUP"] }, 1, 0],
+              $cond: [
+                {
+                  $in: ["$statusUpper", ["READY_FOR_PICKUP", "PENDING"]],
+                },
+                1,
+                0,
+              ],
             },
           },
           deliveredShipments: {
             $sum: {
-              $cond: [{ $eq: ["$shipmentStatus", "DELIVERED"] }, 1, 0],
+              $cond: [{ $eq: ["$statusUpper", "DELIVERED"] }, 1, 0],
             },
           },
           inTransitShipments: {
             $sum: {
               $cond: [
                 {
-                  $in: ["$shipmentStatus", ["IN_TRANSIT", "OUT_FOR_DELIVERY"]],
+                  $in: [
+                    "$statusUpper",
+                    ["IN_TRANSIT", "IN TRANSIT", "OUT_FOR_DELIVERY", "OUT FOR DELIVERY"],
+                  ],
                 },
                 1,
                 0,
@@ -1266,26 +1361,32 @@ module.exports.getShipmentsStats = asyncHandler(async (req, res, next) => {
           },
         },
       },
-    ]);
+    ];
+
+    const [stats] = await Shapment.aggregate(statsPipeline);
 
     const shipperStats = await Shapment.aggregate([
-      { $match: { customerId: customerId } },
+      { $match: { customerId } },
       {
         $group: {
-          _id: "$shipper",
+          _id: { $ifNull: ["$shapmentCompany", "غير محدد"] },
           count: { $sum: 1 },
         },
       },
+      { $sort: { count: -1 } },
     ]);
 
     const result = {
-      totalShipments: stats[0]?.totalShipments || 0,
-      totalValue: stats[0]?.totalValue || 0,
-      totalShippingCost: stats[0]?.totalShippingCost || 0,
-      pendingShipments: stats[0]?.pendingShipments || 0,
-      deliveredShipments: stats[0]?.deliveredShipments || 0,
-      inTransitShipments: stats[0]?.inTransitShipments || 0,
-      shipperBreakdown: shipperStats,
+      totalShipments: stats?.totalShipments || 0,
+      totalValue: stats?.totalValue || 0,
+      totalShippingCost: stats?.totalShippingCost || 0,
+      pendingShipments: stats?.pendingShipments || 0,
+      deliveredShipments: stats?.deliveredShipments || 0,
+      inTransitShipments: stats?.inTransitShipments || 0,
+      shipperBreakdown: shipperStats.map((entry) => ({
+        _id: entry._id,
+        count: entry.count,
+      })),
     };
 
     res.status(200).json({

@@ -67,8 +67,22 @@ const transactionSchema = new mongoose.Schema({
       "order",
     ],
   }, // نوع المرجع
+  notes: {
+    type: String,
+    default: "",
+  },
+  approvedBy: {
+    type: mongoose.Schema.ObjectId,
+    ref: "Customer",
+  },
+  approvedAt: Date,
+  rejectedBy: {
+    type: mongoose.Schema.ObjectId,
+    ref: "Customer",
+  },
+  rejectedAt: Date,
   createdAt: { type: Date, default: Date.now },
-  walletId: { type: String, ref: "Wallet" },
+  walletId: { type: mongoose.Schema.ObjectId, ref: "Wallet" },
 });
 
 const SetImageUrl = (doc) => {
@@ -84,6 +98,10 @@ transactionSchema.post("init", function (doc) {
 
 transactionSchema.post("save", (doc) => {
   SetImageUrl(doc);
+});
+
+transactionSchema.post("find", function (docs) {
+  docs.forEach((doc) => SetImageUrl(doc));
 });
 const Transaction = mongoose.model("Transaction", transactionSchema);
 module.exports = Transaction;

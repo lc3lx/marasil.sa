@@ -1,6 +1,8 @@
 const asyncHandler = require("express-async-handler");
 const Customer = require("../models/customerModel");
 const ApiError = require("../utils/apiError");
+const Transaction = require("../models/transactionModel");
+const Wallet = require("../models/walletModel");
 
 // @desc    Add Balance to User Wallet (Admin Only)
 // @route   POST /api/admin/wallets/:userId/add-balance
@@ -19,9 +21,6 @@ exports.addBalanceToUser = asyncHandler(async (req, res, next) => {
   }
 
   try {
-    const Wallet = require("../models/walletModel");
-    const Transaction = require("../models/transactionModel");
-
     let wallet = await Wallet.findOne({ customerId: userId });
     if (!wallet) {
       wallet = new Wallet({ customerId: userId, balance: 0 });
@@ -69,9 +68,6 @@ exports.subtractBalanceFromUser = asyncHandler(async (req, res, next) => {
   }
 
   try {
-    const Wallet = require("../models/walletModel");
-    const Transaction = require("../models/transactionModel");
-
     let wallet = await Wallet.findOne({ customerId: userId });
     if (!wallet) {
       wallet = new Wallet({ customerId: userId, balance: 0 });
@@ -262,9 +258,6 @@ exports.approveBankTransfer = asyncHandler(async (req, res, next) => {
   const { approved, notes } = req.body;
 
   try {
-    const Transaction = require("../models/transactionModel");
-    const Wallet = require("../models/walletModel");
-
     // البحث عن المعاملة
     const transaction = await Transaction.findById(transactionId)
       .populate('customerId', 'firstName lastName email');
@@ -330,25 +323,109 @@ exports.approveBankTransfer = asyncHandler(async (req, res, next) => {
 // @desc    Get Pending Bank Transfers (Admin Only)
 // @route   GET /api/admin/wallets/pending-transfers
 // @access  Private/Admin
+const MAX_BANK_TRANSFER_LIMIT = 100;
+
+const fetchBankTransfers = async ({ status = "all", page = 1, limit = 20 }) => {
+  const numericPage = Math.max(parseInt(page, 10) || 1, 1);
+  const numericLimit = Math.min(
+    Math.max(parseInt(limit, 10) || 20, 1),
+    MAX_BANK_TRANSFER_LIMIT
+  );
+  const filters = { method: "bank_transfer" };
+  if (status && status !== "all") {
+    filters.status = status;
+  }
+
+  const skip = (numericPage - 1) * numericLimit;
+  const query = Transaction.find(filters)
+    .populate(
+      "customerId",
+      "firstName lastName email phone company_name_ar company_name_en"
+    )
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(numericLimit);
+
+  const [items, total, statusAggregation] = await Promise.all([
+    query,
+    Transaction.countDocuments(filters),
+    Transaction.aggregate([
+      { $match: { method: "bank_transfer" } },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
+  ]);
+
+  const statusCounts = statusAggregation.reduce(
+    (acc, entry) => {
+      acc[entry._id] = entry.count;
+      return acc;
+    },
+    {
+      pending: 0,
+      completed: 0,
+      rejected: 0,
+      approved: 0,
+      failed: 0,
+    }
+  );
+
+  return {
+    items,
+    pagination: {
+      total,
+      page: numericPage,
+      pages: Math.ceil(total / numericLimit),
+      limit: numericLimit,
+    },
+    statusCounts,
+  };
+};
+
 exports.getPendingBankTransfers = asyncHandler(async (req, res, next) => {
   try {
-    const Transaction = require("../models/transactionModel");
-
-    const pendingTransfers = await Transaction.find({
-      paymentMethod: 'bank_transfer',
-      status: 'pending'
-    })
-    .populate('customerId', 'firstName lastName email phone')
-    .sort({ createdAt: -1 });
-
+    const data = await fetchBankTransfers({
+      status: "pending",
+      page: req.query.page,
+      limit: req.query.limit,
+    });
     res.status(200).json({
       success: true,
-      data: pendingTransfers
+      data: data.items,
+      pagination: data.pagination,
+      statusCounts: data.statusCounts,
     });
   } catch (error) {
     res.status(200).json({
       success: true,
-      data: []
+      data: [],
+      pagination: {
+        total: 0,
+        page: 1,
+        pages: 1,
+        limit: Number(req.query.limit) || 20,
+      },
+      statusCounts: {
+        pending: 0,
+        completed: 0,
+        rejected: 0,
+        approved: 0,
+        failed: 0,
+      },
     });
   }
+});
+
+exports.getBankTransfers = asyncHandler(async (req, res, next) => {
+  const data = await fetchBankTransfers({
+    status: req.query.status,
+    page: req.query.page,
+    limit: req.query.limit,
+  });
+
+  res.status(200).json({
+    success: true,
+    data: data.items,
+    pagination: data.pagination,
+    statusCounts: data.statusCounts,
+  });
 });
