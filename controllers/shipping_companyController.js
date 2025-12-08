@@ -1,24 +1,32 @@
 const ShippingCompany = require("../models/shipping_company");
 const asyncHandler = require("express-async-handler");
 
-// 🔸 Get Shipping Companies with Essential Info
+// 🔸 Get Shipping Companies with Essential Info (safe against missing fields)
 exports.getShippingCompaniesInfo = asyncHandler(async (req, res) => {
   const companies = await ShippingCompany.aggregate([
     {
       $project: {
         _id: 0,
         name: "$company",
-        deliveryTime: 1,
+        deliveryTime: { $ifNull: ["$deliveryTime", "2-3 أيام عمل"] },
         shippingTypes: {
           $map: {
-            input: "$shippingTypes",
+            input: {
+              $ifNull: [
+                { $ifNull: ["$shippingTypes", "$shipmentType"] },
+                [],
+              ],
+            },
             as: "type",
             in: {
               type: "$$type.type",
               price: {
-                $add: ["$$type.basePrice", "$$type.profitPrice"],
+                $add: [
+                  { $ifNull: ["$$type.basePrice", 0] },
+                  { $ifNull: ["$$type.profitPrice", 0] },
+                ],
               },
-              deliveryTime: "$deliveryTime",
+              deliveryTime: { $ifNull: ["$deliveryTime", "2-3 أيام عمل"] },
             },
           },
         },
@@ -177,18 +185,18 @@ exports.getShippingTypeForCompany = asyncHandler(async (req, res) => {
 // @access  Public
 module.exports.getShippingCompanies = asyncHandler(async (req, res, next) => {
   // Get all enabled shipping companies
-  const companies = await shappingCompany.find({ status: "Enabled" });
+  const companies = await ShippingCompany.find({ status: "Enabled" });
 
   // Map the companies to only include the required fields
   const companiesList = companies.map((company) => ({
     id: company._id,
     name: company.company,
-    deliveryTime: company.deliveryAt || "2-3 أيام عمل",
-    shippingTypes: company.shippingTypes.map((type) => ({
+    deliveryTime: company.deliveryTime || "2-3 أيام عمل",
+    shippingTypes: (company.shippingTypes || []).map((type) => ({
       type: type.type,
-      price: type.basePrice + type.profitPrice, // Total price = base + profit
-      deliveryTime: company.deliveryAt || "2-3 أيام عمل",
-      codAvailable: type.COD,
+      price: (type.basePrice || 0) + (type.profitPrice || 0), // Total price = base + profit
+      deliveryTime: company.deliveryTime || "2-3 أيام عمل",
+      codAvailable: !!type.COD,
       maxWeight: type.maxWeight,
       maxCodAmount: type.maxCodAmount,
     })),
