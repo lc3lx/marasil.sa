@@ -750,35 +750,70 @@ exports.getAllOrders = asyncHandler(async (req, res) => {
 
   let searchQuery = {};
   if (req.query.search) {
-    searchQuery = {
-      $or: [
-        { orderNumber: { $regex: req.query.search, $options: 'i' } }
-      ]
-    };
+    const rx = new RegExp(req.query.search, 'i');
+    searchQuery.$or = [
+      { order_number: { $regex: rx } },
+      { id: { $regex: rx } },
+      { 'customer.full_name': { $regex: rx } },
+    ];
   }
 
+  // status filter (match by status.name or slug case-insensitively)
   if (req.query.status) {
-    searchQuery.status = req.query.status;
+    const s = String(req.query.status);
+    searchQuery['status.name'] = { $regex: new RegExp(`^${s}$`, 'i') };
+  }
+
+  // date range
+  const { startDate, endDate } = req.query;
+  if (startDate || endDate) {
+    searchQuery.createdAt = {};
+    if (startDate) searchQuery.createdAt.$gte = new Date(startDate);
+    if (endDate) searchQuery.createdAt.$lte = new Date(endDate);
   }
 
   // filter by specific user if provided
   if (req.query.userId) {
-    searchQuery.customerId = req.query.userId;
+    searchQuery.Customer = req.query.userId;
   }
 
   try {
-    const Order = require("../models/orderModel");
+    const Order = require("../models/Order");
     const orders = await Order.find(searchQuery)
-      .populate('customerId', 'firstName lastName email')
+      .populate('Customer', 'firstName lastName email')
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 });
 
     const total = await Order.countDocuments(searchQuery);
 
+    // normalize for dashboard UI
+    const data = orders.map((o) => {
+      const customerName =
+        (o.customer && (o.customer.full_name || [o.customer.first_name, o.customer.last_name].filter(Boolean).join(' '))) ||
+        (o.Customer ? [o.Customer.firstName, o.Customer.lastName].filter(Boolean).join(' ') : '') ||
+        '';
+      const statusRaw = String(o.status?.slug || o.status?.name || '').toLowerCase();
+      let status = 'pending';
+      if (/(deliver|completed|fulfilled|تم التوصيل|تم التنفيذ)/.test(statusRaw)) status = 'completed';
+      else if (/(process|in-progress|ship|تنفيذ|جاري)/.test(statusRaw)) status = 'processing';
+      else if (/(cancel|ملغي)/.test(statusRaw)) status = 'cancelled';
+
+      return {
+        _id: o._id,
+        orderNumber: o.order_number || o.id || String(o._id),
+        customerName,
+        items: Array.isArray(o.items) ? o.items : [],
+        itemsCount: Array.isArray(o.items) ? o.items.length : 0,
+        totalAmount: Number(o.total?.amount || 0),
+        status,
+        createdAt: o.createdAt,
+      };
+    });
+
     res.status(200).json({
       success: true,
-      data: orders,
+      data,
       pagination: {
         currentPage: page,
         totalPages: Math.ceil(total / limit),
