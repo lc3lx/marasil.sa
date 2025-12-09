@@ -684,7 +684,7 @@ class SMSAService {
    */
   async getSMSAOffices() {
     try {
-      const officesApiKey = "d0404d3468504e6e9388620ef882ed7a".toUpperCase();
+      const officesApiKey = "43e1e7b2eb6f4999a4a91a7c1383285d".toUpperCase();
       const response = await axios.get(
         "https://ecomapis.smsaexpress.com/api/lookup/smsaoffices",
         {
