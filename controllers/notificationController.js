@@ -16,7 +16,7 @@ exports.sendNotification = asyncHandler(async (req, res) => {
       type,
       title: title || 'إشعار',
       message,
-      createdBy: req.user?._id || null,
+      createdBy: req.customer?._id || null,
     });
 
     await notification.save();
@@ -103,7 +103,7 @@ exports.unreadCustomerNotification = asyncHandler(async (req, res) => {
 // Admin: Get all notifications
 exports.getAllNotificationsAdmin = asyncHandler(async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', type = '' } = req.query;
+    const { page = 1, limit = 10, search = '', type = '', status = '', startDate = '', endDate = '' } = req.query;
     
     let query = {};
     
@@ -121,6 +121,19 @@ exports.getAllNotificationsAdmin = asyncHandler(async (req, res) => {
       }
     }
 
+    // Filter by status (interpret as read status to reflect delivery/seen)
+    if (status) {
+      if (status === 'sent') query.readStatus = true;
+      if (status === 'pending') query.readStatus = false;
+    }
+
+    // Date range filter
+    if (startDate || endDate) {
+      query.timestamp = {};
+      if (startDate) query.timestamp.$gte = new Date(startDate);
+      if (endDate) query.timestamp.$lte = new Date(endDate);
+    }
+
     const notifications = await Notification.find(query)
       .populate('customerId', 'firstName lastName email')
       .sort({ timestamp: -1 })
@@ -129,9 +142,24 @@ exports.getAllNotificationsAdmin = asyncHandler(async (req, res) => {
 
     const total = await Notification.countDocuments(query);
 
+    // Compute recipients count: broadcast -> all customers, targeted -> 1
+    let recipientsBase = 0;
+    try {
+      const Customer = require("../models/customerModel");
+      recipientsBase = await Customer.countDocuments({ role: { $ne: 'admin' } });
+    } catch (e) {
+      recipientsBase = 0;
+    }
+
+    const mapped = notifications.map((n) => {
+      const obj = n.toObject();
+      obj.recipientsCount = obj.customerId ? 1 : recipientsBase;
+      return obj;
+    });
+
     res.json({
       success: true,
-      data: notifications,
+      data: mapped,
       pagination: {
         currentPage: parseInt(page),
         totalPages: Math.ceil(total / limit),

@@ -159,6 +159,12 @@ io.on("connection", (socket) => {
 // Expose io and activeUsers to routes
 app.set("io", io);
 app.set("activeUsers", activeUsers);
+// Attach to each request
+app.use((req, res, next) => {
+  req.io = io;
+  req.activeUsers = activeUsers;
+  next();
+});
 // تم إزالة express.json() المكرر
 // API Routes
 
