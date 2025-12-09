@@ -79,7 +79,7 @@ router.post("/traking", auth.Protect, trackingShipment);
 router.post("/cancel/:trackingNumber", auth.Protect, cancelShipment);
 router.post("/accountingshipmentprice", auth.Protect, acountingShipmentPrice);
 router.post("/printShipmentInvoice", auth.Protect, printShipmentInvoice);
-router.get("/smsa-offices", auth.Protect, getSMSAOffices);
+router.get("/smsa-offices", getSMSAOffices);
 
 // مسارات نظام الاسترجاع (بدون تسجيل دخول)
 router.post("/return/request-otp", shipmentReturnController.requestEmailOTP);
