@@ -85,4 +85,6 @@ employeeSchema.pre("findOneAndUpdate", function (next) {
   next();
 });
 
-module.exports = mongoose.models.Employee || mongoose.model("Employee", employeeSchema);
+// Use a distinct model name and collection to avoid clashing with existing system Employee model
+module.exports =
+  mongoose.models.AdminEmployee || mongoose.model("AdminEmployee", employeeSchema, "admin_employees");

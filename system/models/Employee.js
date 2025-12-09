@@ -126,6 +126,4 @@ employeeSchema.virtual("salaryPayments", {
 employeeSchema.set("toObject", { virtuals: true });
 employeeSchema.set("toJSON", { virtuals: true });
 
-const Employee = mongoose.model("Employee", employeeSchema);
-
-module.exports = Employee;
+module.exports = mongoose.models.Employee || mongoose.model("Employee", employeeSchema);
