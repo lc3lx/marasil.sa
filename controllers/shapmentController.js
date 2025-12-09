@@ -366,22 +366,35 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
     }
     console.log(trackingInfo);
 
-    // 7. البحث عن عنوان المستلم أو إنشاؤه
+    // 7. البحث عن عنوان المستلم أو إنشاؤه (منع إعادة استخدام عنوان ثابت بين الشحنات)
     const ClientAddress = mongoose.model("ClientAddress");
 
-    // إذا وجد عنوان للعميل يرجع مباشرة، إذا لم يوجد يضيفه فقط
-    let address = await ClientAddress.findOne({
-      clientPhone: order.customer.mobile,
-    });
+    const orderCustomer =
+      (orderToUse && orderToUse.customer) || (order && order.customer) || {};
+
+    const normalizedPhone = String(orderCustomer.mobile || "").trim();
+    const normalizedAddress = String(orderCustomer.address || "").trim();
+    const normalizedCity = String(orderCustomer.city || "").trim();
+    const normalizedDistrict = String(orderCustomer.district || "").trim();
+
+    const addressQuery = {
+      clientPhone: normalizedPhone,
+      clientAddress: normalizedAddress,
+      city: normalizedCity,
+      customer: req.customer._id,
+    };
+    if (normalizedDistrict) addressQuery.district = normalizedDistrict;
+
+    let address = await ClientAddress.findOne(addressQuery);
     if (!address) {
       address = await ClientAddress.create({
-        clientName: order.customer.full_name,
-        clientPhone: order.customer.mobile,
-        clientEmail: order.customer.email,
-        clientAddress: order.customer.address,
-        country: order.customer.country,
-        city: order.customer.city,
-        district: order.customer.district,
+        clientName: orderCustomer.full_name,
+        clientPhone: normalizedPhone,
+        clientEmail: orderCustomer.email,
+        clientAddress: normalizedAddress,
+        country: orderCustomer.country,
+        city: normalizedCity,
+        district: normalizedDistrict || undefined,
         customer: req.customer._id,
       });
     }
@@ -895,6 +908,8 @@ module.exports.getCustomerShipments = asyncHandler(async (req, res, next) => {
 
     const shipments = await Shapment.find({ customerId })
       .populate("customerId", "firstName lastName email phone")
+      .populate("receiverAddress")
+      .populate("orderId")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
