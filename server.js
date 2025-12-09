@@ -41,7 +41,9 @@ const Transaction = require("./models/transactionModel");
 const Wallet = require("./models/walletModel");
 // Scheduled tasks
 const { scheduleSalaryProcessing } = require("./utils/scheduler");
+const { scheduleOmniLabelPolling } = require("./utils/omniLabelScheduler");
 scheduleSalaryProcessing();
+scheduleOmniLabelPolling();
 
 // Initialize app and server
 const app = express();

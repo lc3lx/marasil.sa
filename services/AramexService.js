@@ -15,9 +15,9 @@ exports.formatAramexDate = (date) => {
  */
 exports.formatAddress = (address) => {
   return {
-    Line1: address.address,
-    Line2: address.address,
-    Line3: address.addressLine3 || "",
+    Line1: `${address.address}    `,
+    Line2: `${address.address}    `,
+    Line3: address.addressLine3 || "    ",
     City: address.city,
 
     PostCode: address.postCode || "",

@@ -828,16 +828,47 @@ module.exports.printShipmentInvoice = asyncHandler(async (req, res, next) => {
         return next(new ApiEror(`شركة الشحن ${company} غير مدعومة`, 400));
     }
 
-    // 4. تحديث حالة الشحنة في قاعدة البيانات
-    await Shapment.findOneAndUpdate(
-      { trackingId: trackingNumber },
-      { $set: { "details.invoice": invoiceResult } }
-    );
+    // 4. تحديث حالة الشحنة في قاعدة البيانات وفقًا للشركة وحفظ مكان مناسب للواجهة
+    if (company === "smsa") {
+      // SMSA عادة ترجع base64
+      await Shapment.findOneAndUpdate(
+        { trackingId: trackingNumber },
+        { $set: { "smsaResponse.label": invoiceResult } },
+        { new: true }
+      );
+    } else if (company === "omniclama") {
+      // محاولة استخراج رابط/ملف البوليصة من الاستجابة
+      const extractLabel = (payload) => {
+        if (!payload) return null;
+        if (typeof payload === "string") return payload;
+        if (typeof payload?.data === "string") return payload.data;
+        if (typeof payload?.data?.label === "string") return payload.data.label;
+        if (typeof payload?.data?.url === "string") return payload.data.url;
+        if (typeof payload?.data?.file === "string") return payload.data.file;
+        if (typeof payload?.label === "string") return payload.label;
+        if (typeof payload?.url === "string") return payload.url;
+        if (typeof payload?.file === "string") return payload.file;
+        return null;
+      };
+      const label = extractLabel(invoiceResult);
+      if (!label) {
+        return res.status(202).json({
+          status: "pending",
+          message:
+            "بوليصة Omniclama غير جاهزة بعد. سيتم إعادة المحاولة لاحقًا.",
+        });
+      }
+      await Shapment.findOneAndUpdate(
+        { trackingId: trackingNumber },
+        { $set: { "omniclamaResponse.label": label } },
+        { new: true }
+      );
+    }
 
     // 5. إرجاع نتيجة طباعة الفاتورة
     res.status(200).json({
       status: "success",
-      message: "تم طباعة الفاتورة بنجاح",
+      message: "تم جلب البوليصة بنجاح",
       data: invoiceResult,
     });
   } catch (error) {
