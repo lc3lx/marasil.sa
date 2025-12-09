@@ -7,7 +7,8 @@ const {
   createAnnouncement,
   updateAnnouncement,
   deleteAnnouncement,
-  toggleAnnouncementStatus
+  toggleAnnouncementStatus,
+  sendAnnouncementEmails,
 } = require('../controllers/announcementController');
 const { Protect, allowedTo } = require('../controllers/authController');
 
@@ -28,5 +29,6 @@ router.route('/:id')
   .delete(deleteAnnouncement);
 
 router.patch('/:id/toggle', toggleAnnouncementStatus);
+router.post('/:id/send', sendAnnouncementEmails);
 
 module.exports = router;

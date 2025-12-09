@@ -1,4 +1,6 @@
 const Announcement = require('../models/announcement');
+const Customer = require('../models/customerModel');
+const sendmail = require('../utils/SendMail');
 
 // Get all announcements (for admin)
 const getAllAnnouncements = async (req, res) => {
@@ -183,4 +185,56 @@ module.exports = {
   updateAnnouncement,
   deleteAnnouncement,
   toggleAnnouncementStatus
+};
+
+// Send announcement by email to recipients
+// POST /api/announcements/:id/send
+module.exports.sendAnnouncementEmails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { all = false, recipientIds = [], recipients = [] } = req.body || {};
+    const announcement = await Announcement.findById(id);
+    if (!announcement) {
+      return res.status(404).json({ message: 'الإعلان غير موجود' });
+    }
+
+    // Collect emails
+    let emails = [];
+    if (Array.isArray(recipients)) {
+      emails.push(...recipients.filter((e) => typeof e === 'string' && e.includes('@')));
+    }
+    if (Array.isArray(recipientIds) && recipientIds.length) {
+      const users = await Customer.find({ _id: { $in: recipientIds } }).select('email');
+      emails.push(...users.map((u) => u.email).filter(Boolean));
+    }
+    if (all) {
+      const users = await Customer.find({ role: { $ne: 'admin' }, email: { $ne: null } }).select('email');
+      emails.push(...users.map((u) => u.email).filter(Boolean));
+    }
+    // Deduplicate
+    emails = Array.from(new Set(emails));
+
+    if (!emails.length) {
+      return res.status(400).json({ message: 'لا يوجد مستلمون صالحون' });
+    }
+
+    const subject = announcement.title || 'إشعار';
+    const stripHtml = (html) => String(html || '').replace(/<[^>]+>/g, ' ');
+    const text = stripHtml(announcement.content);
+
+    let sent = 0;
+    for (const to of emails) {
+      try {
+        await sendmail({ to, subject, text });
+        sent += 1;
+      } catch (e) {
+        // continue
+      }
+    }
+
+    res.json({ success: true, recipients: emails.length, sent });
+  } catch (error) {
+    console.error('Error sending announcement emails:', error);
+    res.status(500).json({ message: 'خطأ في إرسال البريد', error: error.message });
+  }
 };
