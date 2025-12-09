@@ -31,6 +31,12 @@ const shapmentSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    // حفظ الأبعاد لعرضها في الواجهة
+    dimension: {
+      length: { type: Number, default: 0 },
+      width: { type: Number, default: 0 },
+      height: { type: Number, default: 0 },
+    },
     paymentMathod: {
       type: String,
       enum: ["Prepaid", "COD"],

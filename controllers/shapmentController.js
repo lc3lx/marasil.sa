@@ -402,6 +402,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
       orderId: orderToUse._id,
       senderAddress: shipperAddress,
       boxNum: Parcels,
+      dimension: dimensionPayload || normalizedDimension || null,
       paymentMathod: order.payment_method === "COD" ? "COD" : "Prepaid",
       shipmentstates: "READY_FOR_PICKUP",
       shapmentingType: shapmentingType,
