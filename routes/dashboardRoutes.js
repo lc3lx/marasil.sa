@@ -30,6 +30,19 @@ const {
   syncAllPlatforms,
 } = require("../controllers/adminPlatformsController");
 
+const {
+  getEmployees,
+  getEmployeeById,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee,
+  updateEmployeeStatus,
+  updateEmployeePermissions,
+  updateEmployeePayroll,
+  updateEmployeeAttendance,
+  getEmployeesStats,
+} = require("../controllers/adminEmployeesController");
+
 const auth = require("../controllers/authController");
 
 const router = express.Router();
@@ -75,5 +88,17 @@ router.patch("/shipments/:shipmentId/status", updateShipmentStatus);
 
 // Orders Management
 router.get("/orders", getAllOrders);
+
+// Employees Management
+router.get("/employees", getEmployees);
+router.get("/employees/stats", getEmployeesStats);
+router.get("/employees/:id", getEmployeeById);
+router.post("/employees", createEmployee);
+router.put("/employees/:id", updateEmployee);
+router.delete("/employees/:id", deleteEmployee);
+router.patch("/employees/:id/status", updateEmployeeStatus);
+router.patch("/employees/:id/permissions", updateEmployeePermissions);
+router.patch("/employees/:id/payroll", updateEmployeePayroll);
+router.patch("/employees/:id/attendance", updateEmployeeAttendance);
 
 module.exports = router;
