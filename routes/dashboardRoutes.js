@@ -22,6 +22,7 @@ const {
 } = require("../controllers/adminWalletController");
 
 const { updateShipmentStatus } = require("../controllers/adminShipmentController");
+const { getInvoices } = require("../controllers/adminInvoiceController");
 
 const auth = require("../controllers/authController");
 
@@ -37,6 +38,9 @@ router.get("/carriers/stats", getCarrierStats);
 
 // Recent Activity
 router.get("/activity", getRecentActivity);
+
+// Invoices
+router.get("/invoices", getInvoices);
 
 // Users Management
 router.get("/users", getAllUsers);
