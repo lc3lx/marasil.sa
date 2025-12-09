@@ -23,6 +23,12 @@ const {
 
 const { updateShipmentStatus } = require("../controllers/adminShipmentController");
 const { getInvoices } = require("../controllers/adminInvoiceController");
+const {
+  getPlatforms,
+  updatePlatformSettings,
+  disconnectPlatform,
+  syncAllPlatforms,
+} = require("../controllers/adminPlatformsController");
 
 const auth = require("../controllers/authController");
 
@@ -41,6 +47,12 @@ router.get("/activity", getRecentActivity);
 
 // Invoices
 router.get("/invoices", getInvoices);
+
+// Platforms
+router.get("/platforms", getPlatforms);
+router.put("/platforms/:id/settings", updatePlatformSettings);
+router.post("/platforms/:id/disconnect", disconnectPlatform);
+router.post("/platforms/sync-all", syncAllPlatforms);
 
 // Users Management
 router.get("/users", getAllUsers);
