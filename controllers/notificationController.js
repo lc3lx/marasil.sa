@@ -22,7 +22,7 @@ exports.sendNotification = asyncHandler(async (req, res) => {
     await notification.save();
 
     if (notification.customerId) {
-      io.to(`user_${notification.customerId}`).emit(
+      io.to(`user-${notification.customerId}`).emit(
         "new_notification",
         notification
       );
@@ -68,7 +68,7 @@ exports.notificationIsRead = asyncHandler(async (req, res) => {
 
     // Emit read status update via WebSocket
     if (notification.customerId) {
-      io.to(`user_${notification.customerId}`).emit("notification_read", {
+      io.to(`user-${notification.customerId}`).emit("notification_read", {
         notificationId: notification._id,
         readStatus: true,
       });
