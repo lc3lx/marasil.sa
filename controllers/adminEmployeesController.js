@@ -6,8 +6,22 @@ const Employee = require("../models/employeeModel");
 const Wallet = require("../models/walletModel");
 const Transaction = require("../models/transactionModel");
 const Customer = require("../models/customerModel");
-const Order = require("../models/orderModel");
-const Shipment = require("../models/shipmentModel");
+
+// محاولة تحميل نماذج Order و Shipment مع التعامل مع الأخطاء
+let Order, Shipment;
+try {
+  Order = require("../models/Order");
+} catch (error) {
+  console.log("Order model not found, activity features will be limited");
+  Order = null;
+}
+
+try {
+  Shipment = require("../models/shipmentModel");
+} catch (error) {
+  console.log("Shipment model not found, activity features will be limited");
+  Shipment = null;
+}
 
 const mapStatus = (s) => {
   if (!s) return undefined;
@@ -613,26 +627,30 @@ exports.getUserActivityDetails = asyncHandler(async (req, res) => {
     shipments: [],
   };
 
-  try {
-    // جلب طلبات المستخدم
-    activity.orders = await Order.find({ customerId: userId })
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .select("_id orderNumber createdAt status");
-  } catch (error) {
-    console.log("Order model not available:", error.message);
+  // جلب طلبات المستخدم إذا كان النموذج متوفر
+  if (Order) {
+    try {
+      activity.orders = await Order.find({ customerId: userId })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .select("_id orderNumber createdAt status");
+    } catch (error) {
+      console.log("Error fetching orders:", error.message);
+    }
   }
 
-  try {
-    // جلب شحنات المستخدم
-    activity.shipments = await Shipment.find({ customerId: userId })
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .select(
-        "_id trackingId companyshipmentid createdAt ordervalue totalprice"
-      );
-  } catch (error) {
-    console.log("Shipment model not available:", error.message);
+  // جلب شحنات المستخدم إذا كان النموذج متوفر
+  if (Shipment) {
+    try {
+      activity.shipments = await Shipment.find({ customerId: userId })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .select(
+          "_id trackingId companyshipmentid createdAt ordervalue totalprice"
+        );
+    } catch (error) {
+      console.log("Error fetching shipments:", error.message);
+    }
   }
 
   res.json({
