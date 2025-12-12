@@ -26,8 +26,9 @@ const payrollSchema = new mongoose.Schema(
 const employeeSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    email: { type: String, trim: true, lowercase: true, index: true },
+    email: { type: String, required: true, trim: true, lowercase: true, index: true, unique: true },
     phone: { type: String, trim: true, index: true },
+    password: { type: String, required: true, select: false },
     role: { type: String, trim: true, index: true },
     department: { type: String, trim: true, index: true },
     status: { type: String, enum: ["نشط", "إجازة", "موقوف"], default: "نشط", index: true },

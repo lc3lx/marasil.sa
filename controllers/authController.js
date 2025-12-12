@@ -5,6 +5,7 @@ const bcrypt = require("bcryptjs");
 const ApiError = require("../utils/apiError");
 const sendmail = require("../utils/SendMail");
 const Customer = require("../models/customerModel");
+const Employee = require("../models/employeeModel");
 const createToken = require("../utils/createToken");
 const { sanitizeUser } = require("../utils/sanitizeData");
 
@@ -106,8 +107,77 @@ exports.Protect = asyncHandler(async (req, res, next) => {
   next();
 });
 
-// @desc   Admin only
+// @desc   Admin and Employee Protection
+exports.ProtectEmployee = asyncHandler(async (req, res, next) => {
+  // 1) Check if token exist, if exist get
+  let token;
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer")
+  ) {
+    token = req.headers.authorization.split(" ")[1];
+  }
+  if (!token) {
+    return next(
+      new ApiError(
+        "You are not login, Please login to get access this route",
+        401
+      )
+    );
+  }
 
+  // 2) Verify token (no change happens, expired token)
+  const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY || process.env.JWT_SECRET);
+
+  // 3) Check if user exists (try admin first, then employee)
+  let currentUser = null;
+  let userType = null;
+
+  // Try to find admin/customer first
+  currentUser = await Customer.findById(decoded.customerId);
+  if (currentUser) {
+    userType = "admin";
+  } else {
+    // Try to find employee
+    currentUser = await Employee.findById(decoded.id);
+    if (currentUser) {
+      userType = "employee";
+    }
+  }
+
+  if (!currentUser) {
+    return next(
+      new ApiError(
+        "The user that belong to this token does no longer exist",
+        401
+      )
+    );
+  }
+
+  // 4) Check if user change his password after token created (for employees only)
+  if (userType === "employee" && currentUser.passwordChangedAt) {
+    const passChangedTimestamp = parseInt(
+      currentUser.passwordChangedAt.getTime() / 1000,
+      10
+    );
+    if (passChangedTimestamp > decoded.iat) {
+      return next(
+        new ApiError(
+          "User recently changed his password. please login again..",
+          401
+        )
+      );
+    }
+  }
+
+  // store authenticated user in req.user
+  req.user = currentUser;
+  req.userType = userType;
+  req.userRole = userType === "employee" ? "employee" : currentUser.role;
+  next();
+});
+
+// @desc   Admin only
 exports.allowedTo = (...roles) =>
   asyncHandler(async (req, res, next) => {
     // 1) access to roles
@@ -117,6 +187,34 @@ exports.allowedTo = (...roles) =>
       );
     }
     next();
+  });
+
+// @desc   Admin or Employee with permissions
+exports.allowedToEmployee = (...allowedRoles) =>
+  asyncHandler(async (req, res, next) => {
+    // Allow admin access to all routes
+    if (req.userType === "admin") {
+      return next();
+    }
+
+    // For employees, check permissions
+    if (req.userType === "employee") {
+      const hasPermission = allowedRoles.some(role => {
+        if (role === "employee") return true;
+        return req.user.permissions && req.user.permissions.includes(role);
+      });
+
+      if (!hasPermission) {
+        return next(
+          new ApiError("You are not authorized to access this route", 403)
+        );
+      }
+      return next();
+    }
+
+    return next(
+      new ApiError("You are not authorized to access this route", 403)
+    );
   });
 
 // @desc forgot password

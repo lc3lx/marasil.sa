@@ -41,6 +41,12 @@ const {
   updateEmployeePayroll,
   updateEmployeeAttendance,
   getEmployeesStats,
+  changeEmployeePassword,
+  loginEmployee,
+  addUserBalance,
+  subtractUserBalance,
+  getUserWalletDetails,
+  getUserActivityDetails,
 } = require("../controllers/adminEmployeesController");
 
 const auth = require("../controllers/authController");
@@ -48,8 +54,8 @@ const auth = require("../controllers/authController");
 const router = express.Router();
 
 // تطبيق middleware المصادقة على جميع الطرق
-router.use(auth.Protect);
-router.use(auth.allowedTo("admin"));
+router.use(auth.ProtectEmployee);
+router.use(auth.allowedToEmployee("admin", "employee"));
 
 // Dashboard Statistics
 router.get("/stats", getDashboardStats);
@@ -72,12 +78,12 @@ router.get("/users", getAllUsers);
 router.put("/users/:id/status", updateUserStatus);
 router.put("/users/:id/role", updateUserRole);
 router.delete("/users/:userId", deleteUser);
-router.get("/users/:userId/wallet", getUserWallet);
-router.get("/users/:userId/activity", getUserActivity);
+router.get("/users/:userId/wallet", getUserWalletDetails);
+router.get("/users/:userId/activity", getUserActivityDetails);
 
 // Wallet Management (Admin)
-router.post("/wallets/:userId/add-balance", addBalanceToUser);
-router.post("/wallets/:userId/subtract-balance", subtractBalanceFromUser);
+router.post("/wallets/:userId/add-balance", addUserBalance);
+router.post("/wallets/:userId/subtract-balance", subtractUserBalance);
 router.get("/wallets/pending-transfers", getPendingBankTransfers);
 router.put("/wallets/approve-bank-transfer/:transactionId", approveBankTransfer);
 router.get("/wallets/transfers", getBankTransfers);
@@ -100,5 +106,7 @@ router.patch("/employees/:id/status", updateEmployeeStatus);
 router.patch("/employees/:id/permissions", updateEmployeePermissions);
 router.patch("/employees/:id/payroll", updateEmployeePayroll);
 router.patch("/employees/:id/attendance", updateEmployeeAttendance);
+router.patch("/employees/:id/change-password", changeEmployeePassword);
+router.post("/employees/login", loginEmployee);
 
 module.exports = router;
