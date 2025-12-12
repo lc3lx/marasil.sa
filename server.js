@@ -168,6 +168,221 @@ app.use((req, res, next) => {
 // تم إزالة express.json() المكرر
 // API Routes
 
+// API endpoint لجلب تفاصيل الدفعات من Moyasar
+app.get(
+  "/api/admin/moyasar-payments",
+  asyncHandler(async (req, res) => {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        status,
+        customerId,
+        dateFrom,
+        dateTo,
+      } = req.query;
+
+      // بناء استعلام البحث
+      const query = { method: "moyasar" };
+
+      if (status && status !== "all") {
+        query.status = status;
+      }
+
+      if (customerId) {
+        query.customerId = customerId;
+      }
+
+      if (dateFrom || dateTo) {
+        query.createdAt = {};
+        if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
+        if (dateTo) query.createdAt.$lte = new Date(dateTo);
+      }
+
+      // حساب إجمالي المعاملات
+      const total = await Transaction.countDocuments(query);
+
+      // جلب المعاملات مع معلومات العميل
+      const transactions = await Transaction.find(query)
+        .populate({
+          path: "customerId",
+          select:
+            "firstName lastName email phone phoneNumber company_name_ar company_name_en",
+        })
+        .populate({
+          path: "walletId",
+          select: "balance",
+        })
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(parseInt(limit))
+        .lean();
+
+      // تنسيق البيانات
+      const formattedTransactions = transactions.map((transaction) => {
+        const customer = transaction.customerId || {};
+        const customerName =
+          [customer.firstName, customer.lastName].filter(Boolean).join(" ") ||
+          customer.company_name_ar ||
+          customer.company_name_en ||
+          customer.email ||
+          "عميل غير معروف";
+
+        const customerEmail = customer.email || "غير متوفر";
+        const customerPhone =
+          customer.phone || customer.phoneNumber || "غير متوفر";
+
+        return {
+          _id: transaction._id,
+          moyasarPaymentId: transaction.moyasarPaymentId,
+          amount: transaction.amount,
+          status: transaction.status,
+          description: transaction.description,
+          customerId: transaction.customerId?._id || transaction.customerId,
+          customerName,
+          customerEmail,
+          customerPhone,
+          walletId: transaction.walletId?._id || transaction.walletId,
+          walletBalance: transaction.walletId?.balance || 0,
+          createdAt: transaction.createdAt,
+          updatedAt: transaction.updatedAt,
+        };
+      });
+
+      const totalPages = Math.ceil(total / limit);
+
+      res.json({
+        success: true,
+        data: formattedTransactions,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+        },
+        summary: {
+          totalAmount: transactions.reduce(
+            (sum, t) => sum + (t.amount || 0),
+            0
+          ),
+          totalTransactions: total,
+          statusCounts: await Transaction.aggregate([
+            { $match: { method: "moyasar", ...query } },
+            { $group: { _id: "$status", count: { $sum: 1 } } },
+          ]),
+        },
+      });
+    } catch (error) {
+      console.error("خطأ في جلب الدفعات من Moyasar:", error);
+      res.status(500).json({
+        success: false,
+        error: "فشل في جلب بيانات الدفعات من Moyasar",
+      });
+    }
+  })
+);
+
+// API endpoint لجلب تفاصيل دفعة محددة من Moyasar
+app.get(
+  "/api/admin/moyasar-payments/:paymentId",
+  asyncHandler(async (req, res) => {
+    try {
+      const { paymentId } = req.params;
+
+      // جلب المعاملة من قاعدة البيانات
+      const transaction = await Transaction.findOne({
+        moyasarPaymentId: paymentId,
+      })
+        .populate({
+          path: "customerId",
+          select:
+            "firstName lastName email phone phoneNumber company_name_ar company_name_en",
+        })
+        .populate({
+          path: "walletId",
+          select: "balance",
+        })
+        .lean();
+
+      if (!transaction) {
+        return res.status(404).json({
+          success: false,
+          error: "الدفعة غير موجودة",
+        });
+      }
+
+      // محاولة جلب التفاصيل من API Moyasar
+      let moyasarDetails = null;
+      try {
+        const authHeader =
+          "Basic " +
+          Buffer.from(process.env.MOYASAR_SECRET_KEY + ":").toString("base64");
+        const moyasarResponse = await axios.get(
+          `https://api.moyasar.com/v1/payments/${paymentId}`,
+          {
+            headers: {
+              Authorization: authHeader,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        moyasarDetails = moyasarResponse.data;
+      } catch (moyasarError) {
+        console.warn("تعذر جلب التفاصيل من Moyasar API:", moyasarError.message);
+      }
+
+      // تنسيق البيانات
+      const customer = transaction.customerId || {};
+      const formattedTransaction = {
+        _id: transaction._id,
+        moyasarPaymentId: transaction.moyasarPaymentId,
+        amount: transaction.amount,
+        status: transaction.status,
+        description: transaction.description,
+        customerId: transaction.customerId?._id || transaction.customerId,
+        customerName:
+          [customer.firstName, customer.lastName].filter(Boolean).join(" ") ||
+          customer.company_name_ar ||
+          customer.company_name_en ||
+          customer.email ||
+          "عميل غير معروف",
+        customerEmail: customer.email || "غير متوفر",
+        customerPhone: customer.phone || customer.phoneNumber || "غير متوفر",
+        walletId: transaction.walletId?._id || transaction.walletId,
+        walletBalance: transaction.walletId?.balance || 0,
+        createdAt: transaction.createdAt,
+        updatedAt: transaction.updatedAt,
+        moyasarDetails: moyasarDetails
+          ? {
+              id: moyasarDetails.id,
+              status: moyasarDetails.status,
+              amount: moyasarDetails.amount,
+              currency: moyasarDetails.currency,
+              description: moyasarDetails.description,
+              source: moyasarDetails.source,
+              metadata: moyasarDetails.metadata,
+              created_at: moyasarDetails.created_at,
+              updated_at: moyasarDetails.updated_at,
+            }
+          : null,
+      };
+
+      res.json({
+        success: true,
+        data: formattedTransaction,
+      });
+    } catch (error) {
+      console.error("خطأ في جلب تفاصيل الدفعة:", error);
+      res.status(500).json({
+        success: false,
+        error: "فشل في جلب تفاصيل الدفعة",
+      });
+    }
+  })
+);
+
 app.post(
   "/api/wallet/webhook/moyasar",
   asyncHandler(async (req, res) => {
