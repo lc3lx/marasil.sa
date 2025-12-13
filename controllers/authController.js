@@ -116,7 +116,11 @@ exports.ProtectEmployee = asyncHandler(async (req, res, next) => {
     req.headers.authorization.startsWith("Bearer")
   ) {
     token = req.headers.authorization.split(" ")[1];
+  } else if (req.headers["x-auth-token"]) {
+    // Also check x-auth-token header
+    token = req.headers["x-auth-token"];
   }
+
   if (!token) {
     return next(
       new ApiError(
@@ -127,17 +131,39 @@ exports.ProtectEmployee = asyncHandler(async (req, res, next) => {
   }
 
   // 2) Verify token (no change happens, expired token)
-  const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY || process.env.JWT_SECRET);
+  let decoded;
+  try {
+    decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET_KEY || process.env.JWT_SECRET
+    );
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return next(
+        new ApiError("Your token has expired. Please login again", 401)
+      );
+    }
+    if (error.name === "JsonWebTokenError") {
+      return next(new ApiError("Invalid token. Please login again", 401));
+    }
+    return next(
+      new ApiError("Token verification failed. Please login again", 401)
+    );
+  }
 
   // 3) Check if user exists (try admin first, then employee)
   let currentUser = null;
   let userType = null;
 
   // Try to find admin/customer first
-  currentUser = await Customer.findById(decoded.customerId);
-  if (currentUser) {
-    userType = "admin";
-  } else {
+  if (decoded.customerId) {
+    currentUser = await Customer.findById(decoded.customerId);
+    if (currentUser) {
+      userType = "admin";
+    }
+  }
+
+  if (!currentUser && decoded.id) {
     // Try to find employee
     currentUser = await Employee.findById(decoded.id);
     if (currentUser) {
@@ -170,10 +196,16 @@ exports.ProtectEmployee = asyncHandler(async (req, res, next) => {
     }
   }
 
-  // store authenticated user in req.user
+  // store authenticated user in req.user and req.customer (for admin compatibility)
   req.user = currentUser;
   req.userType = userType;
   req.userRole = userType === "employee" ? "employee" : currentUser.role;
+
+  // Also set req.customer for admin routes that expect it
+  if (userType === "admin") {
+    req.customer = currentUser;
+  }
+
   next();
 });
 
@@ -199,7 +231,7 @@ exports.allowedToEmployee = (...allowedRoles) =>
 
     // For employees, check permissions
     if (req.userType === "employee") {
-      const hasPermission = allowedRoles.some(role => {
+      const hasPermission = allowedRoles.some((role) => {
         if (role === "employee") return true;
         return req.user.permissions && req.user.permissions.includes(role);
       });
