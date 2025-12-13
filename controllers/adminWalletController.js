@@ -12,7 +12,7 @@ exports.addBalanceToUser = asyncHandler(async (req, res, next) => {
   const { amount, reason } = req.body;
 
   if (!amount || amount <= 0) {
-    return next(new ApiError('المبلغ يجب أن يكون أكبر من صفر', 400));
+    return next(new ApiError("المبلغ يجب أن يكون أكبر من صفر", 400));
   }
 
   const user = await Customer.findById(userId);
@@ -32,22 +32,22 @@ exports.addBalanceToUser = asyncHandler(async (req, res, next) => {
     const transaction = new Transaction({
       customerId: userId,
       walletId: wallet._id,
-      type: 'deposit',
+      type: "deposit",
       amount: Number(amount),
-      status: 'completed',
+      status: "completed",
       description: reason || `إضافة رصيد من الإدارة`,
-      paymentMethod: 'admin_add',
-      adminId: req.customer._id
+      paymentMethod: "admin_add",
+      adminId: req.customer._id,
     });
     await transaction.save();
 
     res.status(200).json({
       success: true,
       message: `تم إضافة ${amount} ريال لمحفظة ${user.firstName} ${user.lastName}`,
-      data: { wallet, transaction }
+      data: { wallet, transaction },
     });
   } catch (error) {
-    return next(new ApiError('خطأ في إضافة الرصيد', 500));
+    return next(new ApiError("خطأ في إضافة الرصيد", 500));
   }
 });
 
@@ -59,7 +59,7 @@ exports.subtractBalanceFromUser = asyncHandler(async (req, res, next) => {
   const { amount, reason } = req.body;
 
   if (!amount || amount <= 0) {
-    return next(new ApiError('المبلغ يجب أن يكون أكبر من صفر', 400));
+    return next(new ApiError("المبلغ يجب أن يكون أكبر من صفر", 400));
   }
 
   const user = await Customer.findById(userId);
@@ -74,7 +74,7 @@ exports.subtractBalanceFromUser = asyncHandler(async (req, res, next) => {
     }
 
     if (Number(wallet.balance) < Number(amount)) {
-      return next(new ApiError('الرصيد غير كافٍ', 400));
+      return next(new ApiError("الرصيد غير كافٍ", 400));
     }
 
     wallet.balance -= Number(amount);
@@ -83,22 +83,22 @@ exports.subtractBalanceFromUser = asyncHandler(async (req, res, next) => {
     const transaction = new Transaction({
       customerId: userId,
       walletId: wallet._id,
-      type: 'withdrawal',
+      type: "withdrawal",
       amount: Number(amount),
-      status: 'completed',
-      description: reason || 'خصم رصيد من الإدارة',
-      paymentMethod: 'admin_deduct',
-      adminId: req.customer._id
+      status: "completed",
+      description: reason || "خصم رصيد من الإدارة",
+      paymentMethod: "admin_deduct",
+      adminId: req.customer._id,
     });
     await transaction.save();
 
     res.status(200).json({
       success: true,
       message: `تم خصم ${amount} ريال من محفظة ${user.firstName} ${user.lastName}`,
-      data: { wallet, transaction }
+      data: { wallet, transaction },
     });
   } catch (error) {
-    return next(new ApiError('خطأ في خصم الرصيد', 500));
+    return next(new ApiError("خطأ في خصم الرصيد", 500));
   }
 });
 
@@ -109,7 +109,7 @@ exports.getUserWallet = asyncHandler(async (req, res, next) => {
   const { userId } = req.params;
 
   // التحقق من وجود المستخدم
-  const user = await Customer.findById(userId).select('-password');
+  const user = await Customer.findById(userId).select("-password");
   if (!user) {
     return next(new ApiError(`لا يوجد مستخدم بهذا المعرف ${userId}`, 404));
   }
@@ -120,7 +120,7 @@ exports.getUserWallet = asyncHandler(async (req, res, next) => {
 
     // جلب محفظة المستخدم
     const wallet = await Wallet.findOne({ customerId: userId });
-    
+
     // جلب آخر المعاملات
     const transactions = await Transaction.find({ customerId: userId })
       .sort({ createdAt: -1 })
@@ -134,11 +134,11 @@ exports.getUserWallet = asyncHandler(async (req, res, next) => {
           name: `${user.firstName} ${user.lastName}`,
           email: user.email,
           phone: user.phone,
-          active: user.active
+          active: user.active,
         },
         wallet: wallet || { balance: 0, customerId: userId },
-        transactions
-      }
+        transactions,
+      },
     });
   } catch (error) {
     res.status(200).json({
@@ -149,11 +149,11 @@ exports.getUserWallet = asyncHandler(async (req, res, next) => {
           name: `${user.firstName} ${user.lastName}`,
           email: user.email,
           phone: user.phone,
-          active: user.active
+          active: user.active,
         },
         wallet: { balance: 0, customerId: userId },
-        transactions: []
-      }
+        transactions: [],
+      },
     });
   }
 });
@@ -170,8 +170,8 @@ exports.deleteUser = asyncHandler(async (req, res, next) => {
   }
 
   // منع حذف المديرين
-  if (user.role === 'admin') {
-    return next(new ApiError('لا يمكن حذف المديرين', 403));
+  if (user.role === "admin") {
+    return next(new ApiError("لا يمكن حذف المديرين", 403));
   }
 
   try {
@@ -188,13 +188,13 @@ exports.deleteUser = asyncHandler(async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: `تم حذف المستخدم ${user.firstName} ${user.lastName} وجميع بياناته`
+      message: `تم حذف المستخدم ${user.firstName} ${user.lastName} وجميع بياناته`,
     });
   } catch (error) {
     await Customer.findByIdAndDelete(userId);
     res.status(200).json({
       success: true,
-      message: `تم حذف المستخدم ${user.firstName} ${user.lastName}`
+      message: `تم حذف المستخدم ${user.firstName} ${user.lastName}`,
     });
   }
 });
@@ -206,14 +206,14 @@ exports.getUserActivity = asyncHandler(async (req, res, next) => {
   const { userId } = req.params;
 
   // التحقق من وجود المستخدم
-  const user = await Customer.findById(userId).select('-password');
+  const user = await Customer.findById(userId).select("-password");
   if (!user) {
     return next(new ApiError(`لا يوجد مستخدم بهذا المعرف ${userId}`, 404));
   }
 
   const activity = {
     orders: [],
-    shipments: []
+    shipments: [],
   };
 
   try {
@@ -223,7 +223,7 @@ exports.getUserActivity = asyncHandler(async (req, res, next) => {
       .sort({ createdAt: -1 })
       .limit(10);
   } catch (error) {
-    console.log('Order model not found');
+    console.log("Order model not found");
   }
 
   try {
@@ -233,7 +233,7 @@ exports.getUserActivity = asyncHandler(async (req, res, next) => {
       .sort({ createdAt: -1 })
       .limit(10);
   } catch (error) {
-    console.log('Shipment model not found');
+    console.log("Shipment model not found");
   }
 
   res.status(200).json({
@@ -243,10 +243,10 @@ exports.getUserActivity = asyncHandler(async (req, res, next) => {
         id: user._id,
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,
-        phone: user.phone
+        phone: user.phone,
       },
-      activity
-    }
+      activity,
+    },
   });
 });
 
@@ -258,65 +258,83 @@ exports.approveBankTransfer = asyncHandler(async (req, res, next) => {
   const { approved, notes } = req.body;
 
   try {
-    // البحث عن المعاملة
-    const transaction = await Transaction.findById(transactionId)
-      .populate('customerId', 'firstName lastName email');
+    // البحث عن المعاملة بدون populate أولاً للحصول على customerId كـ ObjectId
+    const transaction = await Transaction.findById(transactionId);
 
     if (!transaction) {
-      return next(new ApiError(`لا توجد معاملة بهذا المعرف ${transactionId}`, 404));
+      return next(
+        new ApiError(`لا توجد معاملة بهذا المعرف ${transactionId}`, 404)
+      );
     }
 
-    if (transaction.status !== 'pending') {
-      return next(new ApiError('هذه المعاملة تم معالجتها مسبقاً', 400));
+    if (transaction.status !== "pending") {
+      return next(new ApiError("هذه المعاملة تم معالجتها مسبقاً", 400));
     }
+
+    // الحصول على customerId كـ ObjectId
+    const customerId = transaction.customerId;
+
+    // جلب معلومات العميل للرسالة
+    const customer = await Customer.findById(customerId).select(
+      "firstName lastName email"
+    );
 
     if (approved) {
       // الموافقة على المعاملة
-      transaction.status = 'completed';
+      transaction.status = "completed";
       transaction.approvedBy = req.customer._id;
       transaction.approvedAt = new Date();
-      transaction.notes = notes || '';
+      transaction.notes = notes || "";
 
       // إضافة المبلغ للمحفظة
-      let wallet = await Wallet.findOne({ customerId: transaction.customerId });
+      let wallet = await Wallet.findOne({ customerId: customerId });
       if (!wallet) {
         wallet = new Wallet({
-          customerId: transaction.customerId,
-          balance: 0
+          customerId: customerId,
+          balance: 0,
         });
       }
-      wallet.balance += transaction.amount;
+      wallet.balance += Number(transaction.amount);
       await wallet.save();
 
       await transaction.save();
 
+      // Populate للعرض فقط
+      await transaction.populate("customerId", "firstName lastName email");
+
       res.status(200).json({
         success: true,
-        message: `تم الموافقة على المعاملة وإضافة ${transaction.amount} ريال لمحفظة ${transaction.customerId.firstName}`,
+        message: `تم الموافقة على المعاملة وإضافة ${
+          transaction.amount
+        } ريال لمحفظة ${customer ? customer.firstName : "العميل"}`,
         data: {
           transaction,
-          wallet
-        }
+          wallet,
+        },
       });
     } else {
       // رفض المعاملة
-      transaction.status = 'rejected';
+      transaction.status = "rejected";
       transaction.rejectedBy = req.customer._id;
       transaction.rejectedAt = new Date();
-      transaction.notes = notes || 'تم رفض المعاملة من قبل الإدارة';
+      transaction.notes = notes || "تم رفض المعاملة من قبل الإدارة";
 
       await transaction.save();
+
+      // Populate للعرض فقط
+      await transaction.populate("customerId", "firstName lastName email");
 
       res.status(200).json({
         success: true,
         message: `تم رفض المعاملة`,
         data: {
-          transaction
-        }
+          transaction,
+        },
       });
     }
   } catch (error) {
-    return next(new ApiError('خطأ في معالجة المعاملة', 500));
+    console.error("Error in approveBankTransfer:", error);
+    return next(new ApiError(`خطأ في معالجة المعاملة: ${error.message}`, 500));
   }
 });
 
