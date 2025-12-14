@@ -101,7 +101,7 @@ exports.shipmentData = async (
           barcode: generateRandom8DigitNumber(),
           height: parseInt(dimension.high || 0),
           length: parseInt(dimension.length || 230),
-          number: order._id,
+          number: generateRandom8DigitNumber(),
           weight: weight,
           width: parseInt(dimension.width || 130),
         },
