@@ -31,19 +31,13 @@ const normalizeDimensionInput = (dimension = {}) => {
 
   const length =
     toNumber(
-      dimension.length ??
-        dimension.Length ??
-        dimension.long ??
-        dimension.Long
+      dimension.length ?? dimension.Length ?? dimension.long ?? dimension.Long
     ) || 0;
   const width =
     toNumber(dimension.width ?? dimension.Width ?? dimension.Wide) || 0;
   const height =
     toNumber(
-      dimension.height ??
-        dimension.Height ??
-        dimension.high ??
-        dimension.High
+      dimension.height ?? dimension.Height ?? dimension.high ?? dimension.High
     ) || 0;
 
   if (!length && !width && !height) {
@@ -836,7 +830,19 @@ module.exports.printShipmentInvoice = asyncHandler(async (req, res, next) => {
           new ApiEror("طباعة الفواتير لـ RedBox غير متوفرة حالياً", 501)
         );
       case "omniclama":
-        invoiceResult = await omin.printLabels(trackingNumber);
+        try {
+          // التأكد من الحصول على token قبل طلب البوليصة
+          // printLabels يستدعي ensureAuth() داخلياً للحصول على token تلقائياً
+          invoiceResult = await omin.printLabels(trackingNumber);
+        } catch (error) {
+          console.error("OmniLama Print Invoice Error:", error);
+          return next(
+            new ApiEror(
+              `فشل في طلب البوليصة من OmniLama: ${error.message}`,
+              500
+            )
+          );
+        }
         break;
       default:
         return next(new ApiEror(`شركة الشحن ${company} غير مدعومة`, 400));
@@ -1398,7 +1404,12 @@ module.exports.getShipmentsStats = asyncHandler(async (req, res, next) => {
                 {
                   $in: [
                     "$statusUpper",
-                    ["IN_TRANSIT", "IN TRANSIT", "OUT_FOR_DELIVERY", "OUT FOR DELIVERY"],
+                    [
+                      "IN_TRANSIT",
+                      "IN TRANSIT",
+                      "OUT_FOR_DELIVERY",
+                      "OUT FOR DELIVERY",
+                    ],
                   ],
                 },
                 1,
