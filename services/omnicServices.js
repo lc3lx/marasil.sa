@@ -79,7 +79,7 @@ exports.shipmentData = async (
         country_code: "SA",
       },
 
-      number: shipmentNumber,
+      number: generateRandom8DigitNumber(),
       places: [
         {
           items: [
