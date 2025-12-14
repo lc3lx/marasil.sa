@@ -833,9 +833,30 @@ module.exports.printShipmentInvoice = asyncHandler(async (req, res, next) => {
         try {
           // التأكد من الحصول على token قبل طلب البوليصة
           // printLabels يستدعي ensureAuth() داخلياً للحصول على token تلقائياً
+          console.log("📦 [Controller] طلب طباعة بوليصة OmniLama:", {
+            trackingNumber,
+            company,
+          });
+
           invoiceResult = await omin.printLabels(trackingNumber);
+
+          console.log("📄 [Controller] نتيجة طباعة البوليصة من OmniLama:", {
+            trackingNumber,
+            result: JSON.stringify(invoiceResult, null, 2),
+            resultType: typeof invoiceResult,
+            hasData: !!invoiceResult?.data,
+            hasLabel: !!invoiceResult?.label,
+            hasUrl: !!invoiceResult?.url,
+            hasFile: !!invoiceResult?.file,
+          });
         } catch (error) {
-          console.error("OmniLama Print Invoice Error:", error);
+          console.error("❌ [Controller] OmniLama Print Invoice Error:", {
+            trackingNumber,
+            error: error.message,
+            stack: error.stack,
+            response: error.response?.data,
+            status: error.response?.status,
+          });
           return next(
             new ApiEror(
               `فشل في طلب البوليصة من OmniLama: ${error.message}`,
@@ -859,6 +880,14 @@ module.exports.printShipmentInvoice = asyncHandler(async (req, res, next) => {
     } else if (company === "omniclama") {
       // محاولة استخراج رابط/ملف البوليصة من الاستجابة
       const extractLabel = (payload) => {
+        console.log("🔍 [Controller] استخراج البوليصة من الاستجابة:", {
+          payloadType: typeof payload,
+          payloadKeys: payload ? Object.keys(payload) : null,
+          payloadPreview: payload
+            ? JSON.stringify(payload).substring(0, 500)
+            : null,
+        });
+
         if (!payload) return null;
         if (typeof payload === "string") return payload;
         if (typeof payload?.data === "string") return payload.data;
@@ -871,18 +900,40 @@ module.exports.printShipmentInvoice = asyncHandler(async (req, res, next) => {
         return null;
       };
       const label = extractLabel(invoiceResult);
+      console.log("🏷️ [Controller] البوليصة المستخرجة:", {
+        trackingNumber,
+        hasLabel: !!label,
+        labelType: typeof label,
+        labelLength: label ? label.length : 0,
+        labelPreview: label
+          ? typeof label === "string"
+            ? label.substring(0, 200)
+            : JSON.stringify(label).substring(0, 200)
+          : null,
+      });
+
       if (!label) {
+        console.log("⚠️ [Controller] البوليصة غير جاهزة بعد:", {
+          trackingNumber,
+          invoiceResult: JSON.stringify(invoiceResult, null, 2),
+        });
         return res.status(202).json({
           status: "pending",
           message:
             "بوليصة Omniclama غير جاهزة بعد. سيتم إعادة المحاولة لاحقًا.",
         });
       }
+
       await Shapment.findOneAndUpdate(
         { trackingId: trackingNumber },
         { $set: { "omniclamaResponse.label": label } },
         { new: true }
       );
+
+      console.log("💾 [Controller] تم حفظ البوليصة في قاعدة البيانات:", {
+        trackingNumber,
+        labelSaved: true,
+      });
     }
 
     // 5. إرجاع نتيجة طباعة الفاتورة

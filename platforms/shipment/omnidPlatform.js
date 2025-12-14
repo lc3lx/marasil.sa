@@ -209,18 +209,32 @@ class OmniDeliveryAPI {
   async printLabels(orders, size = "A6") {
     // التأكد من الحصول على token قبل إرسال الطلب
     await this.ensureAuth();
-    
+
     const url = `${this.baseURL}/delivery/print/label`;
-    
+
     // التأكد من أن orders هو array
     const ordersArray = Array.isArray(orders) ? orders : [orders];
-    
+
+    console.log("🖨️ [OmniLama] طلب طباعة البوليصة:", {
+      url,
+      orders: ordersArray,
+      size,
+      trackingNumber: ordersArray[0],
+    });
+
     const response = await axios.post(
       url,
       { orders: ordersArray, size },
       { headers: this.headers }
     );
-    
+
+    console.log("✅ [OmniLama] رد طباعة البوليصة:", {
+      status: response.status,
+      statusText: response.statusText,
+      data: JSON.stringify(response.data, null, 2),
+      headers: response.headers,
+    });
+
     return response.data;
   }
 
