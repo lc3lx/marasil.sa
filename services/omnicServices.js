@@ -1,6 +1,14 @@
 const omnidPlatform = require("../platforms/shipment/omnidPlatform");
 
 /**
+ * توليد رقم عشوائي مكون من 8 أرقام
+ * @returns {String} رقم عشوائي مكون من 8 أرقام
+ */
+const generateRandom8DigitNumber = () => {
+  return Math.floor(10000000 + Math.random() * 90000000).toString();
+};
+
+/**
  * تحويل بيانات الشحنة إلى صيغة OmniDelivery
  * @param {Object} order بيانات الطلب
  * @param {Object} shipperAddress عنوان المرسل
@@ -90,7 +98,7 @@ exports.shipmentData = async (
               width: parseInt(dimension.width || 130),
             },
           ],
-          barcode: order._id,
+          barcode: generateRandom8DigitNumber(),
           height: parseInt(dimension.high || 0),
           length: parseInt(dimension.length || 230),
           number: order._id,
