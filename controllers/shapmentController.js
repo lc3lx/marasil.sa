@@ -889,14 +889,67 @@ module.exports.printShipmentInvoice = asyncHandler(async (req, res, next) => {
         });
 
         if (!payload) return null;
-        if (typeof payload === "string") return payload;
-        if (typeof payload?.data === "string") return payload.data;
-        if (typeof payload?.data?.label === "string") return payload.data.label;
-        if (typeof payload?.data?.url === "string") return payload.data.url;
-        if (typeof payload?.data?.file === "string") return payload.data.file;
-        if (typeof payload?.label === "string") return payload.label;
-        if (typeof payload?.url === "string") return payload.url;
-        if (typeof payload?.file === "string") return payload.file;
+
+        // إذا كانت string، حاول parseها كـ JSON
+        let parsedPayload = payload;
+        if (typeof payload === "string") {
+          try {
+            parsedPayload = JSON.parse(payload);
+          } catch (e) {
+            // إذا فشل parsing، ارجعها كـ string
+            return payload;
+          }
+        }
+
+        // استخراج label_link من print_results (شكل OmniLama الجديد)
+        if (
+          parsedPayload?.data?.print_results &&
+          Array.isArray(parsedPayload.data.print_results) &&
+          parsedPayload.data.print_results.length > 0
+        ) {
+          const firstResult = parsedPayload.data.print_results[0];
+          if (firstResult?.label_link) {
+            console.log(
+              "✅ [Controller] تم العثور على label_link:",
+              firstResult.label_link
+            );
+            return firstResult.label_link;
+          }
+        }
+
+        // استخراج من data.print_results مباشرة
+        if (
+          parsedPayload?.print_results &&
+          Array.isArray(parsedPayload.print_results) &&
+          parsedPayload.print_results.length > 0
+        ) {
+          const firstResult = parsedPayload.print_results[0];
+          if (firstResult?.label_link) {
+            console.log(
+              "✅ [Controller] تم العثور على label_link (مباشر):",
+              firstResult.label_link
+            );
+            return firstResult.label_link;
+          }
+        }
+
+        // طرق أخرى للاستخراج (للتوافق مع الأشكال القديمة)
+        if (typeof parsedPayload?.data === "string") return parsedPayload.data;
+        if (typeof parsedPayload?.data?.label === "string")
+          return parsedPayload.data.label;
+        if (typeof parsedPayload?.data?.url === "string")
+          return parsedPayload.data.url;
+        if (typeof parsedPayload?.data?.file === "string")
+          return parsedPayload.data.file;
+        if (typeof parsedPayload?.data?.label_link === "string")
+          return parsedPayload.data.label_link;
+        if (typeof parsedPayload?.label === "string")
+          return parsedPayload.label;
+        if (typeof parsedPayload?.url === "string") return parsedPayload.url;
+        if (typeof parsedPayload?.file === "string") return parsedPayload.file;
+        if (typeof parsedPayload?.label_link === "string")
+          return parsedPayload.label_link;
+
         return null;
       };
       const label = extractLabel(invoiceResult);
