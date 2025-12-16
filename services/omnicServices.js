@@ -49,12 +49,18 @@ exports.shipmentData = async (
 
   // إنشاء رقم فريد للشحنة
   const shipmentNumber = order._id;
+  let cod = 0;
+  if (order.payment_method === "COD") {
+    cod = Number(order?.total?.amount || 0);
+  } else {
+    cod = 0;
+  }
 
   try {
     const shipmentData = {
       cost: {
-        cod_value: parseFloat(order.total.amount),
-        declared_cost: parseFloat(order.total.amount || 0),
+        cod_value: parseFloat(cod),
+        declared_cost: parseFloat(cod),
         services_payment: [],
       },
       initial_status: 11,
