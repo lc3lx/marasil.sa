@@ -28,13 +28,13 @@ def quick_train():
             return
 
     try:
-        # تحضير البيانات
-        print("📊 تحضير البيانات...")
-        dataset = prepare_dataset()
-
-        # إعداد النموذج
+        # إعداد النموذج أولاً
         print("🤖 إعداد النموذج...")
         model, tokenizer = setup_model_and_tokenizer()
+
+        # تحضير البيانات مع tokenizer
+        print("📊 تحضير البيانات...")
+        dataset = prepare_dataset(tokenizer)
 
         # تدريب سريع (epoch واحد فقط)
         print("🎯 بدء التدريب السريع...")
@@ -54,6 +54,7 @@ def quick_train():
             save_total_limit=1,
             dataloader_num_workers=0,
             report_to=[],  # لا نريد logging خارجي
+            remove_unused_columns=False,  # مهم: لا تزيل الأعمدة غير المستخدمة
         )
 
         trainer = Trainer(

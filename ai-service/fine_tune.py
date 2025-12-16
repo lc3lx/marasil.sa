@@ -136,8 +136,8 @@ def extract_training_data_from_system_prompt():
         print(f"خطأ في استخراج البيانات: {e}")
         return []
 
-def prepare_dataset():
-    """تحضير البيانات للتدريب مع استخراج تلقائي"""
+def prepare_dataset(tokenizer=None):
+    """تحضير البيانات للتدريب مع استخراج تلقائي و tokenization"""
     formatted_data = []
 
     # إضافة البيانات الأساسية
@@ -170,7 +170,38 @@ def prepare_dataset():
     with open(TRAINING_DATA_FILE, 'w', encoding='utf-8') as f:
         json.dump(all_training_data, f, ensure_ascii=False, indent=2)
 
-    return Dataset.from_list(formatted_data)
+    dataset = Dataset.from_list(formatted_data)
+
+    # إذا تم تمرير tokenizer، قم بـ tokenization
+    if tokenizer is not None:
+        print("🔄 بدء tokenization للبيانات...")
+
+        def tokenize_function(examples):
+            # Tokenize النص
+            tokenized = tokenizer(
+                examples["text"],
+                truncation=True,
+                padding="max_length",
+                max_length=1024,  # طول مناسب للـ context
+                return_tensors="pt"
+            )
+
+            # إضافة labels للتدريب (نفس input_ids لـ language modeling)
+            tokenized["labels"] = tokenized["input_ids"].clone()
+
+            return tokenized
+
+        # تطبيق tokenization
+        tokenized_dataset = dataset.map(
+            tokenize_function,
+            batched=True,
+            remove_columns=["text"]  # إزالة عمود text الأصلي
+        )
+
+        print("✅ تم tokenization البيانات")
+        return tokenized_dataset
+
+    return dataset
 
 def setup_model_and_tokenizer():
     """تحضير النموذج والـ tokenizer"""
@@ -180,11 +211,18 @@ def setup_model_and_tokenizer():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    from transformers import BitsAndBytesConfig
+
+    quantization_config = BitsAndBytesConfig(
+        load_in_8bit=True,
+        llm_int8_enable_fp32_cpu_offload=True
+    )
+
     model = AutoModelForCausalLM.from_pretrained(
         BASE_MODEL,
         device_map="auto",
         torch_dtype=torch.float16,
-        load_in_8bit=True,  # توفير الذاكرة
+        quantization_config=quantization_config,
         trust_remote_code=True
     )
 
@@ -210,7 +248,7 @@ def train_model():
     print("🎯 بدء عملية التدريب...")
 
     model, tokenizer = setup_model_and_tokenizer()
-    dataset = prepare_dataset()
+    dataset = prepare_dataset(tokenizer)
 
     training_args = TrainingArguments(
         output_dir=OUTPUT_DIR,
@@ -227,6 +265,7 @@ def train_model():
         eval_steps=50,
         warmup_steps=50,
         dataloader_num_workers=0,  # لتجنب مشاكل multiprocessing
+        remove_unused_columns=False,  # مهم: لا تزيل الأعمدة غير المستخدمة
     )
 
     trainer = Trainer(

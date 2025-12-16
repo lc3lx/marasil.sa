@@ -51,10 +51,20 @@ try:
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    # إعداد quantization إذا لزم الأمر
+    quantization_config = None
+    if not use_fine_tuned and torch.cuda.is_available():
+        from transformers import BitsAndBytesConfig
+        quantization_config = BitsAndBytesConfig(
+            load_in_8bit=True,
+            llm_int8_enable_fp32_cpu_offload=True
+        )
+
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
         device_map=device_map if not use_fine_tuned else "auto",
         torch_dtype=dtype if not use_fine_tuned else torch.float16,
+        quantization_config=quantization_config,
         low_cpu_mem_usage=True,
         trust_remote_code=True,
     )
