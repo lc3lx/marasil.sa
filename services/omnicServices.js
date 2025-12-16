@@ -112,6 +112,12 @@ exports.shipmentData = async (
           width: parseInt(dimension.width || 130),
         },
       ],
+      sender: {
+        email: order.shipperAddress.email,
+        name: order.shipperAddress.name,
+        phone: `+966${order.shipperAddress.mobile}`,
+      },
+
       receiver: {
         company_name: order.customer.full_name,
         company_reg_number: order.customer.mobile,
