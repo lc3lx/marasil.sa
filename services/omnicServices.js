@@ -113,8 +113,8 @@ exports.shipmentData = async (
         },
       ],
       sender: {
-        name: order.shipperAddress.full_name || "",
-        phone: `+966${order.shipperAddress.mobile}`,
+        name: shipperAddress.full_name || "",
+        phone: `+966${shipperAddress.mobile}`,
       },
 
       receiver: {
