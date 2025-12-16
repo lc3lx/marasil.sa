@@ -113,7 +113,7 @@ exports.shipmentData = async (
         },
       ],
       sender: {
-        email: order.shipperAddress.email,
+        email: order.shipperAddress.email || "",
         name: order.shipperAddress.name,
         phone: `+966${order.shipperAddress.mobile}`,
       },
