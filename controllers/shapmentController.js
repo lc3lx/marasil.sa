@@ -55,7 +55,8 @@ const normalizeDimensionInput = (dimension = {}) => {
  */
 module.exports.acountingShipmentPrice = asyncHandler(async (req, res, next) => {
   try {
-    const { company, order, shapmentingType, dimension } = req.body;
+    const { company, order, shapmentingType, dimension, weight, Parcels } =
+      req.body;
     if (!company || !order) {
       return next(new ApiEror("All data is required", 400));
     }
@@ -66,6 +67,24 @@ module.exports.acountingShipmentPrice = asyncHandler(async (req, res, next) => {
     if (!shippingType) {
       return next(
         new ApiEror(`Shipping type ${shapmentingType} is not found`, 400)
+      );
+    }
+
+    // فحص الوزن والطرود قبل فحص الأبعاد
+    if (weight > shippingType.denayWeight) {
+      return next(
+        new ApiEror(
+          `الوزن يتجاوز الحد الأقصى المسموح به (${shippingType.denayWeight} كجم). الوزن المرسل: ${weight} كجم`,
+          400
+        )
+      );
+    }
+    if (Parcels > shippingType.maxBoxes) {
+      return next(
+        new ApiEror(
+          `عدد الطرود يتجاوز الحد الأقصى المسموح به (${shippingType.maxBoxes}). عدد الطرود المرسل: ${Parcels}`,
+          400
+        )
       );
     }
 
