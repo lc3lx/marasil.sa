@@ -25,3 +25,4 @@ echo "🛑 للإيقاف اضغط Ctrl+C"
 echo
 
 python app.py
+

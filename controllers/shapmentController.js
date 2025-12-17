@@ -75,6 +75,28 @@ module.exports.acountingShipmentPrice = asyncHandler(async (req, res, next) => {
       normalizedDimension.width > 0 &&
       normalizedDimension.height > 0;
 
+    // فحص الحد الأقصى لحجم الصندوق (50×50×40 سم)
+    const MAX_DIMENSIONS = {
+      length: 50,
+      width: 50,
+      height: 40,
+    };
+
+    if (hasValidDimension) {
+      if (
+        normalizedDimension.length > MAX_DIMENSIONS.length ||
+        normalizedDimension.width > MAX_DIMENSIONS.width ||
+        normalizedDimension.height > MAX_DIMENSIONS.height
+      ) {
+        return next(
+          new ApiEror(
+            `أبعاد الصندوق تجاوزت الحد الأقصى المسموح به (${MAX_DIMENSIONS.length}×${MAX_DIMENSIONS.width}×${MAX_DIMENSIONS.height} سم). الأبعاد المرسلة: ${normalizedDimension.length}×${normalizedDimension.width}×${normalizedDimension.height} سم`,
+            400
+          )
+        );
+      }
+    }
+
     // إضافة dimension إلى order إذا كان موجوداً
     const orderWithDimension = {
       ...order,
@@ -172,6 +194,28 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
       normalizedDimension.length > 0 &&
       normalizedDimension.width > 0 &&
       normalizedDimension.height > 0;
+
+    // فحص الحد الأقصى لحجم الصندوق (50×50×40 سم)
+    const MAX_DIMENSIONS = {
+      length: 50,
+      width: 50,
+      height: 40,
+    };
+
+    if (hasValidDimension) {
+      if (
+        normalizedDimension.length > MAX_DIMENSIONS.length ||
+        normalizedDimension.width > MAX_DIMENSIONS.width ||
+        normalizedDimension.height > MAX_DIMENSIONS.height
+      ) {
+        return next(
+          new ApiEror(
+            `أبعاد الصندوق تجاوزت الحد الأقصى المسموح به (${MAX_DIMENSIONS.length}×${MAX_DIMENSIONS.width}×${MAX_DIMENSIONS.height} سم). الأبعاد المرسلة: ${normalizedDimension.length}×${normalizedDimension.width}×${normalizedDimension.height} سم`,
+            400
+          )
+        );
+      }
+    }
 
     if (company === "omniclama" || company === "redbox") {
       if (!hasValidDimension) {
