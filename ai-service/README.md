@@ -46,12 +46,6 @@ chmod +x quick_start.sh
 ### أرامكس مع طلب الاستلام:
 - `controllers/shapmentController.js` - تحديث إنشاء الشحنة
 - `services/AramexService.js` - إضافة `createPickupRequest`
-- `platforms/shipment/aramexPlatform.js` - إضافة `formatAddress`
-- `test_aramex_pickup.js` - اختبار الميزة
-
-### أرامكس مع طلب الاستلام:
-- `controllers/shapmentController.js` - تحديث إنشاء الشحنة
-- `services/AramexService.js` - إضافة `createPickupRequest`
 - `test_aramex_pickup.py` - اختبار وظيفة طلب الاستلام
 
 ## 🔗 المزيد:
@@ -103,48 +97,6 @@ chmod +x quick_start.sh
 - جدولة ذكية لأوقات الاستلام
 - حفظ معلومات طلب الاستلام في قاعدة البيانات
 - معالجة أخطاء شاملة مع تفاصيل
-
----
-
-## 🧪 الاختبارات:
-
-### اختبار الذكاء الاصطناعي:
-```bash
-python test_training.py
-```
-
-### اختبار ميزة أرامكس:
-```bash
-node test_aramex_pickup.js
-```
-
-### اختبار الخدمة الكاملة:
-```bash
-python app.py
-# ثم في terminal آخر:
-curl -X POST http://localhost:5000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "ما هي مميزات مراسيل؟"}'
-```
-
----
-
-## 🔧 استكشاف الأخطاء:
-
-### خطأ: "AramexPlatform is not a constructor"
-```bash
-# الحل: تأكد من أن aramexPlatform.js يصدر instance وليس class
-```
-
-### خطأ: "formatAddress is not a function"
-```bash
-# الحل: أضف دالة formatAddress إلى aramexPlatform.js
-```
-
-### خطأ في التدريب:
-```bash
-# الحل: python test_training.py للتحقق من البيانات
-```
 
 ---
 

@@ -39,18 +39,19 @@ class AramexService {
   }
 
   /**
-   * تنسيق عنوان العميل إلى صيغة Aramex
-   * @param {Object} address عنوان العميل
+   * تحويل عنوان العميل إلى صيغة Aramex
+   * @param {Object} address عنوان العميل من قاعدة البيانات
    * @returns {Object} عنوان بصيغة Aramex
    */
   formatAddress(address) {
     return {
-      Line1: `${address.address}    `,
-      Line2: `${address.address}    `,
-      Line3: address.addressLine3 || "    ",
-      City: address.city,
-      PostCode: address.postCode || "",
-      CountryCode: address.country ? address.country.toUpperCase() : "SA",
+      Line1: `${address.address || address.Line1 || ""}    `,
+      Line2: `${address.address || address.Line2 || ""}    `,
+      Line3: address.addressLine3 || address.Line3 || "    ",
+      City: address.city || address.City || "",
+      StateOrProvinceCode: address.state || address.StateOrProvinceCode || "",
+      PostCode: address.postalCode || address.PostCode || "",
+      CountryCode: address.country || address.CountryCode || "SA",
     };
   }
 
@@ -206,7 +207,7 @@ class AramexService {
           AccountCountryCode: this.accountCountryCode,
         },
         Pickup: {
-          PickupLocation: pickupData.pickupAddress,
+          PickupLocation: this.formatAddress(pickupData.pickupAddress),
           PickupContact: {
             PersonName: pickupData.contactName || "غير محدد",
             CompanyName: pickupData.companyName || "غير محدد",

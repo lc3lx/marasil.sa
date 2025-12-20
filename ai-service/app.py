@@ -34,19 +34,19 @@ try:
     else:
         print("📚 استخدام النموذج الأساسي (لم يتم العثور على نموذج مدرب)")
         use_fine_tuned = False
-        if torch.cuda.is_available():
-            MODEL_NAME = DEFAULT_GPU_MODEL
-            device_map = 'auto'
-            dtype = torch.float16
-            print(f"🔄 تحميل النموذج على GPU: {MODEL_NAME} (fp16)")
-        else:
-            MODEL_NAME = DEFAULT_CPU_MODEL
-            device_map = 'cpu'
-            dtype = torch.float32
-            print(f"🔄 تحميل نموذج للـ CPU: {MODEL_NAME} (fp32)")
+    if torch.cuda.is_available():
+        MODEL_NAME = DEFAULT_GPU_MODEL
+        device_map = 'auto'
+        dtype = torch.float16
+        print(f"🔄 تحميل النموذج على GPU: {MODEL_NAME} (fp16)")
+    else:
+        MODEL_NAME = DEFAULT_CPU_MODEL
+        device_map = 'cpu'
+        dtype = torch.float32
+        print(f"🔄 تحميل نموذج للـ CPU: {MODEL_NAME} (fp32)")
 
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
-
+    
     # إضافة pad_token إذا لم يكن موجوداً
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -910,23 +910,23 @@ def format_api_response(response_text, api_data, user_name=""):
         if not api_data or api_data.get("error"):
             error_msg = api_data.get("error", "حدث خطأ") if api_data else "لا توجد بيانات"
             return f"{response_text}\n\n⚠️ {error_msg}"
-
+        
         # تنسيق حسب نوع البيانات
         data = api_data.get("data") or api_data
-
+        
         if isinstance(data, list):
             count = len(data)
             if count > 0:
                 return f"{response_text}\n\n✅ وجدت {count} نتيجة. يمكنك مراجعة التفاصيل لضمان خدمة عملائك على أكمل وجه. 📊"
             else:
                 return f"{response_text}\n\n📭 لا توجد نتائج حالياً. إذا تحتاج دعم في أي جانب آخر من أعمالك، أنا هنا."
-
+        
         elif isinstance(data, dict):
             # إذا كان رصيد محفظة - التخطيط المالي
             if "balance" in data or isinstance(data, (int, float)):
                 balance = data.get("balance", data) if isinstance(data, dict) else data
                 return f"{response_text}\n\n💰 رصيد محفظتك: {balance} ريال\n💡 هذا يمكنك من إدارة {int(balance/10) if balance > 10 else 0} شحنة متوسطة اليوم."
-
+            
             # إذا كانت شحنة - حماية السمعة
             if "trackingId" in data or "shipmentStatus" in data:
                 status = data.get("shipmentStatus", data.get("status", "غير معروف"))
@@ -938,15 +938,15 @@ def format_api_response(response_text, api_data, user_name=""):
                     "cancelled": "ملغية"
                 }.get(status.lower(), status)
                 return f"{response_text}\n\n📦 رقم التتبع: {tracking}\n📍 الحالة: {status_ar}\n💼 يمكنك مشاركة هذه المعلومات مع عميلك لتعزيز الثقة."
-
+            
             # معلومات حساب - إدارة الأعمال
             if "firstName" in data or "email" in data:
                 name = data.get("firstName", "")
                 email = data.get("email", "")
                 return f"{response_text}\n\n👤 اسم المتجر: {name}\n📧 البريد الإلكتروني: {email}\n⚡ تأكد من دقة هذه البيانات لضمان وصول التحديثات لعملائك."
-
+        
         return f"{response_text}\n\n✅ تم بنجاح! هذا يساعدك في إدارة أعمالك بكفاءة أكبر."
-
+        
     except Exception as e:
         print(f"❌ خطأ في تنسيق الرد: {e}")
         return response_text
@@ -1010,24 +1010,24 @@ def generate_response(user_message, conversation_history=[], token="", user_name
             text = conversation_text
         else:
             # النموذج الأساسي - استخدام chat template
-            messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_message}
-            ]
-
-            # إضافة تاريخ المحادثة
-            for hist in conversation_history[-3:]:  # آخر 3 رسائل فقط
-                if hist.get("role") == "user":
-                    messages.append({"role": "user", "content": hist.get("content", "")})
-                elif hist.get("role") == "assistant":
-                    messages.append({"role": "assistant", "content": hist.get("content", "")})
-
-            # تحويل لـ prompt
-            text = tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True
-            )
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_message}
+        ]
+        
+        # إضافة تاريخ المحادثة
+        for hist in conversation_history[-3:]:  # آخر 3 رسائل فقط
+            if hist.get("role") == "user":
+                messages.append({"role": "user", "content": hist.get("content", "")})
+            elif hist.get("role") == "assistant":
+                messages.append({"role": "assistant", "content": hist.get("content", "")})
+        
+        # تحويل لـ prompt
+        text = tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
         
         # توليد الرد
         inputs = tokenizer([text], return_tensors="pt").to(model.device)
