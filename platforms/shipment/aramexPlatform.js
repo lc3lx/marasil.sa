@@ -39,6 +39,22 @@ class AramexService {
   }
 
   /**
+   * تنسيق عنوان العميل إلى صيغة Aramex
+   * @param {Object} address عنوان العميل
+   * @returns {Object} عنوان بصيغة Aramex
+   */
+  formatAddress(address) {
+    return {
+      Line1: `${address.address}    `,
+      Line2: `${address.address}    `,
+      Line3: address.addressLine3 || "    ",
+      City: address.city,
+      PostCode: address.postCode || "",
+      CountryCode: address.country ? address.country.toUpperCase() : "SA",
+    };
+  }
+
+  /**
    * إنشاء شحنة جديدة
    * @param {Object} shipmentData - بيانات الشحنة
    * @returns {Promise<Object>} - تفاصيل الشحنة
@@ -190,7 +206,7 @@ class AramexService {
           AccountCountryCode: this.accountCountryCode,
         },
         Pickup: {
-          PickupLocation: this.formatAddress(pickupData.pickupAddress),
+          PickupLocation: pickupData.pickupAddress,
           PickupContact: {
             PersonName: pickupData.contactName || "غير محدد",
             CompanyName: pickupData.companyName || "غير محدد",
