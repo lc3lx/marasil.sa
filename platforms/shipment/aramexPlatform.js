@@ -196,6 +196,12 @@ class AramexService {
    */
   async createPickup(pickupData) {
     try {
+      // طباعة البيانات الواردة للتشخيص
+      console.log(
+        "📦 [Aramex] Pickup Data Received:",
+        JSON.stringify(pickupData, null, 2)
+      );
+
       const payload = {
         ClientInfo: {
           UserName: this.username,
@@ -207,7 +213,7 @@ class AramexService {
           AccountCountryCode: this.accountCountryCode,
         },
         Pickup: {
-          PickupLocation: this.formatAddress(pickupData.pickupAddress),
+          PickupLocation: pickupData.pickupAddress, // البيانات تأتي منسقة بالفعل من AramexService
           PickupContact: {
             PersonName: pickupData.contactName || "غير محدد",
             CompanyName: pickupData.companyName || "غير محدد",
@@ -215,15 +221,20 @@ class AramexService {
             CellPhone: pickupData.mobile || "0000000000",
             EmailAddress: pickupData.email || "test@example.com",
           },
-          PickupDateTime: `\\/Date(${
-            pickupData.pickupDateTime || Date.now()
-          })\\/`,
-          ClosingDateTime: `\\/Date(${
-            pickupData.closingDateTime || Date.now() + 3600000
-          })\\/`,
+          PickupDateTime: `\\/Date(${pickupData.pickupDateTime})\\/`,
+          ClosingDateTime: `\\/Date(${pickupData.closingDateTime})\\/`,
           Status: "Ready",
+          // إضافة حقول إضافية مطلوبة محتملة
+          Comments: pickupData.comments || "Pickup request from Marasil",
+          Reference1: pickupData.reference || "",
         },
       };
+
+      // طباعة الـ payload المرسل
+      console.log(
+        "📤 [Aramex] Pickup Payload:",
+        JSON.stringify(payload, null, 2)
+      );
 
       const response = await axios.post(
         `${this.shippingBaseURL}/CreatePickup`,
@@ -234,8 +245,16 @@ class AramexService {
       );
 
       if (response.status !== 200) {
+        console.error("❌ [Aramex] CreatePickup API Response:", {
+          status: response.status,
+          statusText: response.statusText,
+          data: response.data,
+          headers: response.headers,
+        });
         throw new Error(
-          `خطأ في إنشاء الاستلام: ${JSON.stringify(response.data)}`
+          `خطأ في إنشاء الاستلام (${response.status}): ${JSON.stringify(
+            response.data
+          )}`
         );
       }
 

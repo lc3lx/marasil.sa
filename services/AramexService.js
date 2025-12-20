@@ -15,13 +15,13 @@ exports.formatAramexDate = (date) => {
  */
 exports.formatAddress = (address) => {
   return {
-    Line1: `${address.address}    `,
-    Line2: `${address.address}    `,
-    Line3: address.addressLine3 || "    ",
-    City: address.city,
-
-    PostCode: address.postCode || "",
-    CountryCode: address.country ? address.country.toUpperCase() : "SA",
+    Line1: address.address || address.Line1 || "Address not specified",
+    Line2: address.addressLine2 || address.Line2 || "",
+    Line3: address.addressLine3 || address.Line3 || "",
+    City: address.city || address.City || "Riyadh",
+    StateOrProvinceCode: address.state || address.StateOrProvinceCode || "",
+    PostCode: address.postalCode || address.postCode || "",
+    CountryCode: (address.country || address.CountryCode || "SA").toUpperCase(),
   };
 };
 
@@ -229,8 +229,8 @@ exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
     phone: shipperData.mobile || shipperData.phone || "0000000000",
     mobile: shipperData.mobile || shipperData.phone || "0000000000",
     email: shipperData.email || "test@example.com",
-    pickupDateTime: tomorrow.toISOString(),
-    closingDateTime: closingTime.toISOString(),
+    pickupDateTime: tomorrow.getTime(), // timestamp للـ Aramex format
+    closingDateTime: closingTime.getTime(), // timestamp للـ Aramex format
     // إضافة معلومات إضافية للشحنة
     reference: shipmentInfo.trackingNumber || "غير محدد",
     comments: `استلام شحنة رقم: ${shipmentInfo.trackingNumber || "غير محدد"}`,
@@ -273,10 +273,18 @@ exports.createPickupRequest = async (shipperAddress, shipmentInfo) => {
       shipmentInfo
     );
 
-    console.log("📦 [AramexService] إنشاء طلب استلام:", {
-      trackingNumber: shipmentInfo.trackingNumber,
-      shipperAddress: shipperAddress.address,
-      pickupTime: pickupData.pickupDateTime,
+    console.log("📦 [AramexService] إنشاء طلب استلام - بيانات الإدخال:", {
+      shipperAddress: JSON.stringify(shipperAddress, null, 2),
+      shipmentInfo: JSON.stringify(shipmentInfo, null, 2),
+    });
+
+    console.log("📦 [AramexService] بيانات طلب الاستلام المُعدة:", {
+      pickupAddress: JSON.stringify(pickupData.pickupAddress, null, 2),
+      contactName: pickupData.contactName,
+      phone: pickupData.phone,
+      pickupDateTime: pickupData.pickupDateTime,
+      closingDateTime: pickupData.closingDateTime,
+      reference: pickupData.reference,
     });
 
     // إنشاء طلب الاستلام

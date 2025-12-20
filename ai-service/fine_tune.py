@@ -261,7 +261,7 @@ def train_model():
         save_steps=100,
         save_total_limit=2,
         load_best_model_at_end=True,
-        evaluation_strategy="steps",
+        eval_strategy="steps",
         eval_steps=50,
         warmup_steps=50,
         dataloader_num_workers=0,  # لتجنب مشاكل multiprocessing

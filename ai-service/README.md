@@ -100,4 +100,57 @@ chmod +x quick_start.sh
 
 ---
 
+## 🔧 استكشاف الأخطاء
+
+### خطأ: "expected an indented block after 'else' statement"
+```python
+# في app.py حول السطر 1011
+# الحل: تأكد من indentation صحيح
+if condition:
+    # code
+else:  # يجب أن يكون aligned مع if
+    # code
+```
+
+### خطأ: "evaluation_strategy" غير معروف
+```python
+# في fine_tune.py
+# الحل: غير evaluation_strategy إلى eval_strategy
+training_args = TrainingArguments(
+    eval_strategy="steps",  # وليس evaluation_strategy
+    eval_steps=50,
+    # ... باقي الإعدادات
+)
+```
+
+### خطأ: Aramex API returns 400 Bad Request
+```
+الأسباب الشائعة:
+1. بيانات العنوان غير مكتملة (Line1 مطلوب)
+2. أوقات الاستلام غير صحيحة
+3. credentials غير صحيحة للـ testing environment
+
+الحل: تحقق من logs المفصلة المضافة في createPickup
+```
+
+### خطأ: نفاد الذاكرة
+```python
+# قلل batch size
+per_device_train_batch_size=1,
+
+# أو زد gradient accumulation
+gradient_accumulation_steps=8,
+```
+
+### خطأ: النموذج بطيء
+```bash
+# تحقق من إعدادات GPU
+nvidia-smi
+
+# استخدم نموذج أصغر
+export AI_MODEL="Qwen/Qwen2.5-1.5B-Instruct"
+```
+
+---
+
 **🚀 جاهز لتجربة التحديثات الجديدة!**

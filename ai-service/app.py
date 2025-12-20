@@ -1010,10 +1010,10 @@ def generate_response(user_message, conversation_history=[], token="", user_name
             text = conversation_text
         else:
             # النموذج الأساسي - استخدام chat template
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_message}
-        ]
+            messages = [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_message}
+            ]
         
         # إضافة تاريخ المحادثة
         for hist in conversation_history[-3:]:  # آخر 3 رسائل فقط
