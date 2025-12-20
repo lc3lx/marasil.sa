@@ -218,13 +218,29 @@ def setup_model_and_tokenizer():
         llm_int8_enable_fp32_cpu_offload=True
     )
 
-    model = AutoModelForCausalLM.from_pretrained(
-        BASE_MODEL,
-        device_map="auto",
-        torch_dtype=torch.float16,
-        quantization_config=quantization_config,
-        trust_remote_code=True
-    )
+    # تحميل النموذج مع معالجة أخطاء GPU/CPU
+    try:
+        model = AutoModelForCausalLM.from_pretrained(
+            BASE_MODEL,
+            device_map="auto",
+            torch_dtype=torch.float16,
+            quantization_config=quantization_config,
+            trust_remote_code=True
+        )
+        print("✅ تم تحميل النموذج على GPU")
+    except Exception as e:
+        print(f"⚠️ فشل تحميل النموذج على GPU، جاري المحاولة على CPU: {e}")
+        try:
+            model = AutoModelForCausalLM.from_pretrained(
+                BASE_MODEL,
+                device_map={"": "cpu"},
+                torch_dtype=torch.float32,
+                trust_remote_code=True,
+                low_cpu_mem_usage=True
+            )
+            print("✅ تم تحميل النموذج على CPU")
+        except Exception as e2:
+            raise Exception(f"فشل تحميل النموذج: GPU: {e}, CPU: {e2}")
 
     # إعداد LoRA للتدريب الفعال
     lora_config = LoraConfig(
@@ -250,30 +266,32 @@ def train_model():
     model, tokenizer = setup_model_and_tokenizer()
     dataset = prepare_dataset(tokenizer)
 
-    training_args = TrainingArguments(
-        output_dir=OUTPUT_DIR,
-        num_train_epochs=3,
-        per_device_train_batch_size=2,
-        gradient_accumulation_steps=4,
-        learning_rate=2e-4,
-        fp16=True,
-        logging_steps=10,
-        save_steps=100,
-        save_total_limit=2,
-        load_best_model_at_end=True,
-        eval_strategy="steps",
-        eval_steps=50,
-        warmup_steps=50,
-        dataloader_num_workers=0,  # لتجنب مشاكل multiprocessing
-        remove_unused_columns=False,  # مهم: لا تزيل الأعمدة غير المستخدمة
-    )
+        training_args = TrainingArguments(
+            output_dir=OUTPUT_DIR,
+            num_train_epochs=1,  # epoch واحد فقط للتدريب السريع
+            per_device_train_batch_size=1,  # batch size صغير لتوفير الذاكرة
+            gradient_accumulation_steps=2,
+            learning_rate=5e-5,  # learning rate أقل للاستقرار
+            fp16=False,  # تعطيل fp16 على CPU
+            logging_steps=5,
+            save_steps=25,
+            save_total_limit=1,
+            dataloader_num_workers=0,  # لتجنب مشاكل multiprocessing
+            remove_unused_columns=False,  # مهم: لا تزيل الأعمدة غير المستخدمة
+            report_to=[],  # لا نحتاج logging خارجي
+        )
 
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=dataset,
-        data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
-    )
+        # التأكد من أن dataset يحتوي على الأعمدة المطلوبة
+        print(f"📊 أعمدة البيانات المتاحة: {list(dataset.column_names)}")
+        print(f"📊 حجم البيانات: {len(dataset)}")
+        print(f"📊 عينة من البيانات: {dataset[0].keys()}")
+
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            train_dataset=dataset,
+            data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
+        )
 
     trainer.train()
 

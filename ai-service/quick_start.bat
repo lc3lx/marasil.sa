@@ -13,17 +13,19 @@ echo اختر ما تريد فعله:
 echo [1] تشغيل الخدمة (مع النموذج المدرب إن وجد)
 echo [2] تدريب سريع (دقائق)
 echo [3] تدريب كامل (ساعات)
-echo [4] اختبار التدريب
+echo [4] تدريب بسيط (دقائق)
+echo [5] اختبار التدريب
 echo [5] تحديث المتطلبات
 echo.
 
-set /p choice="اختر رقم (1-5): "
+set /p choice="اختر رقم (1-6): "
 
 if "%choice%"=="1" goto run_service
 if "%choice%"=="2" goto quick_train
 if "%choice%"=="3" goto full_train
-if "%choice%"=="4" goto test_train
-if "%choice%"=="5" goto update_req
+if "%choice%"=="4" goto simple_train
+if "%choice%"=="5" goto test_train
+if "%choice%"=="6" goto update_req
 
 echo ❌ اختيار غير صحيح
 pause
@@ -42,6 +44,11 @@ goto end
 :full_train
 echo 🎯 تدريب كامل...
 python fine_tune.py
+goto end
+
+:simple_train
+echo 🎯 تدريب بسيط...
+python train_simple.py
 goto end
 
 :test_train

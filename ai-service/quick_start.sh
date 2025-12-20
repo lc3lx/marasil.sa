@@ -29,10 +29,14 @@ case $choice in
         python fine_tune.py
         ;;
     4)
+        echo "🎯 تدريب بسيط..."
+        python train_simple.py
+        ;;
+    5)
         echo "🧪 اختبار التدريب..."
         python test_training.py
         ;;
-    5)
+    6)
         echo "📦 تحديث المتطلبات..."
         pip install -r requirements.txt --upgrade
         echo "✅ تم التحديث"
