@@ -264,10 +264,8 @@ exports.deliveryData = (deliveryData) => {
  */
 exports.createPickupRequest = async (shipperAddress, shipmentInfo) => {
   try {
-    const AramexPlatform = require("../platforms/shipment/aramexPlatform");
-
-    // إنشاء مثيل من AramexPlatform
-    const aramex = new AramexPlatform();
+    // استيراد الـ instance المُصدّر من aramexPlatform (ليس class)
+    const aramex = require("../platforms/shipment/aramexPlatform");
 
     // إعداد بيانات طلب الاستلام
     const pickupData = exports.createPickupRequestData(
