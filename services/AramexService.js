@@ -207,6 +207,37 @@ exports.pickupData = (pickupData) => {
 };
 
 /**
+ * إنشاء بيانات طلب الاستلام من بيانات المرسل
+ * @param {Object} shipperData بيانات المرسل
+ * @param {Object} shipmentInfo معلومات الشحنة
+ * @returns {Object} بيانات طلب الاستلام
+ */
+exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
+  // تحديد وقت الاستلام (اليوم التالي من الساعة 9 صباحاً)
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(9, 0, 0, 0); // 9:00 AM
+
+  // وقت انتهاء الاستلام (اليوم التالي من الساعة 5 مساءً)
+  const closingTime = new Date(tomorrow);
+  closingTime.setHours(17, 0, 0, 0); // 5:00 PM
+
+  return {
+    pickupAddress: exports.formatAddress(shipperData),
+    contactName: shipperData.full_name || shipperData.contactName || "غير محدد",
+    companyName: shipperData.full_name || shipperData.companyName || "Marasil",
+    phone: shipperData.mobile || shipperData.phone || "0000000000",
+    mobile: shipperData.mobile || shipperData.phone || "0000000000",
+    email: shipperData.email || "test@example.com",
+    pickupDateTime: tomorrow.toISOString(),
+    closingDateTime: closingTime.toISOString(),
+    // إضافة معلومات إضافية للشحنة
+    reference: shipmentInfo.trackingNumber || "غير محدد",
+    comments: `استلام شحنة رقم: ${shipmentInfo.trackingNumber || "غير محدد"}`,
+  };
+};
+
+/**
  * تحويل بيانات التسليم المجدول إلى صيغة Aramex
  * @param {Object} deliveryData بيانات التسليم
  * @returns {Object} بيانات التسليم بصيغة Aramex
@@ -223,4 +254,59 @@ exports.deliveryData = (deliveryData) => {
     mobile: deliveryData.mobile || "0000000000",
     email: deliveryData.email || "test@example.com",
   };
+};
+
+/**
+ * إنشاء طلب استلام تلقائي للشحنة
+ * @param {Object} shipperAddress عنوان المرسل
+ * @param {Object} shipmentInfo معلومات الشحنة المُنشأة
+ * @returns {Promise<Object>} نتيجة إنشاء طلب الاستلام
+ */
+exports.createPickupRequest = async (shipperAddress, shipmentInfo) => {
+  try {
+    const AramexPlatform = require("../platforms/shipment/aramexPlatform");
+
+    // إنشاء مثيل من AramexPlatform
+    const aramex = new AramexPlatform();
+
+    // إعداد بيانات طلب الاستلام
+    const pickupData = exports.createPickupRequestData(
+      shipperAddress,
+      shipmentInfo
+    );
+
+    console.log("📦 [AramexService] إنشاء طلب استلام:", {
+      trackingNumber: shipmentInfo.trackingNumber,
+      shipperAddress: shipperAddress.address,
+      pickupTime: pickupData.pickupDateTime,
+    });
+
+    // إنشاء طلب الاستلام
+    const pickupResult = await aramex.createPickup(pickupData);
+
+    console.log(
+      "✅ [AramexService] تم إنشاء طلب الاستلام بنجاح:",
+      pickupResult
+    );
+
+    return {
+      success: true,
+      pickupId: pickupResult?.pickupId || pickupResult?.GUID || "غير محدد",
+      pickupData: pickupData,
+      message: "تم إنشاء طلب الاستلام بنجاح",
+      scheduledDate: pickupData.pickupDateTime,
+      ...pickupResult,
+    };
+  } catch (error) {
+    console.error(
+      "❌ [AramexService] فشل في إنشاء طلب الاستلام:",
+      error.message
+    );
+
+    return {
+      success: false,
+      error: error.message,
+      message: "فشل في إنشاء طلب الاستلام",
+    };
+  }
 };

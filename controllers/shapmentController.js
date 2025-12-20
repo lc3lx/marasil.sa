@@ -387,6 +387,35 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           if (!trackingInfo || !trackingInfo.trackingNumber) {
             throw new Error("فشل في الحصول على رقم التتبع");
           }
+
+          // إنشاء طلب الاستلام تلقائياً بعد إنشاء الشحنة
+          console.log("🚛 [Controller] إنشاء طلب استلام لأرامكس...");
+          const pickupResult = await aramxServers.createPickupRequest(
+            shipperAddress,
+            { trackingNumber: trackingInfo.trackingNumber }
+          );
+
+          if (pickupResult.success) {
+            console.log("✅ [Controller] تم إنشاء طلب الاستلام بنجاح");
+            // إضافة معلومات طلب الاستلام للرد
+            trackingInfo.pickupRequest = {
+              pickupId: pickupResult.pickupId,
+              scheduledDate: pickupResult.scheduledDate,
+              message: pickupResult.message,
+              success: true,
+            };
+          } else {
+            console.warn(
+              "⚠️ [Controller] فشل في إنشاء طلب الاستلام:",
+              pickupResult.error
+            );
+            // إضافة معلومات فشل طلب الاستلام للرد
+            trackingInfo.pickupRequest = {
+              success: false,
+              error: pickupResult.error,
+              message: pickupResult.message,
+            };
+          }
         } catch (error) {
           console.error("Aramex Error:", error);
           return next(
@@ -487,6 +516,17 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
       aramexResponse: apiResponses.aramex || null,
       redboxResponse: apiResponses.redbox || null,
       omniclamaResponse: apiResponses.omniclama || null,
+      // حفظ معلومات طلب الاستلام إذا كان موجوداً
+      ...(trackingInfo.pickupRequest && {
+        pickupRequest: {
+          pickupId: trackingInfo.pickupRequest.pickupId,
+          scheduledDate: trackingInfo.pickupRequest.scheduledDate,
+          success: trackingInfo.pickupRequest.success,
+          ...(trackingInfo.pickupRequest.error && {
+            error: trackingInfo.pickupRequest.error,
+          }),
+        },
+      }),
       shapmentType: "straight",
       totalprice: pricing.total,
       shapmentPrice: {
@@ -548,6 +588,18 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           number: trackingInfo.trackingNumber,
           url: `${shippingCompany.trackingURL}${trackingInfo.trackingNumber}`,
         },
+        // إضافة معلومات طلب الاستلام إذا كان موجوداً
+        ...(trackingInfo.pickupRequest && {
+          pickupRequest: {
+            success: trackingInfo.pickupRequest.success,
+            pickupId: trackingInfo.pickupRequest.pickupId,
+            scheduledDate: trackingInfo.pickupRequest.scheduledDate,
+            message: trackingInfo.pickupRequest.message,
+            ...(trackingInfo.pickupRequest.error && {
+              error: trackingInfo.pickupRequest.error,
+            }),
+          },
+        }),
       },
     });
   } catch (error) {
