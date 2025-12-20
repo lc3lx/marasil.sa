@@ -266,7 +266,7 @@ def train_model():
     model, tokenizer = setup_model_and_tokenizer()
     dataset = prepare_dataset(tokenizer)
 
-        training_args = TrainingArguments(
+    training_args = TrainingArguments(
             output_dir=OUTPUT_DIR,
             num_train_epochs=1,  # epoch واحد فقط للتدريب السريع
             per_device_train_batch_size=1,  # batch size صغير لتوفير الذاكرة
@@ -281,17 +281,17 @@ def train_model():
             report_to=[],  # لا نحتاج logging خارجي
         )
 
-        # التأكد من أن dataset يحتوي على الأعمدة المطلوبة
-        print(f"📊 أعمدة البيانات المتاحة: {list(dataset.column_names)}")
-        print(f"📊 حجم البيانات: {len(dataset)}")
-        print(f"📊 عينة من البيانات: {dataset[0].keys()}")
+    # التأكد من أن dataset يحتوي على الأعمدة المطلوبة
+    print(f"📊 أعمدة البيانات المتاحة: {list(dataset.column_names)}")
+    print(f"📊 حجم البيانات: {len(dataset)}")
+    print(f"📊 عينة من البيانات: {dataset[0].keys()}")
 
-        trainer = Trainer(
-            model=model,
-            args=training_args,
-            train_dataset=dataset,
-            data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
-        )
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=dataset,
+        data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
+    )
 
     trainer.train()
 
