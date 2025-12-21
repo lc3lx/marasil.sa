@@ -26,24 +26,34 @@ DEFAULT_CPU_MODEL = os.getenv('AI_MODEL_CPU', 'Qwen/Qwen2.5-1.5B-Instruct')
 FINE_TUNED_MODEL_PATH = "./marasil-ai-v1.0"
 
 try:
-    # التحقق من وجود النموذج المدرب
+    # التحقق من وجود النموذج المدرب أولاً
     if os.path.exists(FINE_TUNED_MODEL_PATH) and os.path.exists(os.path.join(FINE_TUNED_MODEL_PATH, "adapter_model.safetensors")):
         print(f"🎯 تم العثور على نموذج مدرب في: {FINE_TUNED_MODEL_PATH}")
         MODEL_NAME = FINE_TUNED_MODEL_PATH
         use_fine_tuned = True
+        # إعدادات للنموذج المدرب (يعمل على GPU أو CPU)
+        if torch.cuda.is_available():
+            device_map = 'auto'
+            dtype = torch.float16
+            print(f"🔄 تحميل النموذج المدرب على GPU: {MODEL_NAME} (fp16)")
+        else:
+            device_map = 'cpu'
+            dtype = torch.float32
+            print(f"🔄 تحميل النموذج المدرب على CPU: {MODEL_NAME} (fp32)")
     else:
         print("📚 استخدام النموذج الأساسي (لم يتم العثور على نموذج مدرب)")
         use_fine_tuned = False
-    if torch.cuda.is_available():
-        MODEL_NAME = DEFAULT_GPU_MODEL
-        device_map = 'auto'
-        dtype = torch.float16
-        print(f"🔄 تحميل النموذج على GPU: {MODEL_NAME} (fp16)")
-    else:
-        MODEL_NAME = DEFAULT_CPU_MODEL
-        device_map = 'cpu'
-        dtype = torch.float32
-        print(f"🔄 تحميل نموذج للـ CPU: {MODEL_NAME} (fp32)")
+        # اختيار النموذج الأساسي حسب GPU/CPU
+        if torch.cuda.is_available():
+            MODEL_NAME = DEFAULT_GPU_MODEL
+            device_map = 'auto'
+            dtype = torch.float16
+            print(f"🔄 تحميل النموذج الأساسي على GPU: {MODEL_NAME} (fp16)")
+        else:
+            MODEL_NAME = DEFAULT_CPU_MODEL
+            device_map = 'cpu'
+            dtype = torch.float32
+            print(f"🔄 تحميل النموذج الأساسي على CPU: {MODEL_NAME} (fp32)")
 
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
     
@@ -63,7 +73,7 @@ try:
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
         device_map=device_map if not use_fine_tuned else "auto",
-        torch_dtype=dtype if not use_fine_tuned else torch.float16,
+        dtype=dtype if not use_fine_tuned else torch.float16,
         quantization_config=quantization_config,
         low_cpu_mem_usage=True,
         trust_remote_code=True,
@@ -76,7 +86,7 @@ try:
         base_model = AutoModelForCausalLM.from_pretrained(
             base_model_path,
             device_map="auto",
-            torch_dtype=torch.float16,
+            dtype=torch.float16,
             low_cpu_mem_usage=True,
             trust_remote_code=True,
         )
