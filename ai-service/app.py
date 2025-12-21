@@ -17,10 +17,10 @@ CORS(app)
 
 # تحميل النموذج - استخدام نموذج قوي بالعربية
 # Qwen2.5-7B-Instruct: نموذج قوي جداً بالعربية (يحتاج GPU قوي)
-# Qwen2.5-3B-Instruct: متوازن (يعمل على GPU متوسط)
+# Qwen2.5-3B-Instruct: متوازن (يعمل على GPU متوسط) - يستخدم للتدريب
 # Qwen2.5-1.5B-Instruct: سريع (يعمل على CPU/GPU ضعيف)
 DEFAULT_GPU_MODEL = os.getenv('AI_MODEL', 'Qwen/Qwen2.5-3B-Instruct')
-DEFAULT_CPU_MODEL = os.getenv('AI_MODEL_CPU', 'Qwen/Qwen2.5-1.5B-Instruct')
+DEFAULT_CPU_MODEL = os.getenv('AI_MODEL_CPU', 'Qwen/Qwen2.5-3B-Instruct')  # نفس النموذج المستخدم في التدريب
 
 # مسار النموذج المدرب (إذا كان موجوداً)
 FINE_TUNED_MODEL_PATH = "./marasil-ai-v1.0"
@@ -81,17 +81,41 @@ try:
 
     # تحميل محول LoRA إذا كان النموذج مدرباً
     if use_fine_tuned:
-        from peft import PeftModel
-        base_model_path = DEFAULT_GPU_MODEL if torch.cuda.is_available() else DEFAULT_CPU_MODEL
-        base_model = AutoModelForCausalLM.from_pretrained(
-            base_model_path,
-            device_map="auto",
-            dtype=torch.float16,
-            low_cpu_mem_usage=True,
-            trust_remote_code=True,
-        )
-        model = PeftModel.from_pretrained(base_model, FINE_TUNED_MODEL_PATH)
-        print("🔧 تم تحميل محول LoRA بنجاح")
+        try:
+            from peft import PeftModel
+            # استخدام نفس النموذج الأساسي المستخدم في التدريب
+            base_model_path = "Qwen/Qwen2.5-3B-Instruct"
+            base_model = AutoModelForCausalLM.from_pretrained(
+                base_model_path,
+                device_map="auto",
+                dtype=torch.float16,
+                low_cpu_mem_usage=True,
+                trust_remote_code=True,
+            )
+            model = PeftModel.from_pretrained(base_model, FINE_TUNED_MODEL_PATH)
+            print("🔧 تم تحميل محول LoRA بنجاح")
+        except Exception as e:
+            print(f"❌ فشل تحميل النموذج المدرب: {e}")
+            print("🔄 العودة للنموذج الأساسي...")
+            use_fine_tuned = False
+            # إعادة تحميل النموذج الأساسي
+            if torch.cuda.is_available():
+                MODEL_NAME = DEFAULT_GPU_MODEL
+                device_map = 'auto'
+                dtype = torch.float16
+            else:
+                MODEL_NAME = DEFAULT_CPU_MODEL
+                device_map = 'cpu'
+                dtype = torch.float32
+
+            model = AutoModelForCausalLM.from_pretrained(
+                MODEL_NAME,
+                device_map=device_map,
+                dtype=dtype,
+                quantization_config=quantization_config,
+                low_cpu_mem_usage=True,
+                trust_remote_code=True,
+            )
 
     model.eval()
 
