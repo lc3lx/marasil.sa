@@ -1048,20 +1048,20 @@ def generate_response(user_message, conversation_history=[], token="", user_name
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_message}
             ]
-        
-        # إضافة تاريخ المحادثة
-        for hist in conversation_history[-3:]:  # آخر 3 رسائل فقط
-            if hist.get("role") == "user":
-                messages.append({"role": "user", "content": hist.get("content", "")})
-            elif hist.get("role") == "assistant":
-                messages.append({"role": "assistant", "content": hist.get("content", "")})
-        
-        # تحويل لـ prompt
-        text = tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True
-        )
+
+            # إضافة تاريخ المحادثة
+            for hist in conversation_history[-3:]:  # آخر 3 رسائل فقط
+                if hist.get("role") == "user":
+                    messages.append({"role": "user", "content": hist.get("content", "")})
+                elif hist.get("role") == "assistant":
+                    messages.append({"role": "assistant", "content": hist.get("content", "")})
+
+            # تحويل لـ prompt
+            text = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
         
         # توليد الرد
         inputs = tokenizer([text], return_tensors="pt").to(model.device)
