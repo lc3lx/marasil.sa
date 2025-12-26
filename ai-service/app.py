@@ -11,6 +11,13 @@ import json
 import os
 import re
 import requests
+import multiprocessing
+
+# ضبط عدد الأنوية تلقائيًا
+num_threads = multiprocessing.cpu_count()
+torch.set_num_threads(num_threads)
+# يمكنك أيضاً تخصيص يدوي مثلاً: torch.set_num_threads(8)
+
 
 app = Flask(__name__)
 CORS(app)
@@ -1067,18 +1074,37 @@ def generate_response(user_message, conversation_history=[], token="", user_name
         # توليد الرد
         inputs = tokenizer([text], return_tensors="pt").to(model.device)
         
+        import time
         with torch.inference_mode():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=256,  # تقليل عدد التوكنات يسمح بسرعة التوليد وتحكم أفضل
-                do_sample=True,
-                temperature=0.4,
-                top_p=0.8,
-                repetition_penalty=1.2,
-                use_cache=True,
-                pad_token_id=tokenizer.pad_token_id,
-                eos_token_id=tokenizer.eos_token_id,
-            )
+            # --- تنفيذ مع timeout ---
+            start_time = time.time()
+            try:
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=256,  # تقليل عدد التوكنات يسمح بسرعة التوليد وتحكم أفضل
+                    do_sample=True,
+                    temperature=0.4,
+                    top_p=0.8,
+                    repetition_penalty=1.2,
+                    use_cache=True,
+                    pad_token_id=tokenizer.pad_token_id,
+                    eos_token_id=tokenizer.eos_token_id,
+                )
+            except Exception as ex:
+                print(f'❌ خطأ أثناء التوليد: {ex}')
+                return {
+                    "response": "أنا حالياً عم أتدرب أكثر حتى أقدر ألبي جميع خدماتك بشكل أفضل. جرب سؤال أبسط أو بعد دقائق 🙏",
+                    "api_call": None,
+                    "data": None
+                }
+            # التحقق من الوقت المنقضي
+            elapsed = time.time() - start_time
+            if elapsed > 14.5:
+                return {
+                    "response": "أنا حالياً عم أتدرب أكثر حتى أقدر ألبي جميع خدماتك بشكل أفضل. إذا عندك استفسار ضروري، جرب سؤال مختصر أو ابعت رسالة ثانية بعد شوي 🙏",
+                    "api_call": None,
+                    "data": None
+                }
         
         # فك تشفير الرد
         generated_ids = outputs[0]
@@ -1135,7 +1161,7 @@ def generate_response(user_message, conversation_history=[], token="", user_name
         import traceback
         traceback.print_exc()
         return {
-            "response": "عذراً، حدث خطأ تقني مؤقت. نحن نعمل على حل المشكلة لضمان استمرارية أعمالك. جرب مرة أخرى خلال دقائق.",
+            "response": "أنا حالياً عم أتدرب أكثر حتى أقدر ألبي جميع خدماتك بشكل أفضل. جرب سؤال أبسط أو بعد دقائق 🙏",
             "api_call": None,
             "data": None
         }
