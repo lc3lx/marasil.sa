@@ -20,68 +20,68 @@ exports.shipmentdata = (
   }
   console.log(order);
   const shipmentdata = {
-    // البيانات المطلوبة
-    reference: order._id,
-    cod_amount: parseFloat(order.total.amount),
+    reference: String(order._id || ""),
+    cod_amount:
+      order.payment_method === "COD" || order.paymentMethod === "COD"
+        ? 0
+        : parseFloat(order.total?.amount || 0),
     cod_currency: "SAR",
-    customer_name: order.customer?.full_name,
-    customer_phone: order.customer?.mobile,
-    customer_address: order.customer?.address,
-
-    // البيانات الاختيارية
+    customer_name: order.customer?.full_name || "",
+    customer_phone: order.customer?.mobile || "",
+    customer_address: order.customer?.address || "",
+    customer_national_address: {
+      short_code: "",
+      structured: {
+        building_number: "",
+        street_name: "",
+        neighborhood: "",
+        city: order.customer?.city || "",
+        postal_code: "",
+        additional_number: "",
+      },
+    },
     customer_address_coordinates: order.customer?.coordinates
       ? {
           lat: parseFloat(order.customer.coordinates.lat) || 0,
           lng: parseFloat(order.customer.coordinates.lng) || 0,
         }
-      : undefined,
-    customer_city: order.customer?.city,
+      : {
+          lat: 0,
+          lng: 0,
+        },
+    customer_city: order.customer?.city || "",
     customer_country: order.customer?.country || "SA",
     customer_email: order.customer?.email || "",
-
-    // أبعاد الشحنة
-    dimension_height: order.dimension?.height || 0,
-    dimension_length: order.dimension?.length || 0,
-    dimension_width: order.dimension?.width || 0,
+    dimension_height: parseFloat(order.dimension?.height) || 0,
+    dimension_length: parseFloat(order.dimension?.length) || 0,
     dimension_unit: "CM",
-
-    // معلومات الوزن والطرود
-    weight_value: parseFloat(weight) || 1,
-    weight_unit: "KG",
-    package_count: parseInt(parcels) || 1,
-
-    // معلومات المنصة
-    from_platform: order.platform,
-
-    // معلومات نقطة الاستلام
+    dimension_width: parseFloat(order.dimension?.width) || 0,
+    from_platform: order.platform || "",
+    items:
+      order.items?.map((item) => ({
+        currency: "SAR",
+        description: orderDescription || "",
+        name: item.name || "منتج",
+        sku: item.sku || "",
+        quantity: parseInt(item.quantity) || 1,
+        unit_price: parseFloat(item.price) || 0,
+      })) || [],
+    original_tracking_number: String(order._id || ""),
+    number_of_pieces: parseInt(parcels) || 1,
     pickup_location_id: shipperAddress.location_id || "",
     pickup_location_reference: shipperAddress.reference || "",
     point_id: shipperAddress.point_id || "",
-
-    // معلومات المرسل
-    sender_address: shipperAddress.address,
-    sender_email: shipperAddress.email,
-    sender_name: shipperAddress.full_name,
-    sender_phone: shipperAddress.mobile,
-    sender_country: shipperAddress.country,
-    sender_city: shipperAddress.city,
-
-    // معلومات الشحن
+    sender_name: shipperAddress.full_name || "",
+    sender_phone: shipperAddress.mobile || "",
+    sender_email: shipperAddress.email || "",
+    sender_address: shipperAddress.address || "",
+    sender_city: shipperAddress.city || "",
+    sender_city_code: "",
+    sender_country: shipperAddress.country || "SA",
     shipping_price: parseFloat(order.shipping_cost) || 0,
     shipping_price_currency: "SAR",
-
-    // معلومات إضافية
-    original_tracking_number: order._id || "",
-
-    // تفاصيل المنتجات
-    items:
-      order.items?.map((item) => ({
-        name: item.name || "منتج",
-        quantity: item.quantity || 1,
-        price: parseFloat(item.price) || 0,
-        sku: item.sku || "",
-        description: orderDescription || "",
-      })) || [],
+    weight_unit: "KG",
+    weight_value: parseFloat(weight) || 1,
   };
   console.log(shipmentdata);
   return shipmentdata;

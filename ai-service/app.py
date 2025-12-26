@@ -63,12 +63,13 @@ try:
 
     # إعداد quantization إذا لزم الأمر
     quantization_config = None
-    if not use_fine_tuned and torch.cuda.is_available():
+    if torch.cuda.is_available():
         from transformers import BitsAndBytesConfig
         quantization_config = BitsAndBytesConfig(
             load_in_8bit=True,
             llm_int8_enable_fp32_cpu_offload=True
         )
+# تفعيل quantization دائما لجعل النموذج أخف وأكثر سرعة
 
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
@@ -1029,7 +1030,7 @@ def generate_response(user_message, conversation_history=[], token="", user_name
 """
 
             # إضافة تاريخ المحادثة (مختصر للنماذج المدربة)
-            for hist in conversation_history[-2:]:  # آخر رسالتين فقط للنماذج المدربة
+            for hist in conversation_history[-1:]:  # آخر رسالة فقط للنماذج المدربة
                 if hist.get("role") == "user":
                     conversation_text += f"""<|im_end|>
 <|im_start|>user
@@ -1050,7 +1051,7 @@ def generate_response(user_message, conversation_history=[], token="", user_name
             ]
 
             # إضافة تاريخ المحادثة
-            for hist in conversation_history[-3:]:  # آخر 3 رسائل فقط
+            for hist in conversation_history[-1:]:  # آخر رسالة فقط تكفي
                 if hist.get("role") == "user":
                     messages.append({"role": "user", "content": hist.get("content", "")})
                 elif hist.get("role") == "assistant":
@@ -1069,10 +1070,10 @@ def generate_response(user_message, conversation_history=[], token="", user_name
         with torch.inference_mode():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=512,  # زيادة للسماح بـ API calls
+                max_new_tokens=256,  # تقليل عدد التوكنات يسمح بسرعة التوليد وتحكم أفضل
                 do_sample=True,
-                temperature=0.7,
-                top_p=0.9,
+                temperature=0.4,
+                top_p=0.8,
                 repetition_penalty=1.2,
                 use_cache=True,
                 pad_token_id=tokenizer.pad_token_id,

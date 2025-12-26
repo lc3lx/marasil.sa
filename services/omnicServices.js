@@ -100,7 +100,7 @@ exports.shipmentData = async (
               provider_inn: order.provider?.inn || "74162944192",
               provider_name: order.provider?.name || "TechnoPolis",
               quantity: parseInt(order.items?.[0]?.quantity || 1),
-              weight: Math.ceil(weight),
+              weight: weight * 1000,
               width: parseInt(dimension.width || 130),
             },
           ],
@@ -108,7 +108,7 @@ exports.shipmentData = async (
           height: parseInt(dimension.high || 0),
           length: parseInt(dimension.length || 230),
           number: generateRandom8DigitNumber(),
-          weight: weight,
+          weight: weight * 1000,
           width: parseInt(dimension.width || 130),
         },
       ],
@@ -124,7 +124,7 @@ exports.shipmentData = async (
         name: order.customer.full_name,
         phone: `+966${order.customer.mobile}`,
       },
-      weight: weight,
+      weight: weight * 1000,
       width: dimension.width || 10,
     };
 
