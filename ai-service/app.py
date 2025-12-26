@@ -1081,10 +1081,8 @@ def generate_response(user_message, conversation_history=[], token="", user_name
             try:
                 outputs = model.generate(
                     **inputs,
-                    max_new_tokens=160,  # تقليل عدد التوكنات أكثر لتسريع الرد
-                do_sample=False,  # أسرع وأكثر استقراراً للعملية التشغيلية
-                temperature=0.2,
-                top_p=0.8,  # ضبطها للأكثر ثباتاً
+                    max_new_tokens=160,
+                    do_sample=False,
                     repetition_penalty=1.2,
                     use_cache=True,
                     pad_token_id=tokenizer.pad_token_id,
