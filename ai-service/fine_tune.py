@@ -17,8 +17,8 @@ import torch
 import json
 import os
 
-# إعدادات النموذج الأساسي
-BASE_MODEL = "Qwen/Qwen2.5-3B-Instruct"
+# إعدادات النموذج الأساسي - نسخة أصغر لتسريع التدريب
+BASE_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
 OUTPUT_DIR = "./marasil-ai-v1.0"
 TRAINING_DATA_FILE = "training_data.json"
 
@@ -270,15 +270,16 @@ def train_model():
             output_dir=OUTPUT_DIR,
             num_train_epochs=1,  # epoch واحد فقط للتدريب السريع
             per_device_train_batch_size=1,  # batch size صغير لتوفير الذاكرة
-            gradient_accumulation_steps=2,
-            learning_rate=5e-5,  # learning rate أقل للاستقرار
+            gradient_accumulation_steps=1,  # تقليل لتسريع التدريب
+            learning_rate=1e-4,  # learning rate أعلى قليلاً للتدريب السريع
             fp16=False,  # تعطيل fp16 على CPU
-            logging_steps=5,
-            save_steps=25,
+            logging_steps=10,  # logging أقل تكراراً
+            save_steps=50,  # حفظ أقل تكراراً
             save_total_limit=1,
             dataloader_num_workers=0,  # لتجنب مشاكل multiprocessing
             remove_unused_columns=False,  # مهم: لا تزيل الأعمدة غير المستخدمة
             report_to=[],  # لا نحتاج logging خارجي
+            max_steps=100,  # حد أقصى للخطوات لتسريع التدريب (حوالي 100 خطوة فقط)
         )
 
     # التأكد من أن dataset يحتوي على الأعمدة المطلوبة
