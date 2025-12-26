@@ -26,8 +26,8 @@ CORS(app)
 # Qwen2.5-7B-Instruct: نموذج قوي جداً بالعربية (يحتاج GPU قوي)
 # Qwen2.5-3B-Instruct: متوازن (يعمل على GPU متوسط) - يستخدم للتدريب
 # Qwen2.5-1.5B-Instruct: سريع (يعمل على CPU/GPU ضعيف)
-DEFAULT_GPU_MODEL = os.getenv('AI_MODEL', 'Qwen/Qwen2.5-3B-Instruct')
-DEFAULT_CPU_MODEL = os.getenv('AI_MODEL_CPU', 'Qwen/Qwen2.5-3B-Instruct')  # نفس النموذج المستخدم في التدريب
+DEFAULT_GPU_MODEL = os.getenv('AI_MODEL', 'Qwen/Qwen2.5-1.5B-Instruct')
+DEFAULT_CPU_MODEL = os.getenv('AI_MODEL_CPU', 'Qwen/Qwen2.5-1.5B-Instruct')  # يفضل الأصغر للسرعة في الإنتاج بدون GPU
 
 # مسار النموذج المدرب (إذا كان موجوداً)
 FINE_TUNED_MODEL_PATH = "./marasil-ai-v1.0"
@@ -1037,7 +1037,7 @@ def generate_response(user_message, conversation_history=[], token="", user_name
 """
 
             # إضافة تاريخ المحادثة (مختصر للنماذج المدربة)
-            for hist in conversation_history[-1:]:  # آخر رسالة فقط للنماذج المدربة
+            for hist in conversation_history[-1:]:  # آخر رسالة فقط للنماذج المدربة (أو يمكنك [] فقط!)
                 if hist.get("role") == "user":
                     conversation_text += f"""<|im_end|>
 <|im_start|>user
@@ -1058,7 +1058,7 @@ def generate_response(user_message, conversation_history=[], token="", user_name
             ]
 
             # إضافة تاريخ المحادثة
-            for hist in conversation_history[-1:]:  # آخر رسالة فقط تكفي
+            for hist in conversation_history[-1:]:  # آخر رسالة فقط (أو حتى بدون أي تاريخ لتعزيز السرعة)
                 if hist.get("role") == "user":
                     messages.append({"role": "user", "content": hist.get("content", "")})
                 elif hist.get("role") == "assistant":
@@ -1081,10 +1081,10 @@ def generate_response(user_message, conversation_history=[], token="", user_name
             try:
                 outputs = model.generate(
                     **inputs,
-                    max_new_tokens=256,  # تقليل عدد التوكنات يسمح بسرعة التوليد وتحكم أفضل
-                    do_sample=True,
-                    temperature=0.4,
-                    top_p=0.8,
+                    max_new_tokens=160,  # تقليل عدد التوكنات أكثر لتسريع الرد
+                do_sample=False,  # أسرع وأكثر استقراراً للعملية التشغيلية
+                temperature=0.2,
+                top_p=0.8,  # ضبطها للأكثر ثباتاً
                     repetition_penalty=1.2,
                     use_cache=True,
                     pad_token_id=tokenizer.pad_token_id,
@@ -1123,6 +1123,14 @@ def generate_response(user_message, conversation_history=[], token="", user_name
         
         # استخراج API call
         api_call_data = extract_api_call(response)
+
+        # فلترة الرد: إذا لم يوجد api_call صالح، أعطِ رسالة ذكية فورية
+        if not api_call_data:
+            return {
+                "response": "أنا حالياً عم أتدرب لتقديم خدمة أفضل. جرب سؤال أوضح عن خدمة أو عملية بالمنصة، أو بعد دقائق 🙏",
+                "api_call": None,
+                "data": None
+            }
         
         # إزالة API call من الرد النهائي
         if api_call_data:
@@ -1191,6 +1199,20 @@ def chat():
         # توليد الرد
         result = generate_response(user_message, conversation_history, token, user_name)
         
+        # --- سجل المحادثة في ملف للتعلم المستقبلي ---
+        try:
+            log_path = os.path.join(os.path.dirname(__file__), "conversations_log.jsonl")
+            with open(log_path, "a", encoding="utf-8") as log_f:
+                json.dump({
+                    "user": user_message,
+                    "assistant": result.get("response"),
+                    "api_call": result.get("api_call"),
+                    "data": result.get("data"),
+                    "userName": user_name
+                }, log_f, ensure_ascii=False)
+                log_f.write("\n")
+        except Exception as e:
+            print(f"[WARN] لم أستطع حفظ المحادثة: {e}")
         return jsonify(result)
         
     except Exception as e:
