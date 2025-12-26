@@ -127,12 +127,20 @@ try:
 
     model.eval()
 
-    # Warmup
+    # Warmup - بسيط وآمن لتجنب الأخطاء
     try:
         warm_inputs = tokenizer("مرحبا", return_tensors="pt").to(model.device)
         with torch.inference_mode():
-            _ = model.generate(**warm_inputs, max_new_tokens=5)
-    except Exception:
+            _ = model.generate(
+                **warm_inputs,
+                max_new_tokens=5,
+                do_sample=False,
+                use_cache=True,
+                pad_token_id=tokenizer.pad_token_id,
+                eos_token_id=tokenizer.eos_token_id
+            )
+    except Exception as e:
+        print(f"⚠️ فشل الـ warmup: {e}")
         pass
 
     status = "مدرب (مراسيل 1.0)" if use_fine_tuned else "أساسي"
