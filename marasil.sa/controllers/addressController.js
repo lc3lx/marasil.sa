@@ -28,13 +28,27 @@ exports.addAdrress = asyncHandler(async (req, res, next) => {
 // @access private/protect/Customer
 
 exports.removeaddress = asyncHandler(async (req, res, next) => {
+  console.log("Delete Address Debug:", {
+    addressId: req.params.addressId,
+    customerId: req.customer._id,
+    customerIdType: typeof req.customer._id,
+    addressIdType: typeof req.params.addressId,
+    params: req.params,
+  });
+
   // التحقق من أن العنوان ينتمي للمستخدم الحالي
   const customer = await Customer.findOne({
     _id: req.customer._id,
-    "addresses._id": req.params.addressId
+    "addresses._id": req.params.addressId,
   });
 
+  console.log("Customer found for delete:", !!customer);
+
   if (!customer) {
+    console.log("Address not found or unauthorized for delete:", {
+      customerId: req.customer._id,
+      addressId: req.params.addressId,
+    });
     return next(
       new ApiError(`لا يمكن العثور على العنوان أو أنت غير مصرح لحذفه`, 403)
     );
@@ -81,13 +95,28 @@ exports.getaddresses = asyncHandler(async (req, res, next) => {
 exports.updateAddress = asyncHandler(async (req, res, next) => {
   const { addressId } = req.params;
 
+  console.log("Update Address Debug:", {
+    addressId: addressId,
+    customerId: req.customer._id,
+    customerIdType: typeof req.customer._id,
+    addressIdType: typeof addressId,
+    params: req.params,
+    body: req.body,
+  });
+
   // التحقق من أن العنوان ينتمي للمستخدم الحالي
   const customer = await Customer.findOne({
     _id: req.customer._id,
-    "addresses._id": addressId
+    "addresses._id": addressId,
   });
 
+  console.log("Customer found for address:", !!customer);
+
   if (!customer) {
+    console.log("Address not found or unauthorized:", {
+      customerId: req.customer._id,
+      addressId: addressId,
+    });
     return next(
       new ApiError(`لا يمكن العثور على العنوان أو أنت غير مصرح لتعديله`, 403)
     );
