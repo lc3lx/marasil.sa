@@ -33,6 +33,9 @@ const clientSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    city_en: {
+      type: String,
+    },
     district: {
       type: String,
     },
