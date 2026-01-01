@@ -5,12 +5,12 @@
  */
 exports.formatAddress = (address) => {
   return {
-    RecipientShortCode: address.addressDetails,
+    RecipientShortCode: address.addressDetails || address.district || "",
     ContactName: address.full_name, // بين 5 و150 حرف
     ContactPhoneNumber: address.mobile, // رقم الهاتف
     Country: address.country, // رمز الدولة
     City: address.city,
-    AddressLine1: `${address.address}        `,
+    AddressLine1: `${address.address || address.location || ""}        `,
     // District: address.address, // اسم المدينة
   };
 };
@@ -40,9 +40,26 @@ exports.Shapmentdata = (
     dimension.height || dimension.high || dimension?.Height || 0
   );
 
+  // دمج بيانات clientAddress مع customer لضمان وجود addressDetails
+  const consigneeData = {
+    ...order.customer,
+    addressDetails:
+      order.clientAddress?.addressDetails ||
+      order.customer?.addressDetails ||
+      order.customer?.district ||
+      "",
+    full_name:
+      order.customer?.full_name || order.clientAddress?.clientName || "",
+    mobile: order.customer?.mobile || order.clientAddress?.clientPhone || "",
+    address:
+      order.customer?.address || order.clientAddress?.clientAddress || "",
+    city: order.customer?.city || order.clientAddress?.city || "",
+    country: order.customer?.country || order.clientAddress?.country || "",
+  };
+
   const shipmentData = {
     CODAmount: isCOD ? order.total.amount : 0,
-    ConsigneeAddress: exports.formatAddress(order.customer),
+    ConsigneeAddress: exports.formatAddress(consigneeData),
 
     ShipperAddress: exports.formatAddress(shipperAddress),
     ContentDescription: orderDescription,
