@@ -77,7 +77,7 @@ const customerSchema = new mongoose.Schema(
         country: String,
         city: String,
         street: String,
-        district: String,
+        addressDetails: { type: String, required: true },
         phone: String,
         postalCode: String,
         detalis: String,

@@ -131,7 +131,7 @@ exports.updateAddress = asyncHandler(async (req, res, next) => {
     country,
     street,
     city,
-    district,
+    addressDetails,
   } = req.body;
 
   const updateFields = {};
@@ -144,7 +144,7 @@ exports.updateAddress = asyncHandler(async (req, res, next) => {
   if (country) updateFields["addresses.$.country"] = country;
   if (street) updateFields["addresses.$.street"] = street;
   if (city) updateFields["addresses.$.city"] = city;
-  if (district) updateFields["addresses.$.district"] = district;
+  if (addressDetails) updateFields["addresses.$.addressDetails"] = addressDetails;
 
   const updatedCustomer = await Customer.findOneAndUpdate(
     { _id: req.customer._id, "addresses._id": addressId },
