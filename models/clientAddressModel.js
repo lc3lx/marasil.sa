@@ -12,7 +12,6 @@ const clientSchema = new mongoose.Schema(
     },
     addressDetails: {
       type: String,
-      required: true,
     },
     clientPhone: {
       type: String,
@@ -25,8 +24,8 @@ const clientSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    ///الرمز البريدي
-    countrycode: {
+    ///العنوان الوطني
+    nationalAddress: {
       type: String,
     },
 

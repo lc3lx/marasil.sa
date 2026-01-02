@@ -57,6 +57,8 @@ const orderSchema = new mongoose.Schema({
     city: String,
     country: String,
     address: String,
+    nationalAddress: String,
+
     currency: { type: String },
     location: String,
 
@@ -125,7 +127,7 @@ orderSchema.pre(/^find/, function (next) {
   this.populate({
     path: "clientAddress",
     select:
-      "clientName clientAddress addressDetails clientPhone clientEmail country city district -_id,customer",
+      "clientName clientAddress addressDetails clientPhone clientEmail country city district nationalAddress -_id,customer",
   });
   next();
 });

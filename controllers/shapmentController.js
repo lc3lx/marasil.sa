@@ -180,7 +180,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           address: order.customer?.address,
           country: order.customer?.country,
           city: order.customer?.city,
-          district: order.customer?.district || "حي الرياض",
+          nationalAddress: order.customer?.nationalAddress || "",
         },
         total: {
           amount: order.total?.amount || 0,
@@ -461,7 +461,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
     const normalizedPhone = String(orderCustomer.mobile || "").trim();
     const normalizedAddress = String(orderCustomer.address || "").trim();
     const normalizedCity = String(orderCustomer.city || "").trim();
-    const normalizedDistrict = String(orderCustomer.district || "").trim();
+    const normalizedNationalAddress = String(orderCustomer.nationalAddress || "").trim();
 
     const addressQuery = {
       clientPhone: normalizedPhone,
@@ -469,7 +469,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
       city: normalizedCity,
       customer: req.customer._id,
     };
-    if (normalizedDistrict) addressQuery.district = normalizedDistrict;
+    if (normalizedNationalAddress) addressQuery.nationalAddress = normalizedNationalAddress;
 
     let address = await ClientAddress.findOne(addressQuery);
     if (!address) {
@@ -480,7 +480,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
         clientAddress: normalizedAddress,
         country: orderCustomer.country,
         city: normalizedCity,
-        district: normalizedDistrict || undefined,
+        nationalAddress: normalizedNationalAddress || undefined,
         customer: req.customer._id,
       });
     }
