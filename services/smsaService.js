@@ -5,7 +5,7 @@
  */
 exports.formatAddress = (address) => {
   return {
-    RecipientShortCode: address.nationalAddress,
+    ShortCode: address.nationalAddress,
     ContactName: address.full_name, // بين 5 و150 حرف
     ContactPhoneNumber: address.mobile, // رقم الهاتف
     Country: address.country, // رمز الدولة
