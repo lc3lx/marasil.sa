@@ -113,7 +113,11 @@ const customerSchema = new mongoose.Schema(
       language: { type: String, default: "ar" },
       customCss: { type: String, default: "" },
       customJs: { type: String, default: "" },
-      embedCode: { type: String, default: "<div id='shipexpress-tracking' data-tracking-id='YOUR_TRACKING_ID'></div><script src='https://tracking.shipexpress.com/embed.js'></script>" },
+      embedCode: {
+        type: String,
+        default:
+          "<div id='shipexpress-tracking' data-tracking-id='YOUR_TRACKING_ID'></div><script src='https://tracking.shipexpress.com/embed.js'></script>",
+      },
     },
   },
   { timestamps: true }
