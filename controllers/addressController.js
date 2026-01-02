@@ -6,6 +6,9 @@ const Customer = require("../models/customerModel");
 // @access private/protect/Customer
 
 exports.addAdrress = asyncHandler(async (req, res, next) => {
+  console.log("addAdrress - req.body:", JSON.stringify(req.body, null, 2));
+  console.log("addAdrress - req.customer._id:", req.customer._id);
+
   const customer = await Customer.findByIdAndUpdate(
     req.customer._id,
     {
@@ -14,6 +17,11 @@ exports.addAdrress = asyncHandler(async (req, res, next) => {
     {
       new: true,
     }
+  );
+
+  console.log(
+    "addAdrress - customer addresses after update:",
+    JSON.stringify(customer.addresses, null, 2)
   );
 
   res.status(201).json({
@@ -80,6 +88,9 @@ exports.updateAddress = asyncHandler(async (req, res, next) => {
       nationalAddress,
     } = req.body;
 
+    console.log("updateAddress - req.body:", JSON.stringify(req.body, null, 2));
+    console.log("updateAddress - addressId:", addressId);
+
     const updateFields = {};
 
     if (alias) updateFields["addresses.$.alias"] = alias;
@@ -91,7 +102,13 @@ exports.updateAddress = asyncHandler(async (req, res, next) => {
     if (street) updateFields["addresses.$.street"] = street;
     if (city) updateFields["addresses.$.city"] = city;
     if (district) updateFields["addresses.$.district"] = district;
-    if (nationalAddress !== undefined) updateFields["addresses.$.nationalAddress"] = nationalAddress;
+    if (nationalAddress !== undefined)
+      updateFields["addresses.$.nationalAddress"] = nationalAddress;
+
+    console.log(
+      "updateAddress - updateFields:",
+      JSON.stringify(updateFields, null, 2)
+    );
 
     const customer = await Customer.findOneAndUpdate(
       { _id: req.customer._id, "addresses._id": addressId },
