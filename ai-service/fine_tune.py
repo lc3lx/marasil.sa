@@ -1,7 +1,6 @@
 """
-مراسيل 1.0 - Fine-tuning Script
-تدريب النموذج على هوية الشريك التشغيلي للتجار
-يجعل الذكاء أسرع وأكثر دقة في الإجابات
+مراسيل 1.0 - Fine-tuning Script (محسّن 2026)
+تدريب سريع وفعّال باستخدام LoRA + 4-bit
 """
 
 from transformers import (
@@ -9,7 +8,8 @@ from transformers import (
     AutoTokenizer,
     TrainingArguments,
     Trainer,
-    DataCollatorForLanguageModeling
+    DataCollatorForLanguageModeling,
+    BitsAndBytesConfig
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from datasets import Dataset
@@ -17,14 +17,34 @@ import torch
 import json
 import os
 
-# إعدادات النموذج الأساسي - نسخة أصغر لتسريع التدريب
-BASE_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
+# إعدادات محسّنة
+BASE_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"  # أفضل توازن سرعة/ذكاء
 OUTPUT_DIR = "./marasil-ai-v1.0"
 TRAINING_DATA_FILE = "training_data.json"
 
-# بيانات التدريب المتقدمة - مراسيل كشريك تشغيلي
+# بيانات تدريب موسّعة ومحسّنة
 TRAINING_DATA = [
-    # أسئلة شائعة عن مراسيل
+    # أسئلة شائعة
+    {"instruction": "لماذا مراسيل؟", "input": "ليش أختار مراسيل؟", "output": "مرحباً! 💼 مراسيل شريكك التشغيلي الحقيقي:\n\n🚛 تجمع أكثر من شركة شحن بأسعار تنافسية\n🎯 حرية اختيار الناقل الأنسب لكل شحنة\n📊 لوحة تحكم واحدة توفر وقتك وجهدك\n✅ شفافية كاملة في الأسعار والتتبع\n\nهدفنا: نجاح متجرك = نجاحنا 💪"},
+    
+    {"instruction": "سهولة الاستخدام", "input": "مراسيل سهلة؟", "output": "بالتأكيد! 🎯\n\nالمنصة مصممة للتجار مثلك:\n✅ واجهة بسيطة وواضحة\n✅ لا تحتاج خبرة تقنية\n✅ دعم فوري عند الحاجة\n✅ كل العمليات من مكان واحد\n\nمراسيل توفر عليك ساعات يومياً ⏰"},
+
+    # حماية السمعة
+    {"instruction": "عميل غاضب", "input": "عميلي معصب بسبب تأخير!", "output": "أفهم قلقك تماماً، سمعة متجرك أولويتنا 📊\n\nدعني أساعدك فوراً:\n1. أطمئن عميلك أنك تتابع شخصياً\n2. أتحقق من حالة الشحنة الآن\n\nأعطني رقم التتبع وسأعطيك المعلومات الدقيقة لتهدئة العميل 💪\n\n```json\n{\n  \"api_call\": {\n    \"method\": \"POST\",\n    \"url\": \"/shipment/traking\",\n    \"headers\": {\"Authorization\": \"Bearer {{USER_TOKEN}}\", \"Content-Type\": \"application/json\"},\n    \"body\": {\"trackingNumber\": \"[أدخل الرقم هنا]\"}\n  }\n}\n```"},
+
+    {"instruction": "خوف من خسارة عميل", "input": "أخاف أخسر العميل", "output": "لا تقلق، نحن هنا لحماية علاقتك بالعميل 💙\n\nالخطوات السريعة:\n🎯 تواصل استباقي قبل أن يسأل\n⚡ حل سريع وشفاف\n📞 شرح واضح ومهني\n\nأعطني رقم الشحنة وسأساعدك بالرد المثالي للعميل."},
+
+    # أقسام المنصة
+    {"instruction": "الصفحة الرئيسية", "input": "ايش الصفحة الرئيسية؟", "output": "الصفحة الرئيسية هي مركز قيادتك! 📊\n\nتعطيك لمحة فورية عن:\n💰 رصيد المحفظة\n📦 الشحنات النشطة\n🚚 الأداء اليومي\n🎯 اقتراحات لتحسين التكاليف\n\nكل شيء تحت سيطرتك من أول نظرة ⚡"},
+
+    {"instruction": "قسم شحناتي", "input": "قسم شحناتي وشو؟", "output": "قسم شحناتي = عينك على كل طلباتك 📦\n\nترى كل الشحنات مقسمة حسب الحالة:\n✅ جاهزة للشحن\n🚛 في الطريق\n✅ تم التسليم\n❌ ملغية\n\nكل التفاصيل بنقرة واحدة، بدون تعقيد."},
+
+    # عمليات شائعة
+    {"instruction": "تتبع شحنة", "input": "عميلي يبي يعرف وين طلبه رقم 123456", "output": "سأتتبعها لك الآن عشان ترد على عميلك بثقة 📍\n\n```json\n{\n  \"api_call\": {\n    \"method\": \"POST\",\n    \"url\": \"/shipment/traking\",\n    \"headers\": {\"Authorization\": \"Bearer {{USER_TOKEN}}\", \"Content-Type\": \"application/json\"},\n    \"body\": {\"trackingNumber\": \"123456\"}\n  }\n}\n```"},
+
+    {"instruction": "رصيد المحفظة", "input": "كم رصيدي؟", "output": "سأجيبك بالرصيد فوراً لتخطيط شحناتك 💰\n\n```json\n{\n  \"api_call\": {\n    \"method\": \"GET\",\n    \"url\": \"/wallet/myBalance\",\n    \"headers\": {\"Authorization\": \"Bearer {{USER_TOKEN}}\", \"Content-Type\": \"application/json\"}\n  }\n}\n```"},
+
+    {"instruction": "إلغاء شحنة", "input": "أبي ألغي شحنة ABC123", "output": "تمام، سأساعدك بالإلغاء فوراً لحماية سمعتك ⚡\n\n```json\n{\n  \"api_call\": {\n    \"method\": \"POST\",\n    \"url\": \"/shipment/cancel/ABC123\",\n    \"headers\": {\"Authorization\": \"Bearer {{USER_TOKEN}}\", \"Content-Type\": \"application/json\"}\n  }\n}\n```"},
     {
         "instruction": "تاجر يسأل لماذا يختار مراسيل",
         "input": "هاي داتا اضافيه ليش أختار مراسيل بدل غيرها؟",
@@ -96,257 +116,97 @@ TRAINING_DATA = [
     },
 ]
 
-def extract_training_data_from_system_prompt():
-    """استخراج بيانات التدريب من SYSTEM_PROMPT"""
-    try:
-        import app
-        system_prompt = app.SYSTEM_PROMPT
-        additional_data = []
+def prepare_dataset(tokenizer):
+    formatted = []
+    for item in TRAINING_DATA:
+        text = f"<|im_start|>system\nأنت مراسيل - شريك تشغيلي للتاجر. تحمي سمعته وتقلل شكاواه.\n{item['instruction']}<|im_end|>\n<|im_start|>user\n{item['input']}<|im_end|>\n<|im_start|>assistant\n{item['output']}<|im_end|>"
+        formatted.append({"text": text})
 
-        # استخراج الأسئلة الشائعة وتحويلها لبيانات تدريب
-        sections_to_extract = [
-            ("**لماذا تختار مراسيل؟**", "تاجر يسأل عن مميزات مراسيل"),
-            ("**هل مراسيل تضمن راحة العميل؟**", "تاجر يسأل عن ضمان راحة العميل"),
-            ("**الصفحة الرئيسية**", "تاجر يسأل عن الصفحة الرئيسية"),
-            ("**شحناتي**", "تاجر يسأل عن قسم شحناتي"),
-        ]
-
-        for section_marker, instruction in sections_to_extract:
-            if section_marker in system_prompt:
-                start_idx = system_prompt.find(section_marker)
-                end_idx = system_prompt.find("\n\n**", start_idx + 1)
-                if end_idx == -1:
-                    end_idx = len(system_prompt)
-
-                content = system_prompt[start_idx:end_idx].strip()
-
-                # تحويل المحتوى لبيانات تدريب
-                if "- " in content:
-                    features = [line.strip("- ") for line in content.split("\n") if line.strip().startswith("- ")]
-                    if features:
-                        output = "مراسيل تقدم لك:\n\n" + "\n".join(f"✅ {feature}" for feature in features[:5])
-                        additional_data.append({
-                            "instruction": instruction,
-                            "input": section_marker.replace("*", "").strip(),
-                            "output": output + "\n\nهذه المميزات تجعل مراسيل شريكك المثالي في النجاح. 💪"
-                        })
-
-        return additional_data
-    except Exception as e:
-        print(f"خطأ في استخراج البيانات: {e}")
-        return []
-
-def prepare_dataset(tokenizer=None):
-    """تحضير البيانات للتدريب مع استخراج تلقائي و tokenization"""
-    formatted_data = []
-
-    # إضافة البيانات الأساسية
-    all_training_data = TRAINING_DATA.copy()
-
-    # إضافة البيانات المستخرجة من SYSTEM_PROMPT
-    additional_data = extract_training_data_from_system_prompt()
-    all_training_data.extend(additional_data)
-
-    print(f"📊 إجمالي بيانات التدريب: {len(all_training_data)}")
-
-    for item in all_training_data:
-        # تنسيق البيانات بصيغة محادثة متقدمة لـ Qwen
-        text = f"""<|im_start|>system
-أنت مراسيل - الذكاء الاصطناعي لمنصة مراسيل للشحن. أنت شريك تشغيلي للتاجر وليس خدمة دعم تقليدية.
-تهدف لتقليل الشكاوى وحماية سمعة المتاجر.
-
-{item['instruction']}
-<|im_end|>
-<|im_start|>user
-{item['input']}
-<|im_end|>
-<|im_start|>assistant
-{item['output']}
-<|im_end|>"""
-
-        formatted_data.append({"text": text})
-
-    # حفظ البيانات للمراجعة
     with open(TRAINING_DATA_FILE, 'w', encoding='utf-8') as f:
-        json.dump(all_training_data, f, ensure_ascii=False, indent=2)
+        json.dump(TRAINING_DATA, f, ensure_ascii=False, indent=2)
 
-    dataset = Dataset.from_list(formatted_data)
+    dataset = Dataset.from_list(formatted)
 
-    # إذا تم تمرير tokenizer، قم بـ tokenization
-    if tokenizer is not None:
-        print("🔄 بدء tokenization للبيانات...")
+    def tokenize(ex):
+        tok = tokenizer(ex["text"], truncation=True, max_length=768, padding="max_length")
+        tok["labels"] = tok["input_ids"].copy()
+        return tok
 
-        def tokenize_function(examples):
-            # Tokenize النص
-            tokenized = tokenizer(
-                examples["text"],
-                truncation=True,
-                padding="max_length",
-                max_length=1024,  # طول مناسب للـ context
-                return_tensors="pt"
-            )
+    return dataset.map(tokenize, batched=True, remove_columns=["text"])
 
-            # إضافة labels للتدريب (نفس input_ids لـ language modeling)
-            tokenized["labels"] = tokenized["input_ids"].clone()
+def train_model():
+    print("🚀 بدء التدريب المحسّن...")
 
-            return tokenized
-
-        # تطبيق tokenization
-        tokenized_dataset = dataset.map(
-            tokenize_function,
-            batched=True,
-            remove_columns=["text"]  # إزالة عمود text الأصلي
-        )
-
-        print("✅ تم tokenization البيانات")
-        return tokenized_dataset
-
-    return dataset
-
-def setup_model_and_tokenizer():
-    """تحضير النموذج والـ tokenizer"""
-    print("🚀 تحميل النموذج الأساسي...")
+    # 4-bit quantization
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_use_double_quant=True,
+    )
 
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, use_fast=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    from transformers import BitsAndBytesConfig
-
-    quantization_config = BitsAndBytesConfig(
-        load_in_8bit=True,
-        llm_int8_enable_fp32_cpu_offload=True
+    model = AutoModelForCausalLM.from_pretrained(
+        BASE_MODEL,
+        quantization_config=bnb_config,
+        device_map="auto",
+        trust_remote_code=True
     )
 
-    # تحميل النموذج مع معالجة أخطاء GPU/CPU
-    try:
-        model = AutoModelForCausalLM.from_pretrained(
-            BASE_MODEL,
-            device_map="auto",
-            torch_dtype=torch.float16,
-            quantization_config=quantization_config,
-            trust_remote_code=True
-        )
-        print("✅ تم تحميل النموذج على GPU")
-    except Exception as e:
-        print(f"⚠️ فشل تحميل النموذج على GPU، جاري المحاولة على CPU: {e}")
-        try:
-            model = AutoModelForCausalLM.from_pretrained(
-                BASE_MODEL,
-                device_map={"": "cpu"},
-                torch_dtype=torch.float32,
-                trust_remote_code=True,
-                low_cpu_mem_usage=True
-            )
-            print("✅ تم تحميل النموذج على CPU")
-        except Exception as e2:
-            raise Exception(f"فشل تحميل النموذج: GPU: {e}, CPU: {e2}")
+    model = prepare_model_for_kbit_training(model)
 
-    # إعداد LoRA للتدريب الفعال
     lora_config = LoraConfig(
-        r=16,  # rank
-        lora_alpha=32,
+        r=32,
+        lora_alpha=64,
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
         lora_dropout=0.05,
         bias="none",
         task_type="CAUSAL_LM"
     )
 
-    model = prepare_model_for_kbit_training(model)
     model = get_peft_model(model, lora_config)
-
     model.print_trainable_parameters()
 
-    return model, tokenizer
-
-def train_model():
-    """تدريب النموذج"""
-    print("🎯 بدء عملية التدريب...")
-
-    model, tokenizer = setup_model_and_tokenizer()
     dataset = prepare_dataset(tokenizer)
 
-    training_args = TrainingArguments(
-            output_dir=OUTPUT_DIR,
-            num_train_epochs=1,  # epoch واحد فقط للتدريب السريع
-            per_device_train_batch_size=1,  # batch size صغير لتوفير الذاكرة
-            gradient_accumulation_steps=1,  # تقليل لتسريع التدريب
-            learning_rate=1e-4,  # learning rate أعلى قليلاً للتدريب السريع
-            fp16=False,  # تعطيل fp16 على CPU
-            logging_steps=10,  # logging أقل تكراراً
-            save_steps=50,  # حفظ أقل تكراراً
-            save_total_limit=1,
-            dataloader_num_workers=0,  # لتجنب مشاكل multiprocessing
-            remove_unused_columns=False,  # مهم: لا تزيل الأعمدة غير المستخدمة
-            report_to=[],  # لا نحتاج logging خارجي
-            max_steps=100,  # حد أقصى للخطوات لتسريع التدريب (حوالي 100 خطوة فقط)
-        )
-
-    # التأكد من أن dataset يحتوي على الأعمدة المطلوبة
-    print(f"📊 أعمدة البيانات المتاحة: {list(dataset.column_names)}")
-    print(f"📊 حجم البيانات: {len(dataset)}")
-    print(f"📊 عينة من البيانات: {dataset[0].keys()}")
+    args = TrainingArguments(
+        output_dir=OUTPUT_DIR,
+        num_train_epochs=3,
+        per_device_train_batch_size=4,
+        gradient_accumulation_steps=4,
+        learning_rate=2e-4,
+        fp16=True,
+        logging_steps=5,
+        save_steps=50,
+        save_total_limit=2,
+        optim="paged_adamw_8bit",
+        report_to=[],
+        remove_unused_columns=False,
+    )
 
     trainer = Trainer(
         model=model,
-        args=training_args,
+        args=args,
         train_dataset=dataset,
-        data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
+        data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False),
     )
 
     trainer.train()
-
-    # حفظ النموذج المدرب
-    trainer.save_model()
+    trainer.save_model(OUTPUT_DIR)
     tokenizer.save_pretrained(OUTPUT_DIR)
-
-    print(f"✅ تم حفظ النموذج في: {OUTPUT_DIR}")
-
-    return model, tokenizer
-
-def test_model(model, tokenizer):
-    """اختبار النموذج المدرب"""
-    print("\n🧪 اختبار النموذج المدرب:")
-
-    test_inputs = [
-        "عميلي يسأل عن شحنة رقم 123456",
-        "كم رصيد المحفظة عندي؟",
-        "ما هو قسم شحناتي؟",
-        "هل مراسيل سهلة الاستخدام؟"
-    ]
-
-    for test_input in test_inputs:
-        inputs = tokenizer(f"<|im_start|>user\n{test_input}<|im_end|>\n<|im_start|>assistant\n", return_tensors="pt").to(model.device)
-
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=200,
-                do_sample=True,
-                temperature=0.7,
-                top_p=0.9,
-                pad_token_id=tokenizer.pad_token_id,
-                eos_token_id=tokenizer.eos_token_id
-            )
-
-        response = tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)
-        print(f"\n📝 السؤال: {test_input}")
-        print(f"🤖 الإجابة: {response[:150]}...")
-
-def main():
-    """الدالة الرئيسية"""
-    print("🚀 مراسيل 1.0 - بدء Fine-tuning")
-    print("=" * 50)
-
-    # تدريب النموذج
-    model, tokenizer = train_model()
-
-    # اختبار النموذج
-    test_model(model, tokenizer)
-
-    print("\n✅ انتهى التدريب بنجاح!")
-    print(f"📁 النموذج محفوظ في: {OUTPUT_DIR}")
-    print("💡 لاستخدام النموذج الجديد، حدث BASE_MODEL في app.py")
+    print(f"✅ النموذج المحسّن جاهز في: {OUTPUT_DIR}")
 
 if __name__ == "__main__":
-    main()
+    train_model()
+
+
+
+
+# بيانات التدريب المتقدمة - مراسيل كشريك تشغيلي
+TRAINING_DATA = [
+    # أسئلة شائعة عن مراسيل
+   
+]
