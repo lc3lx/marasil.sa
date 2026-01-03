@@ -162,7 +162,7 @@ exports.shipmentData = (
             Value: weight,
             Unit: "KG",
           },
-          DescriptionOfGoods: `orderDescription ,nationalAddress:${order.customer.nationalAddress}`,
+          DescriptionOfGoods: `${orderDescription}   ,nationalAddress:${order.customer.nationalAddress}`,
           GoodsOriginCountry: "SA",
           NumberOfPieces: 6,
           ProductGroup: "DOM",
