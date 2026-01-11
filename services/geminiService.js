@@ -6,45 +6,112 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 /**
  * System Prompt الصارم للمساعد الذكي
  */
-const SYSTEM_PROMPT = `You are a shipping platform assistant for Marasil. Your ONLY job is to respond with valid JSON.
+const SYSTEM_PROMPT = `Respond ONLY with JSON. No other text.
 
-CRITICAL RULES:
-1. Respond ONLY with valid JSON - no explanations, no extra text
-2. If user wants to perform an action, return JSON with appropriate action
-3. If user just wants to chat, return CHAT_RESPONSE with Arabic message
-4. Never mention Gemini, AI, or any technical details
-
-SUPPORTED ACTIONS - respond with EXACT format:
-
-TRACK_SHIPMENT:
-{"action": "TRACK_SHIPMENT", "data": {"tracking_number": "string"}}
-
-CREATE_SHIPMENT:
-{"action": "CREATE_SHIPMENT", "data": {"company": "string", "weight": "string", "receiver_name": "string", "receiver_phone": "string", "receiver_city": "string", "receiver_address": "string"}}
-
-CANCEL_SHIPMENT:
-{"action": "CANCEL_SHIPMENT", "data": {"shipment_id": "string"}}
-
-GET_WALLET_BALANCE:
+Actions:
+{"action": "TRACK_SHIPMENT", "data": {"tracking_number": "NUMBER"}}
+{"action": "CREATE_SHIPMENT", "data": {}}
+{"action": "CANCEL_SHIPMENT", "data": {"shipment_id": "ID"}}
 {"action": "GET_WALLET_BALANCE"}
-
-LIST_SHIPMENTS:
 {"action": "LIST_SHIPMENTS"}
+{"action": "CHAT_RESPONSE", "message": "Arabic text"}
 
-CHAT_RESPONSE (for questions/chat):
-{"action": "CHAT_RESPONSE", "message": "Arabic text here"}
+For unclear requests: {"action": "CHAT_RESPONSE", "message": "Helpful response in Arabic"}`;
 
-COMMAND EXAMPLES (Arabic → JSON):
-- "تتبع الشحنة رقم 123456" → {"action": "TRACK_SHIPMENT", "data": {"tracking_number": "123456"}}
-- "أريد إنشاء شحنة جديدة" → {"action": "CREATE_SHIPMENT", "data": {"company": "ARAMEX", "weight": "2", "receiver_name": "أحمد", "receiver_phone": "0501234567", "receiver_city": "الرياض", "receiver_address": "شارع الملك"}}
-- "ألغِ الشحنة رقم 123" → {"action": "CANCEL_SHIPMENT", "data": {"shipment_id": "123"}}
-- "كم رصيدي" → {"action": "GET_WALLET_BALANCE"}
-- "عرض شحناتي" → {"action": "LIST_SHIPMENTS"}
-- "مرحبا" → {"action": "CHAT_RESPONSE", "message": "مرحباً! كيف يمكنني مساعدتك في إدارة شحناتك؟"}
-- "كيف أستخدم النظام" → {"action": "CHAT_RESPONSE", "message": "يمكنك تتبع شحناتك، إنشاء شحنات جديدة، عرض رصيدك، وإدارة طلباتك من هنا."}
+/**
+ * تحليل سريع للرسالة بناءً على الكلمات المفتاحية
+ */
+function quickKeywordParse(message) {
+  const lowerMessage = message.toLowerCase().trim();
 
-IMPORTANT: For any greeting, question, or unclear request, respond with CHAT_RESPONSE containing helpful Arabic message.
-For specific actions (track, create, cancel, balance, list), respond with the appropriate action JSON.`;
+  // تتبع شحنة - أولوية عالية
+  if (lowerMessage.includes("تتبع") || lowerMessage.includes("track")) {
+    const numberMatch = message.match(/(\d{6,})/);
+    if (numberMatch) {
+      return {
+        action: "TRACK_SHIPMENT",
+        data: { tracking_number: numberMatch[1] },
+      };
+    }
+  }
+
+  // إنشاء شحنة
+  if (
+    lowerMessage.includes("إنشاء") ||
+    lowerMessage.includes("create") ||
+    lowerMessage.includes("جديدة")
+  ) {
+    return {
+      action: "CREATE_SHIPMENT",
+      data: {},
+    };
+  }
+
+  // رصيد المحفظة
+  if (
+    lowerMessage.includes("رصيد") ||
+    lowerMessage.includes("balance") ||
+    lowerMessage.includes("محفظة")
+  ) {
+    return {
+      action: "GET_WALLET_BALANCE",
+    };
+  }
+
+  // قائمة الشحنات
+  if (
+    lowerMessage.includes("شحناتي") ||
+    lowerMessage.includes("قائمة") ||
+    lowerMessage.includes("عرض") ||
+    lowerMessage.includes("list")
+  ) {
+    return {
+      action: "LIST_SHIPMENTS",
+    };
+  }
+
+  // إلغاء شحنة
+  if (lowerMessage.includes("إلغاء") || lowerMessage.includes("cancel")) {
+    const numberMatch = message.match(/(\d{3,})/);
+    if (numberMatch) {
+      return {
+        action: "CANCEL_SHIPMENT",
+        data: { shipment_id: numberMatch[1] },
+      };
+    }
+  }
+
+  // تحيات وأسئلة عامة
+  if (
+    lowerMessage.includes("مرحبا") ||
+    lowerMessage.includes("hello") ||
+    lowerMessage.includes("hi") ||
+    lowerMessage.includes("كيف") ||
+    lowerMessage.includes("help") ||
+    lowerMessage.includes("مساعدة")
+  ) {
+    return {
+      action: "CHAT_RESPONSE",
+      message:
+        "مرحباً! أنا مساعدك في منصة مراسيل. يمكنني مساعدتك في:\n\n✅ تتبع الشحنات\n✅ إنشاء شحنات جديدة\n✅ عرض رصيد محفظتك\n✅ إدارة شحناتك\n\nكيف يمكنني مساعدتك اليوم؟",
+    };
+  }
+
+  // شكر
+  if (
+    lowerMessage.includes("شكرا") ||
+    lowerMessage.includes("thank") ||
+    lowerMessage.includes("thanks")
+  ) {
+    return {
+      action: "CHAT_RESPONSE",
+      message:
+        "العفو! يسعدني مساعدتك. إذا كان لديك أي استفسار آخر، لا تتردد في السؤال.",
+    };
+  }
+
+  return null; // لم يتم التعرف على نمط معروف
+}
 
 /**
  * استخراج Intent من الرسالة (اختياري - Gemini سيحدده)
@@ -110,6 +177,15 @@ function buildContext(recentMessages) {
  */
 async function sendToGemini(userMessage, context = "") {
   try {
+    console.log("🎯 [Gemini] Processing user message:", userMessage);
+
+    // أولاً: محاولة keyword-based parsing للأوامر البسيطة
+    const quickResult = quickKeywordParse(userMessage);
+    if (quickResult) {
+      console.log("⚡ [Gemini] Quick parse success:", quickResult.action);
+      return quickResult;
+    }
+
     // التحقق من وجود GEMINI_API_KEY
     if (!process.env.GEMINI_API_KEY) {
       console.error(
@@ -149,6 +225,11 @@ ${context}
     const text = response.text();
 
     console.log("✅ [Gemini] Raw response from Gemini:", text);
+    console.log("🔍 [Gemini] Response type check:");
+    console.log("   - Contains 'action':", text.includes("action"));
+    console.log("   - Contains '{':", text.includes("{"));
+    console.log("   - Contains '}':", text.includes("}"));
+    console.log("   - Contains Arabic:", /[\u0600-\u06FF]/.test(text));
 
     // تنظيف الرد من أي markdown أو تنسيق إضافي
     let cleanResponse = text.trim();
@@ -185,13 +266,41 @@ ${context}
       console.error("❌ [Gemini] Failed to parse JSON response:", parseError);
       console.error("❌ [Gemini] Raw response was:", cleanResponse);
 
-      // محاولة استخراج action من النص كـ fallback
+      // محاولة استخراج action من النص كـ fallback - تحليل ذكي
       const lowerText = cleanResponse.toLowerCase();
+      const originalText = cleanResponse;
 
-      if (lowerText.includes("track_shipment") || lowerText.includes("تتبع")) {
-        const trackingMatch = cleanResponse.match(/(\d+)/);
+      console.log("🔄 [Gemini] Starting fallback parsing...");
+      console.log("🔄 [Gemini] Lower text:", lowerText);
+
+      // فحص أقوى للكلمات المفتاحية
+      const trackKeywords = [
+        "track",
+        "تتبع",
+        "شحنة",
+        "رقم",
+        "tracking",
+        "shipment",
+      ];
+      const createKeywords = [
+        "create",
+        "إنشاء",
+        "جديدة",
+        "شحنة جديدة",
+        "إضافة",
+      ];
+      const balanceKeywords = ["balance", "رصيد", "محفظة", "كم رصيد"];
+      const listKeywords = ["list", "عرض", "شحناتي", "قائمة", "shipments"];
+      const cancelKeywords = ["cancel", "إلغاء", "ألغ"];
+
+      // تتبع شحنة - أولوية عالية
+      if (trackKeywords.some((keyword) => originalText.includes(keyword))) {
+        const trackingMatch = originalText.match(/(\d{6,})/); // أرقام 6 أو أكثر
         if (trackingMatch) {
-          console.log("🔄 [Gemini] Fallback: Detected TRACK_SHIPMENT");
+          console.log(
+            "🔄 [Gemini] Fallback: TRACK_SHIPMENT detected with number:",
+            trackingMatch[1]
+          );
           return {
             action: "TRACK_SHIPMENT",
             data: { tracking_number: trackingMatch[1] },
@@ -199,35 +308,44 @@ ${context}
         }
       }
 
-      if (
-        lowerText.includes("create_shipment") ||
-        lowerText.includes("إنشاء")
-      ) {
-        console.log("🔄 [Gemini] Fallback: Detected CREATE_SHIPMENT");
+      // إنشاء شحنة
+      if (createKeywords.some((keyword) => originalText.includes(keyword))) {
+        console.log("🔄 [Gemini] Fallback: CREATE_SHIPMENT detected");
         return {
           action: "CREATE_SHIPMENT",
           data: {},
         };
       }
 
-      if (
-        lowerText.includes("get_wallet_balance") ||
-        lowerText.includes("رصيد")
-      ) {
-        console.log("🔄 [Gemini] Fallback: Detected GET_WALLET_BALANCE");
+      // رصيد المحفظة
+      if (balanceKeywords.some((keyword) => originalText.includes(keyword))) {
+        console.log("🔄 [Gemini] Fallback: GET_WALLET_BALANCE detected");
         return {
           action: "GET_WALLET_BALANCE",
         };
       }
 
-      if (
-        lowerText.includes("list_shipments") ||
-        lowerText.includes("شحناتي")
-      ) {
-        console.log("🔄 [Gemini] Fallback: Detected LIST_SHIPMENTS");
+      // قائمة الشحنات
+      if (listKeywords.some((keyword) => originalText.includes(keyword))) {
+        console.log("🔄 [Gemini] Fallback: LIST_SHIPMENTS detected");
         return {
           action: "LIST_SHIPMENTS",
         };
+      }
+
+      // إلغاء شحنة
+      if (cancelKeywords.some((keyword) => originalText.includes(keyword))) {
+        const cancelMatch = originalText.match(/(\d{3,})/);
+        if (cancelMatch) {
+          console.log(
+            "🔄 [Gemini] Fallback: CANCEL_SHIPMENT detected with ID:",
+            cancelMatch[1]
+          );
+          return {
+            action: "CANCEL_SHIPMENT",
+            data: { shipment_id: cancelMatch[1] },
+          };
+        }
       }
 
       // إذا فشل كل شيء، أعد رسالة عدم فهم
@@ -390,4 +508,5 @@ module.exports = {
   processGeminiResponse,
   extractIntent,
   buildContext,
+  quickKeywordParse,
 };
