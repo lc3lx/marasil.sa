@@ -126,7 +126,16 @@ function buildContext(recentMessages) {
  */
 async function sendToGemini(userMessage, context = "") {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    // التحقق من وجود GEMINI_API_KEY
+    if (!process.env.GEMINI_API_KEY) {
+      console.error("❌ [Gemini] GEMINI_API_KEY not found in environment variables");
+      return {
+        action: "CHAT_RESPONSE",
+        message: "عذراً، خدمة الذكاء الاصطناعي غير متوفرة حالياً. يرجى المحاولة لاحقاً."
+      };
+    }
+
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
     // بناء الـ prompt الكامل
     const fullPrompt = `${SYSTEM_PROMPT}
@@ -183,9 +192,22 @@ ${context}
     console.error("❌ [Gemini] Error communicating with Gemini API:", error);
 
     // في حالة خطأ في API، أعد رسالة خطأ بالعربية
+    let errorMessage = "عذراً، حدث خطأ تقني. يرجى المحاولة لاحقاً.";
+
+    // تخصيص رسالة الخطأ حسب نوع الخطأ
+    if (error.message && error.message.includes("API_KEY")) {
+      errorMessage = "عذراً، مفتاح الذكاء الاصطناعي غير متوفر.";
+    } else if (error.message && error.message.includes("quota")) {
+      errorMessage = "عذراً، تم تجاوز الحد المسموح للاستخدام.";
+    } else if (error.message && error.message.includes("network")) {
+      errorMessage = "عذراً، مشكلة في الاتصال بالإنترنت.";
+    } else if (error.message && error.message.includes("model")) {
+      errorMessage = "عذراً، نموذج الذكاء الاصطناعي غير متوفر حالياً.";
+    }
+
     return {
       action: "CHAT_RESPONSE",
-      message: "عذراً، حدث خطأ تقني. يرجى المحاولة لاحقاً.",
+      message: errorMessage,
     };
   }
 }
@@ -288,11 +310,12 @@ async function processGeminiResponse(geminiResponse, services) {
         };
 
       case "CHAT_RESPONSE":
+        const message = data && data.message ? data.message : "عذراً، لم أفهم طلبك. يرجى المحاولة مرة أخرى.";
         return {
           success: true,
           action: "CHAT_RESPONSE",
-          result: { message: data.message },
-          message: data.message,
+          result: { message: message },
+          message: message,
         };
 
       default:
