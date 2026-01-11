@@ -246,6 +246,7 @@ curl -X POST http://localhost:3000/api/ai/chat \
 ### أخطاء Gemini API
 
 #### ❌ `models/gemini-pro is not found`
+
 ```
 Error: models/gemini-pro is not found for API version v1beta
 ```
@@ -253,27 +254,32 @@ Error: models/gemini-pro is not found for API version v1beta
 **الحل**: النموذج `gemini-pro` قديم. استخدم `gemini-1.5-pro` أو `gemini-1.5-flash`.
 
 #### ❌ `GEMINI_API_KEY not found`
+
 ```
 ❌ [Gemini] GEMINI_API_KEY not found in environment variables
 ```
 
 **الحل**: أضف مفتاح API إلى ملف `.env`:
+
 ```env
 GEMINI_API_KEY=your_actual_api_key_here
 ```
 
 #### ❌ `Error fetching from https://generativelanguage.googleapis.com`
+
 ```
 GoogleGenerativeAIFetchError: [404 Not Found]
 ```
 
 **الحل**:
+
 - تحقق من صحة مفتاح API
 - تأكد من اتصال الإنترنت
 - جرب نموذج آخر
 - تحقق من الحدود اليومية
 
 #### ❌ `Cannot read properties of undefined (reading 'message')`
+
 ```
 TypeError: Cannot read properties of undefined (reading 'message')
 ```

@@ -6,61 +6,45 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 /**
  * System Prompt الصارم للمساعد الذكي
  */
-const SYSTEM_PROMPT = `أنت مساعد ذكي لمنصة شحن مراسيل. مهمتك الوحيدة هي مساعدة التاجر في إدارة شحناته.
+const SYSTEM_PROMPT = `You are a shipping platform assistant for Marasil. Your ONLY job is to respond with valid JSON.
 
-القواعد الصارمة:
-1. لا تتحدث خارج المطلوب - فقط JSON
-2. إذا كان الطلب يتطلب تنفيذ عملية، أرجع JSON فقط بالصيغة المحددة
-3. إذا كان الطلب استفساراً أو شرح، أرجع JSON مع "CHAT_RESPONSE"
-4. لا تذكر أي شيء عن Gemini أو الذكاء الاصطناعي
+CRITICAL RULES:
+1. Respond ONLY with valid JSON - no explanations, no extra text
+2. If user wants to perform an action, return JSON with appropriate action
+3. If user just wants to chat, return CHAT_RESPONSE with Arabic message
+4. Never mention Gemini, AI, or any technical details
 
-الصيغ المسموحة فقط:
+SUPPORTED ACTIONS - respond with EXACT format:
 
-للعمليات:
-{
-  "action": "TRACK_SHIPMENT",
-  "data": { "tracking_number": "رقم التتبع" }
-}
+TRACK_SHIPMENT:
+{"action": "TRACK_SHIPMENT", "data": {"tracking_number": "string"}}
 
-{
-  "action": "CREATE_SHIPMENT",
-  "data": {
-    "company": "اسم الشركة",
-    "weight": "الوزن بالكيلو",
-    "receiver_name": "اسم المستلم",
-    "receiver_phone": "رقم هاتف المستلم",
-    "receiver_city": "مدينة المستلم",
-    "receiver_address": "عنوان المستلم"
-  }
-}
+CREATE_SHIPMENT:
+{"action": "CREATE_SHIPMENT", "data": {"company": "string", "weight": "string", "receiver_name": "string", "receiver_phone": "string", "receiver_city": "string", "receiver_address": "string"}}
 
-{
-  "action": "CANCEL_SHIPMENT",
-  "data": { "shipment_id": "معرف الشحنة" }
-}
+CANCEL_SHIPMENT:
+{"action": "CANCEL_SHIPMENT", "data": {"shipment_id": "string"}}
 
-{
-  "action": "GET_WALLET_BALANCE"
-}
+GET_WALLET_BALANCE:
+{"action": "GET_WALLET_BALANCE"}
 
-{
-  "action": "LIST_SHIPMENTS"
-}
+LIST_SHIPMENTS:
+{"action": "LIST_SHIPMENTS"}
 
-للردود النصية:
-{
-  "action": "CHAT_RESPONSE",
-  "message": "نص عربي واضح للتاجر"
-}
+CHAT_RESPONSE (for questions/chat):
+{"action": "CHAT_RESPONSE", "message": "Arabic text here"}
 
-الأوامر المدعومة:
-- تتبع شحنة: "تتبع الشحنة رقم 123456"
-- إنشاء شحنة: "أريد إنشاء شحنة إلى الرياض وزن 2 كيلو"
-- إلغاء شحنة: "ألغِ الشحنة رقم 123"
-- رصيد المحفظة: "كم رصيدي"
-- قائمة الشحنات: "عرض شحناتي"
+COMMAND EXAMPLES (Arabic → JSON):
+- "تتبع الشحنة رقم 123456" → {"action": "TRACK_SHIPMENT", "data": {"tracking_number": "123456"}}
+- "أريد إنشاء شحنة جديدة" → {"action": "CREATE_SHIPMENT", "data": {"company": "ARAMEX", "weight": "2", "receiver_name": "أحمد", "receiver_phone": "0501234567", "receiver_city": "الرياض", "receiver_address": "شارع الملك"}}
+- "ألغِ الشحنة رقم 123" → {"action": "CANCEL_SHIPMENT", "data": {"shipment_id": "123"}}
+- "كم رصيدي" → {"action": "GET_WALLET_BALANCE"}
+- "عرض شحناتي" → {"action": "LIST_SHIPMENTS"}
+- "مرحبا" → {"action": "CHAT_RESPONSE", "message": "مرحباً! كيف يمكنني مساعدتك في إدارة شحناتك؟"}
+- "كيف أستخدم النظام" → {"action": "CHAT_RESPONSE", "message": "يمكنك تتبع شحناتك، إنشاء شحنات جديدة، عرض رصيدك، وإدارة طلباتك من هنا."}
 
-إذا لم تفهم الطلب، أجب بـ CHAT_RESPONSE مع رسالة توضيحية.`;
+IMPORTANT: For any greeting, question, or unclear request, respond with CHAT_RESPONSE containing helpful Arabic message.
+For specific actions (track, create, cancel, balance, list), respond with the appropriate action JSON.`;
 
 /**
  * استخراج Intent من الرسالة (اختياري - Gemini سيحدده)
@@ -128,10 +112,13 @@ async function sendToGemini(userMessage, context = "") {
   try {
     // التحقق من وجود GEMINI_API_KEY
     if (!process.env.GEMINI_API_KEY) {
-      console.error("❌ [Gemini] GEMINI_API_KEY not found in environment variables");
+      console.error(
+        "❌ [Gemini] GEMINI_API_KEY not found in environment variables"
+      );
       return {
         action: "CHAT_RESPONSE",
-        message: "عذراً، خدمة الذكاء الاصطناعي غير متوفرة حالياً. يرجى المحاولة لاحقاً."
+        message:
+          "عذراً، خدمة الذكاء الاصطناعي غير متوفرة حالياً. يرجى المحاولة لاحقاً.",
       };
     }
 
@@ -147,11 +134,15 @@ ${context}
 
 أجب بالصيغة المطلوبة فقط:`;
 
+    // تقييد طول الـ prompt
+    const maxPromptLength = 2000;
+    if (fullPrompt.length > maxPromptLength) {
+      const truncatedContext = buildContext(recentMessages.slice(-3)); // آخر 3 رسائل فقط
+      fullPrompt = `${SYSTEM_PROMPT}\n\nContext (last 3 messages):\n${truncatedContext}\n\nUser: ${userMessage}\n\nRespond with valid JSON only:`;
+    }
+
     console.log("🚀 [Gemini] Sending prompt to Gemini...");
-    console.log(
-      "📝 [Gemini] Full prompt:",
-      fullPrompt.substring(0, 500) + "..."
-    );
+    console.log("📝 [Gemini] Prompt length:", fullPrompt.length, "characters");
 
     const result = await model.generateContent(fullPrompt);
     const response = await result.response;
@@ -168,6 +159,18 @@ ${context}
       .replace(/\s*```$/, "");
     cleanResponse = cleanResponse.replace(/^```\s*/, "").replace(/\s*```$/, "");
 
+    // إزالة أي نص عربي إضافي قد يكون قبل JSON
+    const jsonStart = cleanResponse.indexOf("{");
+    if (jsonStart > 0) {
+      cleanResponse = cleanResponse.substring(jsonStart);
+    }
+
+    // إزالة أي نص بعد JSON
+    const jsonEnd = cleanResponse.lastIndexOf("}");
+    if (jsonEnd > 0 && jsonEnd < cleanResponse.length - 1) {
+      cleanResponse = cleanResponse.substring(0, jsonEnd + 1);
+    }
+
     console.log("🧹 [Gemini] Cleaned response:", cleanResponse);
 
     // محاولة تحليل JSON
@@ -182,10 +185,56 @@ ${context}
       console.error("❌ [Gemini] Failed to parse JSON response:", parseError);
       console.error("❌ [Gemini] Raw response was:", cleanResponse);
 
-      // إذا فشل التحليل، أعد رسالة خطأ واضحة
+      // محاولة استخراج action من النص كـ fallback
+      const lowerText = cleanResponse.toLowerCase();
+
+      if (lowerText.includes("track_shipment") || lowerText.includes("تتبع")) {
+        const trackingMatch = cleanResponse.match(/(\d+)/);
+        if (trackingMatch) {
+          console.log("🔄 [Gemini] Fallback: Detected TRACK_SHIPMENT");
+          return {
+            action: "TRACK_SHIPMENT",
+            data: { tracking_number: trackingMatch[1] },
+          };
+        }
+      }
+
+      if (
+        lowerText.includes("create_shipment") ||
+        lowerText.includes("إنشاء")
+      ) {
+        console.log("🔄 [Gemini] Fallback: Detected CREATE_SHIPMENT");
+        return {
+          action: "CREATE_SHIPMENT",
+          data: {},
+        };
+      }
+
+      if (
+        lowerText.includes("get_wallet_balance") ||
+        lowerText.includes("رصيد")
+      ) {
+        console.log("🔄 [Gemini] Fallback: Detected GET_WALLET_BALANCE");
+        return {
+          action: "GET_WALLET_BALANCE",
+        };
+      }
+
+      if (
+        lowerText.includes("list_shipments") ||
+        lowerText.includes("شحناتي")
+      ) {
+        console.log("🔄 [Gemini] Fallback: Detected LIST_SHIPMENTS");
+        return {
+          action: "LIST_SHIPMENTS",
+        };
+      }
+
+      // إذا فشل كل شيء، أعد رسالة عدم فهم
+      console.log("🔄 [Gemini] Fallback: Using CHAT_RESPONSE");
       return {
         action: "CHAT_RESPONSE",
-        message: "عذراً، حدث خطأ في معالجة طلبك. يرجى المحاولة مرة أخرى.",
+        message: "عذراً، لم أفهم طلبك. يرجى المحاولة مرة أخرى.",
       };
     }
   } catch (error) {
@@ -310,7 +359,10 @@ async function processGeminiResponse(geminiResponse, services) {
         };
 
       case "CHAT_RESPONSE":
-        const message = data && data.message ? data.message : "عذراً، لم أفهم طلبك. يرجى المحاولة مرة أخرى.";
+        const message =
+          data && data.message
+            ? data.message
+            : "عذراً، لم أفهم طلبك. يرجى المحاولة مرة أخرى.";
         return {
           success: true,
           action: "CHAT_RESPONSE",
