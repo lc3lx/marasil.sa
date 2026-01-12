@@ -431,8 +431,19 @@ function quickKeywordParse(message, userInfo = null) {
     "تمام الحمد لله",
   ];
 
-  // أنماط الترحيب - أولوية عالية
-  if (greetingPatterns.some((pattern) => lowerMessage.includes(pattern))) {
+  // أنماط الترحيب - أولوية عالية (لكن ليس إذا كانت جزء من جملة أخرى)
+  const isGreeting = greetingPatterns.some((pattern) => {
+    // تجنب التحيات التي تكون جزء من جملة مثل "هاي الرقم"
+    if (pattern === "هاي" && cleanMessage.includes("هاي الرقم")) {
+      return false;
+    }
+    if (pattern === "هاي" && cleanMessage.includes("هاي رقم")) {
+      return false;
+    }
+    return lowerMessage.includes(pattern);
+  });
+
+  if (isGreeting) {
     console.log("✅ [Quick Parse] Matched GREETING");
     return {
       intent: "CHAT",
@@ -903,11 +914,32 @@ async function processGeminiResponse(
     case "TRACK":
       if (data && data.tracking_number) {
         console.log("🔄 [AI] Executing trackShipment:", data.tracking_number);
-        apiResult = await services.shipmentService.trackShipment(
-          data.tracking_number
+        console.log("🔄 [AI] Services available:", !!services);
+        console.log(
+          "🔄 [AI] Shipment service available:",
+          !!services.shipmentService
         );
-        shouldCallAPI = true;
+        console.log(
+          "🔄 [AI] Track method available:",
+          typeof services.shipmentService.trackShipment
+        );
+
+        try {
+          apiResult = await services.shipmentService.trackShipment(
+            data.tracking_number
+          );
+          console.log("🔄 [AI] API result:", apiResult);
+          shouldCallAPI = true;
+        } catch (apiError) {
+          console.error("❌ [AI] API call failed:", apiError);
+          apiResult = {
+            success: false,
+            message: "حدث خطأ في استدعاء API التتبع",
+          };
+          shouldCallAPI = true;
+        }
       } else {
+        console.log("⚠️ [AI] No tracking number provided for TRACK intent");
         // لا يوجد رقم تتبع، أعد الرسالة الأصلية
         return {
           success: true,
