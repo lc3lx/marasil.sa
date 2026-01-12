@@ -648,8 +648,21 @@ function quickKeywordParse(message) {
     "فلوسي قديش",
     "عندي كم فلوس",
     "balance",
+    "رصيد محفظتي",
+    "رصيد محفظتك",
+    "كم رصيد محفظتي",
+    "كم معي رصيد",
+    "كم معي رصيد بالمحفظة",
+    "رصيدي بالمحفظة",
+    "رصيد المحفظة",
+    "رصيد المحفظة كم",
   ];
   if (balancePatterns.some((pattern) => cleanMessage.includes(pattern))) {
+    console.log("💰 [Balance] Detected balance pattern in cleanMessage!");
+    return { action: "GET_WALLET_BALANCE" };
+  }
+  if (balancePatterns.some((pattern) => lowerMessage.includes(pattern))) {
+    console.log("💰 [Balance] Detected balance pattern in lowerMessage!");
     return { action: "GET_WALLET_BALANCE" };
   }
 
@@ -767,10 +780,15 @@ async function sendToGemini(userMessage, context = "", userId = null) {
     // أولاً: محاولة keyword-based parsing للأوامر البسيطة
     console.log("🎯 [Gemini] Processing user message:", userMessage);
     const quickResult = quickKeywordParse(userMessage);
-    console.log("🎯 [Gemini] Quick result:", quickResult);
+    console.log(
+      "🎯 [Gemini] Quick result:",
+      JSON.stringify(quickResult, null, 2)
+    );
     if (quickResult) {
       console.log("⚡ [Gemini] Quick parse success:", quickResult.action);
       return quickResult;
+    } else {
+      console.log("⚡ [Gemini] Quick parse returned null, going to Gemini API");
     }
 
     // التحقق من وجود GEMINI_API_KEY
@@ -810,6 +828,12 @@ ${context}
 
 === الرسالة الحالية ===
 "${userMessage}"
+
+=== أمثلة أسئلة الرصيد ===
+- "كم رصيدي" → {"intent": "BALANCE", "confidence": 0.9, "missing_fields": [], "message": "", "data": {}}
+- "رصيد محفظتي" → {"intent": "BALANCE", "confidence": 0.9, "missing_fields": [], "message": "", "data": {}}
+- "فلوسي كم" → {"intent": "BALANCE", "confidence": 0.9, "missing_fields": [], "message": "", "data": {}}
+- "كم معي رصيد بالمحفظة" → {"intent": "BALANCE", "confidence": 0.9, "missing_fields": [], "message": "", "data": {}}
 
 أجب بـ JSON صالح فقط حسب الصيغة المطلوبة:`;
 
@@ -1155,7 +1179,9 @@ async function processGeminiResponse(geminiResponse, services, userId = null) {
         };
 
       case "BALANCE":
+        console.log("💰 [Balance] Processing BALANCE intent");
         const balanceResult = await services.walletService.getBalance();
+        console.log("💰 [Balance] Balance result:", balanceResult);
         return {
           success: true,
           action: "GET_WALLET_BALANCE",
