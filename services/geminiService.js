@@ -98,8 +98,18 @@ const SYSTEM_PROMPT = `أنت مساعد خدمة عملاء شحنات سعود
 /**
  * تحليل سريع للرسالة بناءً على الكلمات المفتاحية
  */
-function quickKeywordParse(message) {
+function quickKeywordParse(message, userInfo = null) {
   const lowerMessage = message.toLowerCase().trim();
+
+  // الحصول على اسم العميل
+  const userName = userInfo
+    ? `${userInfo.firstName || ""} ${userInfo.lastName || ""}`.trim() ||
+      "عميلنا الكريم"
+    : "عميلنا الكريم";
+
+  console.log(`🔍 [Quick Parse] Input: "${message}"`);
+  console.log(`🔍 [Quick Parse] Lower: "${lowerMessage}"`);
+  console.log(`🔍 [Quick Parse] User: ${userName}`);
 
   // تنظيف الأخطاء الإملائية الشائعة في اللهجة السعودية
   let cleanMessage = lowerMessage
@@ -678,11 +688,38 @@ function quickKeywordParse(message) {
     "أرسل لي",
     "أحتاج أشحن",
     "أبي أشحن",
+    "كيف أنشئ شحنة",
+    "كيف أشحن",
+    "كيف أضيف شحنة",
+    "إنشاء شحنة جديدة",
+    "أضف شحنة",
+    "أريد شحنة جديدة",
+    "بدي شحنة جديدة",
+    "شحنة جديدة",
   ];
   if (
     createShipmentPatterns.some((pattern) => cleanMessage.includes(pattern))
   ) {
     return { action: "CREATE_SHIPMENT", data: {} };
+  }
+
+  // أسئلة عن المساعدة العامة
+  const helpPatterns = [
+    "مساعدة",
+    "help",
+    "بدي مساعدة",
+    "أحتاج مساعدة",
+    "أريد مساعدة",
+    "ساعدني",
+    "ساعديني",
+    "/مساعدة",
+  ];
+  if (helpPatterns.some((pattern) => cleanMessage.includes(pattern))) {
+    console.log("✅ [Quick Parse] Matched HELP pattern");
+    return {
+      action: "CHAT_RESPONSE",
+      message: `تمام ${userName} 👍 أنا هنا عشان أساعدك! 🤝\n\n✨ **أقدر أساعدك في**:\n• 📦 **إنشاء شحنة جديدة** - قل "أريد أشحن"\n• 🔍 **تتبع شحنة** - قل "تابع رقم الشحنة"\n• 💰 **رصيد المحفظة** - قل "كم رصيدي"\n• 📋 **شحناتي** - قل "عرض شحناتي"\n• 🏢 **معلومات عن مراسيل** - قل "ما هي مراسيل"\n\nوش تحب أعمل لك اليوم؟ 😊`,
+    };
   }
 
   // أسئلة عن التتبع - بالعامية السعودية
@@ -696,15 +733,44 @@ function quickKeywordParse(message) {
     "شوف الشحنة",
     "وريني الشحنة",
     "track",
+    "بدي اتبع",
+    "أريد أتبع",
+    "اتبع شحنتي",
+    "تابع شحنتي",
+    "تتبع شحنتي",
+    "/تتبع",
   ];
   if (trackShipmentPatterns.some((pattern) => cleanMessage.includes(pattern))) {
+    console.log("✅ [Quick Parse] Matched TRACK pattern");
     const numberMatch = message.match(/(\d{6,})/);
     if (numberMatch) {
+      console.log("✅ [Quick Parse] Found tracking number:", numberMatch[1]);
       return {
         action: "TRACK_SHIPMENT",
         data: { tracking_number: numberMatch[1] },
       };
+    } else {
+      console.log("❌ [Quick Parse] No tracking number found");
     }
+  }
+
+  // أسئلة تعليمية عن كيفية إنشاء الشحنة
+  const howToCreatePatterns = [
+    "كيف أنشئ شحنة",
+    "كيف أشحن",
+    "كيف أضيف شحنة",
+    "كيف أرسل شحنة",
+    "كيفية إنشاء شحنة",
+    "كيفية الشحن",
+    "طريقة إنشاء شحنة",
+    "خطوات إنشاء شحنة",
+  ];
+  if (howToCreatePatterns.some((pattern) => cleanMessage.includes(pattern))) {
+    console.log("✅ [Quick Parse] Matched HOW_TO_CREATE pattern");
+    return {
+      action: "CHAT_RESPONSE",
+      message: `تمام ${userName} 👍 إنشاء شحنة سهل جداً! 📦\n\n**خطوات إنشاء الشحنة**:\n\n1️⃣ **أخبرني ببيانات المستلم**\n• اسم المستلم الكامل\n• رقم جواله\n• عنوان التوصيل\n• مدينة الوصول\n\n2️⃣ **أخبرني بتفاصيل الشحنة**\n• وزن الشحنة بالكيلو\n• نوع الشحنة (وثائق/بضائع/أخرى)\n• أي ملاحظات خاصة\n\n3️⃣ **أنا أختار لك الشركة المناسبة**\n• حسب المسافة والوزن\n• أحسب التكلفة تلقائياً\n• أعطيك أفضل سعر\n\n💡 **مثال**: "أريد أشحن شيء لأحمد في الرياض، رقم جواله 0501234567، وزن 2 كيلو"\n\nقلي تفاصيل شحنتك وسأساعدك فوراً! 🚀`,
+    };
   }
 
   return null; // لم يتم التعرف على نمط معروف
@@ -783,7 +849,7 @@ async function sendToGemini(
 
     // أولاً: محاولة keyword-based parsing للأوامر البسيطة
     console.log("🎯 [Gemini] Processing user message:", userMessage);
-    const quickResult = quickKeywordParse(userMessage);
+    const quickResult = quickKeywordParse(userMessage, userInfo);
     console.log(
       "🎯 [Gemini] Quick result:",
       JSON.stringify(quickResult, null, 2)
@@ -1076,6 +1142,10 @@ async function processGeminiResponse(
   );
 
   try {
+    console.log("🔄 [Gemini] Starting to process intent:", intent);
+    console.log("🔄 [Gemini] Services available:", !!services);
+    console.log("🔄 [Gemini] Services methods:", Object.keys(services || {}));
+
     // تحديث stateManager إذا كان userId متوفر
     if (userId && intent !== "CHAT") {
       stateManager.updateState(userId, {

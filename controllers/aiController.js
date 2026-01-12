@@ -15,21 +15,21 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
       message: message?.substring(0, 100) + "...",
       user_id,
       session_id,
-      hasToken: !!user_token
+      hasToken: !!user_token,
     });
 
     // التحقق من البيانات المطلوبة
     if (!message || !message.trim()) {
       return res.status(400).json({
         success: false,
-        message: "الرسالة مطلوبة"
+        message: "الرسالة مطلوبة",
       });
     }
 
     if (!user_id) {
       return res.status(400).json({
         success: false,
-        message: "معرف المستخدم مطلوب"
+        message: "معرف المستخدم مطلوب",
       });
     }
 
@@ -48,26 +48,40 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
     // جلب بيانات المستخدم الكاملة من قاعدة البيانات
     if (!customer) {
       try {
-        const Customer = require('../models/customerModel');
-        customer = await Customer.findById(user_id).select('firstName lastName email phone addresses');
+        const Customer = require("../models/customerModel");
+        customer = await Customer.findById(user_id).select(
+          "firstName lastName email phone addresses"
+        );
         if (!customer) {
           console.warn("⚠️ [AI-Controller] Customer not found:", user_id);
-          customer = { _id: user_id, firstName: 'عميل', lastName: 'محترم' };
+          customer = { _id: user_id, firstName: "عميل", lastName: "محترم" };
         }
       } catch (dbError) {
         console.warn("⚠️ [AI-Controller] Database error:", dbError.message);
-        customer = { _id: user_id, firstName: 'عميل', lastName: 'محترم' };
+        customer = { _id: user_id, firstName: "عميل", lastName: "محترم" };
       }
     }
 
     // 1. إيجاد أو إنشاء محادثة
-    console.log("🔍 [AI-Controller] Finding/creating conversation for user:", user_id);
-    const conversation = await Conversation.findOrCreateConversation(user_id, session_id);
-    console.log("✅ [AI-Controller] Conversation found/created:", conversation._id);
+    console.log(
+      "🔍 [AI-Controller] Finding/creating conversation for user:",
+      user_id
+    );
+    const conversation = await Conversation.findOrCreateConversation(
+      user_id,
+      session_id
+    );
+    console.log(
+      "✅ [AI-Controller] Conversation found/created:",
+      conversation._id
+    );
 
     // 2. الحصول على آخر 10 رسائل للسياق
     const recentMessages = conversation.getRecentMessages(10);
-    console.log("📚 [AI-Controller] Recent messages count:", recentMessages.length);
+    console.log(
+      "📚 [AI-Controller] Recent messages count:",
+      recentMessages.length
+    );
 
     // 3. بناء السياق
     const context = geminiService.buildContext(recentMessages);
@@ -75,13 +89,21 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
 
     // 4. إرسال لـ Gemini
     console.log("🚀 [AI-Controller] Sending to Gemini...");
-    const geminiResponse = await geminiService.sendToGemini(message, context, user_id, customer);
+    const geminiResponse = await geminiService.sendToGemini(
+      message,
+      context,
+      user_id,
+      customer
+    );
 
-    if (!geminiResponse || typeof geminiResponse !== 'object') {
-      console.error("❌ [AI-Controller] Invalid Gemini response:", geminiResponse);
+    if (!geminiResponse || typeof geminiResponse !== "object") {
+      console.error(
+        "❌ [AI-Controller] Invalid Gemini response:",
+        geminiResponse
+      );
       return res.status(500).json({
         success: false,
-        message: "حدث خطأ في معالجة الطلب"
+        message: "حدث خطأ في معالجة الطلب",
       });
     }
 
@@ -92,10 +114,15 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
 
     // 6. معالجة رد Gemini وتنفيذ العمليات
     console.log("🔄 [AI-Controller] Processing Gemini response...");
-    const executionResult = await geminiService.processGeminiResponse(geminiResponse, {
-      shipmentService: aiServices,
-      walletService: aiServices
-    }, user_id, customer);
+    const executionResult = await geminiService.processGeminiResponse(
+      geminiResponse,
+      {
+        shipmentService: aiServices,
+        walletService: aiServices,
+      },
+      user_id,
+      customer
+    );
 
     console.log("✅ [AI-Controller] Execution result:", executionResult);
 
@@ -103,16 +130,16 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
     console.log("💾 [AI-Controller] Saving conversation...");
 
     // حفظ رسالة المستخدم
-    await conversation.addMessage('user', message, {
-      timestamp: new Date()
+    await conversation.addMessage("user", message, {
+      timestamp: new Date(),
     });
 
     // حفظ رد AI مع النتائج
-    await conversation.addMessage('ai', executionResult.message, {
+    await conversation.addMessage("ai", executionResult.message, {
       geminiResponse,
       executionResult,
       action: geminiResponse.action,
-      timestamp: new Date()
+      timestamp: new Date(),
     });
 
     // تحديث آخر intent إذا كان متوفراً
@@ -126,39 +153,49 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
     // 8. إرجاع الرد النهائي
     res.status(200).json({
       success: true,
-      intent: geminiResponse.intent || 'CHAT',
+      intent: geminiResponse.intent || "CHAT",
       confidence: geminiResponse.confidence || 0.5,
       missing_fields: geminiResponse.missing_fields || [],
       message: executionResult.message,
       data: {
         conversation_id: conversation._id,
         session_id: conversation.sessionId,
-        execution_result: executionResult.success ? executionResult.result : null,
-        collected_data: geminiResponse.data || {}
+        execution_result: executionResult.success
+          ? executionResult.result
+          : null,
+        collected_data: geminiResponse.data || {},
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-
   } catch (error) {
     console.error("❌ [AI-Controller] Chat error:", error);
 
     // في حالة خطأ، نحاول حفظ رسالة خطأ في المحادثة
     try {
       if (req.body.user_id) {
-        const conversation = await Conversation.findOrCreateConversation(req.body.user_id);
-        await conversation.addMessage('ai', 'عذراً، حدث خطأ تقني. يرجى المحاولة لاحقاً.', {
-          error: error.message,
-          timestamp: new Date()
-        });
+        const conversation = await Conversation.findOrCreateConversation(
+          req.body.user_id
+        );
+        await conversation.addMessage(
+          "ai",
+          "عذراً، حدث خطأ تقني. يرجى المحاولة لاحقاً.",
+          {
+            error: error.message,
+            timestamp: new Date(),
+          }
+        );
       }
     } catch (saveError) {
-      console.error("❌ [AI-Controller] Error saving error message:", saveError);
+      console.error(
+        "❌ [AI-Controller] Error saving error message:",
+        saveError
+      );
     }
 
     res.status(500).json({
       success: false,
       message: "حدث خطأ في معالجة الطلب. يرجى المحاولة لاحقاً.",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 });
@@ -172,7 +209,10 @@ exports.getConversationHistory = asyncHandler(async (req, res, next) => {
     const { userId } = req.params;
     const { limit = 50, session_id } = req.query;
 
-    console.log("📖 [AI-Controller] Getting conversation history for user:", userId);
+    console.log(
+      "📖 [AI-Controller] Getting conversation history for user:",
+      userId
+    );
 
     let query = { userId };
     if (session_id) {
@@ -181,27 +221,27 @@ exports.getConversationHistory = asyncHandler(async (req, res, next) => {
 
     const conversation = await Conversation.findOne(query)
       .sort({ lastActivity: -1 })
-      .populate('userId', 'firstName lastName email');
+      .populate("userId", "firstName lastName email");
 
     if (!conversation) {
       return res.status(200).json({
         success: true,
         data: {
           messages: [],
-          totalMessages: 0
-        }
+          totalMessages: 0,
+        },
       });
     }
 
     // الحصول على آخر الرسائل
     const messages = conversation.messages
       .slice(-parseInt(limit))
-      .map(msg => ({
+      .map((msg) => ({
         id: msg._id,
         type: msg.type,
         content: msg.content,
         timestamp: msg.timestamp,
-        action: msg.action
+        action: msg.action,
       }));
 
     res.status(200).json({
@@ -211,15 +251,14 @@ exports.getConversationHistory = asyncHandler(async (req, res, next) => {
         session_id: conversation.sessionId,
         messages,
         totalMessages: conversation.messages.length,
-        lastActivity: conversation.lastActivity
-      }
+        lastActivity: conversation.lastActivity,
+      },
     });
-
   } catch (error) {
     console.error("❌ [AI-Controller] History error:", error);
     res.status(500).json({
       success: false,
-      message: "حدث خطأ في الحصول على تاريخ المحادثة"
+      message: "حدث خطأ في الحصول على تاريخ المحادثة",
     });
   }
 });
@@ -239,20 +278,19 @@ exports.deleteConversation = asyncHandler(async (req, res, next) => {
     if (!conversation) {
       return res.status(404).json({
         success: false,
-        message: "المحادثة غير موجودة"
+        message: "المحادثة غير موجودة",
       });
     }
 
     res.status(200).json({
       success: true,
-      message: "تم حذف المحادثة بنجاح"
+      message: "تم حذف المحادثة بنجاح",
     });
-
   } catch (error) {
     console.error("❌ [AI-Controller] Delete conversation error:", error);
     res.status(500).json({
       success: false,
-      message: "حدث خطأ في حذف المحادثة"
+      message: "حدث خطأ في حذف المحادثة",
     });
   }
 });
@@ -276,11 +314,11 @@ exports.getConversationStats = asyncHandler(async (req, res, next) => {
           totalMessages: { $sum: { $size: "$messages" } },
           totalActions: { $sum: "$metadata.totalActions" },
           activeConversations: {
-            $sum: { $cond: [{ $eq: ["$isActive", true] }, 1, 0] }
+            $sum: { $cond: [{ $eq: ["$isActive", true] }, 1, 0] },
           },
-          lastActivity: { $max: "$lastActivity" }
-        }
-      }
+          lastActivity: { $max: "$lastActivity" },
+        },
+      },
     ]);
 
     const result = stats[0] || {
@@ -288,19 +326,18 @@ exports.getConversationStats = asyncHandler(async (req, res, next) => {
       totalMessages: 0,
       totalActions: 0,
       activeConversations: 0,
-      lastActivity: null
+      lastActivity: null,
     };
 
     res.status(200).json({
       success: true,
-      data: result
+      data: result,
     });
-
   } catch (error) {
     console.error("❌ [AI-Controller] Stats error:", error);
     res.status(500).json({
       success: false,
-      message: "حدث خطأ في الحصول على الإحصائيات"
+      message: "حدث خطأ في الحصول على الإحصائيات",
     });
   }
 });
