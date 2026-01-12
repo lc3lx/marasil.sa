@@ -37,6 +37,59 @@ const testCases = [
   { input: "شكراً لك", expected: "CHAT_RESPONSE" },
   { input: "thanks", expected: "CHAT_RESPONSE" },
 
+  // أسئلة عن الشركة
+  { input: "ما هي مراسيل", expected: "CHAT_RESPONSE" },
+  { input: "عن الشركة", expected: "CHAT_RESPONSE" },
+  { input: "who is marasil", expected: "CHAT_RESPONSE" },
+
+  // أسئلة عن شركات الشحن
+  { input: "ما هي شركات الشحن المتوفرة", expected: "CHAT_RESPONSE" },
+  { input: "shipping companies", expected: "CHAT_RESPONSE" },
+
+  // أسئلة عن الخدمات
+  { input: "ما هي خدماتكم", expected: "CHAT_RESPONSE" },
+  { input: "what services do you offer", expected: "CHAT_RESPONSE" },
+
+  // أسئلة عن الأسعار
+  { input: "كم تكلفة الشحن", expected: "CHAT_RESPONSE" },
+  { input: "what are your prices", expected: "CHAT_RESPONSE" },
+
+  // أسئلة عن التتبع
+  { input: "كيف أتتبع شحنتي", expected: "CHAT_RESPONSE" },
+  { input: "how to track", expected: "CHAT_RESPONSE" },
+
+  // أسئلة عن الدعم
+  { input: "أحتاج مساعدة", expected: "CHAT_RESPONSE" },
+  { input: "I need support", expected: "CHAT_RESPONSE" },
+
+  // أسئلة عن التسجيل
+  { input: "كيف أسجل حساب", expected: "CHAT_RESPONSE" },
+  { input: "how to register", expected: "CHAT_RESPONSE" },
+
+  // أسئلة عن المناطق
+  { input: "أين تشحنون", expected: "CHAT_RESPONSE" },
+  { input: "what areas do you cover", expected: "CHAT_RESPONSE" },
+
+  // أسئلة عن الأمان
+  { input: "هل شحنتي آمنة", expected: "CHAT_RESPONSE" },
+  { input: "is shipping safe", expected: "CHAT_RESPONSE" },
+
+  // أسئلة عن العروض
+  { input: "ما هي العروض الحالية", expected: "CHAT_RESPONSE" },
+  { input: "current offers", expected: "CHAT_RESPONSE" },
+
+  // أسئلة عن التطبيق
+  { input: "هل لديكم تطبيق", expected: "CHAT_RESPONSE" },
+  { input: "do you have an app", expected: "CHAT_RESPONSE" },
+
+  // أسئلة عن أوقات التوصيل
+  { input: "كم يستغرق التوصيل", expected: "CHAT_RESPONSE" },
+  { input: "delivery time", expected: "CHAT_RESPONSE" },
+
+  // أسئلة عن الإلغاء
+  { input: "كيف ألغي الشحنة", expected: "CHAT_RESPONSE" },
+  { input: "how to cancel", expected: "CHAT_RESPONSE" },
+
   // غير معروف (يجب أن يرجع null)
   { input: "ما هو الطقس اليوم", expected: null },
   { input: "random text", expected: null },
