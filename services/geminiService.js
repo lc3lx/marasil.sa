@@ -677,8 +677,16 @@ function quickKeywordParse(message, userInfo = null) {
     "زبط هذول كمان",
     "زبط هاللي قبل كمان",
     "زبط اللي قبل كمان",
+    "زبط الوضع",
+    "زبط الشغل",
+    "زبط الكلام",
     "عطيني معلومات زيادة",
     "عطيني تفاصيل أكثر",
+    "أكثر",
+    "زيادة",
+    "وإيه أكثر",
+    "وش أكثر",
+    "وش غير كذا",
   ];
   if (companyPatterns.some((pattern) => cleanMessage.includes(pattern))) {
     console.log("✅ [Quick Parse] Matched COMPANY_INFO pattern");
@@ -740,6 +748,15 @@ function quickKeywordParse(message, userInfo = null) {
     "كم اسعار الشركات",
     "شو اسعار شركات الشحن",
     "كم تكلفة شركات الشحن",
+    "بدي اعرف كم",
+    "أبي أعرف كم",
+    "أريد أعرف كم",
+    "كم تكلفني",
+    "كم سعر",
+    "شو سعر",
+    "وش سعر",
+    "كم يكلفني",
+    "كم السعر لـ",
   ];
   if (pricingPatterns.some((pattern) => cleanMessage.includes(pattern))) {
     console.log("✅ [Quick Parse] Matched PRICING pattern");
@@ -957,12 +974,13 @@ function quickKeywordParse(message, userInfo = null) {
 
   // تفاصيل الشحنة للحساب (وزن، دفع، أبعاد)
   const shipmentDetailsPatterns = [
-    /\d+(\.\d+)?\s*ك(?:يلو|جم|غ)/i, // وزن مثل "2 كيلو" أو "2.5 كجم"
+    /\d+(\.\d+)?\s*ك(?:يلو|جم|غ|ليو|يلو)/i, // وزن مثل "2 كيلو" أو "2.5 كجم" أو "10 كليو"
     /\d+(\.\d+)?\s*kg/i, // وزن بالإنجليزية "2 kg"
     /كاش|نقد/i, // طريقة دفع كاش
     /دفع عند الاستلام|cod/i, // دفع عند الاستلام
     /\d+\s*x\s*\d+\s*x\s*\d+/i, // أبعاد مثل "30x20x10"
     /\d+\s*×\s*\d+\s*×\s*\d+/i, // أبعاد بالضرب "30×20×10"
+    /شحنة\s+\d+/i, // مثل "شحنة 10"
   ];
 
   if (shipmentDetailsPatterns.some((pattern) => pattern.test(cleanMessage))) {
@@ -1195,16 +1213,24 @@ async function processGeminiResponse(
           const shipmentDetails = extractShipmentDetails(data.shipmentDetails);
           console.log("📊 [AI] Extracted shipment details:", shipmentDetails);
 
-          // التحقق من اكتمال البيانات المطلوبة
-          if (!shipmentDetails.weight || !shipmentDetails.paymentMethod) {
+          // التحقق من اكتمال البيانات المطلوبة - الوزن مطلوب، طريقة الدفع اختيارية (افتراضي COD)
+          if (!shipmentDetails.weight) {
             return {
               success: true,
               intent: "CHAT",
               result: geminiResponse,
               message: `عذراً ${
                 userInfo?.firstName || "عميلنا"
-              }، ما قدرت أستخرج جميع التفاصيل المطلوبة. قلي بوضوح:\n\n⚖️ وزن الشحنة (مثال: 2 كيلو)\n💰 طريقة الدفع (كاش أو دفع عند الاستلام)\n\nوسأحسب لك الأسعار! 🧮`,
+              }، ما قدرت أستخرج وزن الشحنة. قلي بوضوح:\n\n⚖️ وزن الشحنة (مثال: 2 كيلو)\n💰 طريقة الدفع اختيارية (كاش أو دفع عند الاستلام - افتراضي دفع عند الاستلام)\n\nوسأحسب لك الأسعار! 🧮`,
             };
+          }
+
+          // إذا لم يحدد طريقة الدفع، افترض COD
+          if (!shipmentDetails.paymentMethod) {
+            shipmentDetails.paymentMethod = "COD";
+            console.log(
+              "💳 [AI] No payment method specified, defaulting to COD"
+            );
           }
 
           // الحصول على شركات الشحن من قاعدة البيانات
@@ -1414,11 +1440,20 @@ function extractShipmentDetails(message) {
     dimensions: null,
   };
 
-  // استخراج الوزن
-  const weightMatch = message.match(/(\d+(?:\.\d+)?)\s*(?:ك(?:يلو|جم|غ)|kg)/i);
+  // استخراج الوزن - دعم جميع الاختلافات العامية
+  const weightMatch = message.match(
+    /(\d+(?:\.\d+)?)\s*(?:ك(?:يلو|جم|غ|ليو|يلو|ليوغرام)|kg)/i
+  );
   if (weightMatch) {
     details.weight = parseFloat(weightMatch[1]);
     console.log("⚖️ [AI] Extracted weight:", details.weight);
+  } else {
+    // محاولة استخراج من "شحنة X كليو"
+    const shipmentWeightMatch = message.match(/شحنة\s+(\d+(?:\.\d+)?)/i);
+    if (shipmentWeightMatch) {
+      details.weight = parseFloat(shipmentWeightMatch[1]);
+      console.log("⚖️ [AI] Extracted weight from shipment:", details.weight);
+    }
   }
 
   // استخراج طريقة الدفع
