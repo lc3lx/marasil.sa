@@ -77,11 +77,6 @@ function quickKeywordParse(message) {
     "🗣️ [Test] Checking 'مين انت' in lowerMessage:",
     lowerMessage.includes("مين انت")
   );
-  console.log("🗣️ [Greetings] Available patterns:", greetingPatterns);
-  console.log(
-    "🗣️ [Greetings] Matching patterns:",
-    greetingPatterns.filter((p) => cleanMessage.includes(p))
-  );
 
   // تتبع شحنة - أولوية عالية
   if (lowerMessage.includes("تتبع") || lowerMessage.includes("track")) {
@@ -176,8 +171,8 @@ function quickKeywordParse(message) {
     "اسمك وش",
   ];
   if (
-    identityPatterns.some((pattern) => cleanMessage.includes(pattern)) ||
-    identityPatterns.some((pattern) => lowerMessage.includes(pattern))
+    identityPatterns.some((pattern) => lowerMessage.includes(pattern)) ||
+    identityPatterns.some((pattern) => cleanMessage.includes(pattern))
   ) {
     return {
       action: "CHAT_RESPONSE",
@@ -202,6 +197,7 @@ function quickKeywordParse(message) {
     "كيف حالك",
     "كيف الأحوال",
     "كيف الحال",
+    "كيف",
     "hello",
     "hi",
     "hey",
@@ -224,13 +220,18 @@ function quickKeywordParse(message) {
     "تمام الحمد لله",
     "الحمد لله",
   ];
+  console.log("🗣️ [Greetings] Available patterns:", greetingPatterns);
   console.log(
     "🗣️ [Greetings] Checking patterns:",
     greetingPatterns.filter((p) => cleanMessage.includes(p))
   );
+  console.log(
+    "🗣️ [Greetings] Checking patterns in lowerMessage:",
+    greetingPatterns.filter((p) => lowerMessage.includes(p))
+  );
   if (
-    greetingPatterns.some((pattern) => cleanMessage.includes(pattern)) ||
-    greetingPatterns.some((pattern) => lowerMessage.includes(pattern))
+    greetingPatterns.some((pattern) => lowerMessage.includes(pattern)) ||
+    greetingPatterns.some((pattern) => cleanMessage.includes(pattern))
   ) {
     console.log("✅ [Greetings] Detected greeting pattern!");
     return {
