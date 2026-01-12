@@ -207,7 +207,53 @@ function quickKeywordParse(message, userInfo = null) {
       data: {},
     };
   }
-  // ... إضافات أخرى لشركات الشحن، الأسعار، إلخ
+
+  // أسئلة عن شركات الشحن
+  const shippingCompaniesPatterns = [
+    "شركات الشحن",
+    "shipping companies",
+    "ما الشركات",
+    "شركات متوفرة",
+    "أي شركات",
+    "شركات التوصيل",
+  ];
+  if (
+    shippingCompaniesPatterns.some((pattern) => cleanMessage.includes(pattern))
+  ) {
+    console.log("✅ [Quick Parse] Matched SHIPPING_COMPANIES pattern");
+    return {
+      intent: "SHIPPING_COMPANIES",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `تمام ${userName}، خلني أجيبلك معلومات عن شركات الشحن المتاحة...`,
+      data: {},
+    };
+  }
+
+  // أسئلة عن الأسعار والتكلفة
+  const pricingPatterns = [
+    "كم التكلفة",
+    "كم السعر",
+    "كم الثمن",
+    "التكلفة",
+    "السعر",
+    "الأسعار",
+    "price",
+    "cost",
+    "كم يكلف",
+    "كم تكلفة",
+  ];
+  if (pricingPatterns.some((pattern) => cleanMessage.includes(pattern))) {
+    console.log("✅ [Quick Parse] Matched PRICING pattern");
+    return {
+      intent: "PRICING",
+      confidence: 0.8,
+      missing_fields: ["weight"],
+      message: `تمام ${userName}، لحساب التكلفة أحتاج أعرف:\n• وزن الشحنة بالكيلو\n• المسافة أو المدينة\n\nقلي تفاصيل الشحنتك وسأحسب لك التكلفة بدقة! 💰`,
+      data: {},
+    };
+  }
+
   // (ابقِ الباقي كما هو)
 }
 
@@ -279,7 +325,29 @@ async function processGeminiResponse(
           api_call.params
         );
         break;
-      // ... حالات لكل API
+      case "cancelShipment":
+        apiResult = await services.shipmentService.cancelShipment(
+          api_call.params.shipment_id
+        );
+        break;
+      case "getBalance":
+        apiResult = await services.walletService.getBalance();
+        break;
+      case "getUserShipments":
+        apiResult = await services.shipmentService.getUserShipments();
+        break;
+      case "getCompanyInfo":
+        apiResult = await services.generalService.getCompanyInfo();
+        break;
+      case "getShippingCompanies":
+        apiResult = await services.generalService.getShippingCompanies();
+        break;
+      case "getPricingInfo":
+        apiResult = await services.generalService.getPricingInfo(
+          api_call.params
+        );
+        break;
+      // ... حالات أخرى إذا لزم
       default:
         apiResult = { success: false, message: "API غير مدعوم" };
     }
