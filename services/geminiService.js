@@ -319,7 +319,41 @@ function buildContext(recentMessages) {
 
   // إذا كان السياق الأخير يحتوي على كلمات مفتاحية، أبرزها
   let contextHint = "";
+
+  // فحص أكثر دقة للسياق - النظر في الرسائل الأخيرة
+  const lastMessage = recentLines[recentLines.length - 1] || "";
+  const secondLastMessage = recentLines[recentLines.length - 2] || "";
+
+  // إذا كان آخر رد من الـ AI يتحدث عن تتبع شحنة
   if (
+    lastMessage.includes("شحنة الحين") ||
+    lastMessage.includes("بيانات الشحنة") ||
+    secondLastMessage.includes("شحنة الحين") ||
+    secondLastMessage.includes("بيانات الشحنة")
+  ) {
+    contextHint =
+      "الحالة الحالية: المستخدم طلب تتبع شحنة وينتظر النتيجة - عندما يقول 'جبتها' أو 'وريني' يقصد عرض بيانات الشحنة";
+  }
+  // إذا كان آخر رد من الـ AI يتحدث عن قائمة شحنات
+  else if (
+    lastMessage.includes("قائمة شحنات") ||
+    lastMessage.includes("شحناتك") ||
+    secondLastMessage.includes("قائمة شحنات") ||
+    secondLastMessage.includes("شحناتك")
+  ) {
+    contextHint = "الحالة الحالية: المستخدم طلب قائمة الشحنات وينتظر النتيجة";
+  }
+  // إذا كان آخر رد من الـ AI يتحدث عن الرصيد
+  else if (
+    lastMessage.includes("رصيدك") ||
+    lastMessage.includes("فلوس") ||
+    secondLastMessage.includes("رصيدك") ||
+    secondLastMessage.includes("فلوس")
+  ) {
+    contextHint = "الحالة الحالية: المستخدم طلب الرصيد وينتظر النتيجة";
+  }
+  // فحوصات عامة
+  else if (
     recentContext.includes("تتبع") ||
     recentContext.includes("تابع") ||
     recentContext.includes("tracking")
@@ -721,6 +755,22 @@ function quickKeywordParse(message, userInfo = null) {
     "كيف وصلت",
     "وش صار",
     "شو صار",
+    "جبتها",
+    "حصلت عليها",
+    "وريني",
+    "شوفها",
+    "اطلعها",
+    "عرضها",
+    "ما شافها",
+    "ما شفتها",
+    "ما شوفتها",
+    "أرني",
+    "أظهر",
+    "show me",
+    "show",
+    "display",
+    "عرضلي",
+    "وريني إياها",
   ];
 
   if (continuationPatterns.some((pattern) => cleanMessage.includes(pattern))) {
@@ -732,27 +782,45 @@ function quickKeywordParse(message, userInfo = null) {
       if (
         context.includes("تتبع شحنة محددة") ||
         context.includes("tracking_number") ||
-        context.includes("رقم التتبع")
+        context.includes("رقم التتبع") ||
+        context.includes("شحنة الحين") ||
+        context.includes("بيانات الشحنة")
       ) {
         // ابحث عن رقم التتبع في السياق
         const contextTrackingMatch = context.match(/(\d{6,})/);
         if (contextTrackingMatch) {
           console.log(
-            "✅ [Quick Parse] Found tracking number in context:",
+            "✅ [Quick Parse] Found tracking number in context for continuation:",
             contextTrackingMatch[1]
           );
           return {
             intent: "TRACK",
             confidence: 0.95,
             missing_fields: [],
-            message: `تمام ${userName}، خلني أجيبلك بيانات الشحنة الحين...`,
+            message: `تمام ${userName}، هذي بيانات الشحنة المطلوبة...`,
             data: { tracking_number: contextTrackingMatch[1] },
+          };
+        } else {
+          // إذا كان هناك سياق تتبع لكن لا رقم محدد
+          console.log(
+            "✅ [Quick Parse] Continuation in tracking context without number"
+          );
+          return {
+            intent: "CHAT",
+            confidence: 0.7,
+            missing_fields: [],
+            message: `${userName}، أنت تتبع شحنة، بس ما لقيت رقم التتبع في المحادثة. قلي الرقم تاني عشان أجيب لك البيانات.`,
+            data: {},
           };
         }
       }
 
       // إذا كان السياق يتعلق بقائمة الشحنات
-      if (context.includes("قائمة الشحنات") || context.includes("shipments")) {
+      if (
+        context.includes("قائمة الشحنات") ||
+        context.includes("shipments") ||
+        context.includes("شحناتك")
+      ) {
         return {
           intent: "LIST",
           confidence: 0.8,
@@ -761,14 +829,29 @@ function quickKeywordParse(message, userInfo = null) {
           data: {},
         };
       }
+
+      // إذا كان السياق يتعلق بالرصيد
+      if (
+        context.includes("الرصيد المالي") ||
+        context.includes("رصيدك") ||
+        context.includes("فلوس")
+      ) {
+        return {
+          intent: "BALANCE",
+          confidence: 0.8,
+          missing_fields: [],
+          message: `تمام ${userName}، خلني أجيبلك بيانات رصيدك من النظام...`,
+          data: {},
+        };
+      }
     }
 
-    // إذا لم يكن هناك سياق واضح، اسأل للتوضيح
+    // إذا لم يكن هناك سياق واضح، اسأل للتوضيح لكن بشكل أذكى
     return {
       intent: "CHAT",
       confidence: 0.6,
       missing_fields: [],
-      message: `${userName}، تقصد وين إيه بالضبط؟ الشحنات أو الطلبات أو إيه؟`,
+      message: `${userName}، تقصد تشوف إيه بالضبط؟ معلومات شحنة معينة ولا قائمة الشحنات ولا الرصيد؟`,
       data: {},
     };
   }
