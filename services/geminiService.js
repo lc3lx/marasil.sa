@@ -673,6 +673,12 @@ function quickKeywordParse(message, userInfo = null) {
     "مراسيل هي",
     "ما هي خدماتكم",
     "خدماتكم",
+    "زبط هدول كمان",
+    "زبط هذول كمان",
+    "زبط هاللي قبل كمان",
+    "زبط اللي قبل كمان",
+    "عطيني معلومات زيادة",
+    "عطيني تفاصيل أكثر",
   ];
   if (companyPatterns.some((pattern) => cleanMessage.includes(pattern))) {
     console.log("✅ [Quick Parse] Matched COMPANY_INFO pattern");
@@ -708,7 +714,7 @@ function quickKeywordParse(message, userInfo = null) {
     };
   }
 
-  // الأسعار والتكلفة
+  // الأسعار والتكلفة - أنماط شاملة
   const pricingPatterns = [
     "كم التكلفة",
     "كم السعر",
@@ -721,6 +727,19 @@ function quickKeywordParse(message, userInfo = null) {
     "كم يكلف",
     "كم تكلفة",
     "كم سعر الشحن",
+    "شو اسعار",
+    "وش اسعار",
+    "شو الأسعار",
+    "كم تكلفة الشحن",
+    "كم سعر الشحنات",
+    "اسعار الشركات",
+    "أسعار الشركات",
+    "تكلفة الشحن",
+    "سعر الشحن",
+    "شو اسعار الشركات",
+    "كم اسعار الشركات",
+    "شو اسعار شركات الشحن",
+    "كم تكلفة شركات الشحن",
   ];
   if (pricingPatterns.some((pattern) => cleanMessage.includes(pattern))) {
     console.log("✅ [Quick Parse] Matched PRICING pattern");
@@ -844,6 +863,25 @@ function quickKeywordParse(message, userInfo = null) {
           data: {},
         };
       }
+
+      // إذا كان السياق يتعلق بالأسعار أو الشركات
+      if (
+        context.includes("الأسعار") ||
+        context.includes("اسعار") ||
+        context.includes("شركات الشحن") ||
+        context.includes("أي نوع شحنة") ||
+        context.includes("نوع الشحنة") ||
+        context.includes("كل شركة") ||
+        context.includes("مميزاتها")
+      ) {
+        return {
+          intent: "CHAT",
+          confidence: 0.7,
+          missing_fields: [],
+          message: `تمام ${userName}، لحساب أسعار الشحن ${cleanMessage} أحتاج أعرف الوزن والمسافة. قلي تفاصيل شحنتك وسأعطيك أسعار دقيقة لجميع الشركات! 💰`,
+          data: {},
+        };
+      }
     }
 
     // إذا لم يكن هناك سياق واضح، اسأل للتوضيح لكن بشكل أذكى
@@ -851,9 +889,99 @@ function quickKeywordParse(message, userInfo = null) {
       intent: "CHAT",
       confidence: 0.6,
       missing_fields: [],
-      message: `${userName}، تقصد تشوف إيه بالضبط؟ معلومات شحنة معينة ولا قائمة الشحنات ولا الرصيد؟`,
+      message: `${userName}، تقصد تشوف إيه بالضبط؟ معلومات شحنة معينة ولا قائمة الشحنات ولا الرصيد أو الأسعار؟`,
       data: {},
     };
+  }
+
+  // أنواع الشحنات - استمرارية للأسعار
+  const shipmentTypePatterns = [
+    "شحن عادي",
+    "شحن سريع",
+    "شحن اقتصادي",
+    "شحن برو",
+    "شحن تدريجي",
+    "شحن فوري",
+    "شحن مستعجل",
+    "شحن عاجل",
+    "عادي",
+    "سريع",
+    "اقتصادي",
+    "برو",
+    "تدريجي",
+    "فوري",
+  ];
+
+  if (shipmentTypePatterns.some((pattern) => cleanMessage.includes(pattern))) {
+    console.log("✅ [Quick Parse] Matched SHIPMENT_TYPE pattern");
+
+    // إذا كان السياق يتعلق بالأسعار أو الشركات
+    if (
+      context &&
+      (context.includes("الأسعار") ||
+        context.includes("اسعار") ||
+        context.includes("شركات الشحن") ||
+        context.includes("أي نوع شحنة"))
+    ) {
+      // استخراج نوع الشحن من الرسالة
+      const shipmentType =
+        cleanMessage.includes("عادي") || cleanMessage.includes("اقتصادي")
+          ? "اقتصادي"
+          : cleanMessage.includes("برو")
+          ? "برو"
+          : cleanMessage.includes("سريع")
+          ? "برو"
+          : "اقتصادي";
+
+      return {
+        intent: "CHAT",
+        confidence: 0.8,
+        missing_fields: ["weight", "paymentMethod"],
+        message: `تمام ${userName}، لحساب سعر الشحن ${cleanMessage} بدقة أحتاج أعرف:\n\n⚖️ وزن الشحنة بالكيلوغرام؟\n💰 طريقة الدفع (كاش أو دفع عند الاستلام)؟\n📏 الأبعاد اختياري (الطول × العرض × الارتفاع بالسنتيمتر)\n\nقلي هذي التفاصيل وسأحسب لك الأسعار لكل شركة! 🧮`,
+        data: {
+          shipmentType: shipmentType,
+          context: "pricing_calculation",
+        },
+      };
+    }
+
+    // إذا لم يكن هناك سياق محدد، اسأل عن التفاصيل
+    return {
+      intent: "CHAT",
+      confidence: 0.7,
+      missing_fields: [],
+      message: `${userName}، تقصد تشحن ${cleanMessage}؟ قلي تفاصيل الشحنة (الوزن، العنوان) وسأساعدك في إنشاء الشحنة فوراً! 📦`,
+      data: {},
+    };
+  }
+
+  // تفاصيل الشحنة للحساب (وزن، دفع، أبعاد)
+  const shipmentDetailsPatterns = [
+    /\d+(\.\d+)?\s*ك(?:يلو|جم|غ)/i, // وزن مثل "2 كيلو" أو "2.5 كجم"
+    /\d+(\.\d+)?\s*kg/i, // وزن بالإنجليزية "2 kg"
+    /كاش|نقد/i, // طريقة دفع كاش
+    /دفع عند الاستلام|cod/i, // دفع عند الاستلام
+    /\d+\s*x\s*\d+\s*x\s*\d+/i, // أبعاد مثل "30x20x10"
+    /\d+\s*×\s*\d+\s*×\s*\d+/i, // أبعاد بالضرب "30×20×10"
+  ];
+
+  if (shipmentDetailsPatterns.some((pattern) => pattern.test(cleanMessage))) {
+    console.log("✅ [Quick Parse] Matched SHIPMENT_DETAILS pattern");
+
+    // إذا كان السياق يتعلق بحساب الأسعار
+    if (context && context.includes("pricing_calculation")) {
+      return {
+        intent: "CHAT",
+        confidence: 0.9,
+        missing_fields: [],
+        message: `تمام ${userName}، خلني أحسب لك الأسعار فوراً...`,
+        data: {
+          action: "CALCULATE_PRICING",
+          shipmentDetails: cleanMessage,
+          context: "pricing_calculation",
+        },
+      };
+    }
   }
 
   // إذا لم يتطابق مع أي نمط - رد دردشة عام
@@ -1054,6 +1182,83 @@ async function processGeminiResponse(
         message: geminiResponse.message || "يرجى تقديم تفاصيل الشحنة",
       };
 
+    case "CHAT":
+      // التحقق من وجود CALCULATE_PRICING action في البيانات
+      if (data && data.action === "CALCULATE_PRICING" && data.shipmentDetails) {
+        console.log(
+          "🔄 [AI] Executing CALCULATE_PRICING with details:",
+          data.shipmentDetails
+        );
+
+        try {
+          // استخراج البيانات من الرسالة
+          const shipmentDetails = extractShipmentDetails(data.shipmentDetails);
+          console.log("📊 [AI] Extracted shipment details:", shipmentDetails);
+
+          // التحقق من اكتمال البيانات المطلوبة
+          if (!shipmentDetails.weight || !shipmentDetails.paymentMethod) {
+            return {
+              success: true,
+              intent: "CHAT",
+              result: geminiResponse,
+              message: `عذراً ${
+                userInfo?.firstName || "عميلنا"
+              }، ما قدرت أستخرج جميع التفاصيل المطلوبة. قلي بوضوح:\n\n⚖️ وزن الشحنة (مثال: 2 كيلو)\n💰 طريقة الدفع (كاش أو دفع عند الاستلام)\n\nوسأحسب لك الأسعار! 🧮`,
+            };
+          }
+
+          // الحصول على شركات الشحن من قاعدة البيانات
+          const companiesResult =
+            await services.generalService.getShippingCompanies();
+          if (!companiesResult.success) {
+            return {
+              success: false,
+              intent: "CHAT",
+              result: geminiResponse,
+              message: "حدث خطأ في الحصول على بيانات شركات الشحن",
+            };
+          }
+
+          // حساب الأسعار لكل شركة
+          const pricingComparison = await calculatePricingForAllCompanies(
+            companiesResult.companies,
+            shipmentDetails
+          );
+
+          // بناء رسالة المقارنة
+          let pricingMessage = `💰 **حساب الأسعار لشحنتك:**\n\n`;
+          pricingMessage += `⚖️ الوزن: ${shipmentDetails.weight} كجم\n`;
+          pricingMessage += `💳 طريقة الدفع: ${
+            shipmentDetails.paymentMethod === "COD" ? "دفع عند الاستلام" : "كاش"
+          }\n\n`;
+
+          pricingComparison.forEach((company, index) => {
+            const emoji = ["🚚", "📦", "🚛", "✈️"][index] || "📮";
+            pricingMessage += `${emoji} **${company.name}**\n`;
+            pricingMessage += `💰 السعر: ${company.total} ريال\n`;
+            pricingMessage += `📋 التفاصيل: ${company.breakdown}\n\n`;
+          });
+
+          pricingMessage += `🛒 أي شركة تفضلها لإنشاء الشحنة؟`;
+
+          return {
+            success: true,
+            intent: "CHAT",
+            result: geminiResponse,
+            message: pricingMessage,
+          };
+        } catch (error) {
+          console.error("❌ [AI] CALCULATE_PRICING failed:", error);
+          return {
+            success: false,
+            intent: "CHAT",
+            result: geminiResponse,
+            message: "حدث خطأ في حساب الأسعار. يرجى المحاولة مرة أخرى.",
+          };
+        }
+      }
+      break;
+
     case "CANCEL":
       if (data && data.shipment_id) {
         console.log("🔄 [AI] Executing cancelShipment:", data.shipment_id);
@@ -1199,7 +1404,143 @@ async function processGeminiResponse(
   };
 }
 
-// (الباقي من الوظائف كما هو)
+// استخراج تفاصيل الشحنة من الرسالة
+function extractShipmentDetails(message) {
+  console.log("🔍 [AI] Extracting shipment details from:", message);
+
+  const details = {
+    weight: null,
+    paymentMethod: null,
+    dimensions: null,
+  };
+
+  // استخراج الوزن
+  const weightMatch = message.match(/(\d+(?:\.\d+)?)\s*(?:ك(?:يلو|جم|غ)|kg)/i);
+  if (weightMatch) {
+    details.weight = parseFloat(weightMatch[1]);
+    console.log("⚖️ [AI] Extracted weight:", details.weight);
+  }
+
+  // استخراج طريقة الدفع
+  if (
+    message.includes("دفع عند الاستلام") ||
+    message.includes("cod") ||
+    message.includes("COD")
+  ) {
+    details.paymentMethod = "COD";
+  } else if (
+    message.includes("كاش") ||
+    message.includes("نقد") ||
+    message.includes("cash")
+  ) {
+    details.paymentMethod = "CASH";
+  }
+
+  // استخراج الأبعاد (اختياري)
+  const dimensionMatch = message.match(/(\d+)\s*[x×]\s*(\d+)\s*[x×]\s*(\d+)/i);
+  if (dimensionMatch) {
+    details.dimensions = {
+      length: parseInt(dimensionMatch[1]),
+      width: parseInt(dimensionMatch[2]),
+      height: parseInt(dimensionMatch[3]),
+    };
+    console.log("📏 [AI] Extracted dimensions:", details.dimensions);
+  }
+
+  return details;
+}
+
+// حساب الأسعار لكل شركة
+async function calculatePricingForAllCompanies(companies, shipmentDetails) {
+  console.log("🧮 [AI] Calculating pricing for all companies");
+
+  const shipmentAccount = require("./shipmentAccount");
+  const pricingResults = [];
+
+  // بيانات الشحنة الموحدة
+  const orderData = {
+    weight: shipmentDetails.weight,
+    paymentMethod: shipmentDetails.paymentMethod,
+    dimension: shipmentDetails.dimensions || {
+      length: 0,
+      width: 0,
+      height: 0,
+    },
+  };
+
+  for (const company of companies) {
+    try {
+      console.log(`🏢 [AI] Calculating for ${company.name}`);
+
+      // اختيار نوع الشحن المناسب (افتراضياً اقتصادي)
+      const shippingType = company.types?.includes("اقتصادي")
+        ? {
+            basePrice: 25,
+            profitPrice: 5,
+            maxWeight: 5,
+            baseAdditionalweigth: 3,
+            profitAdditionalweigth: 1,
+            baseCODfees: 5,
+            profitCODfees: 1,
+            priceaddedtax: 0.15,
+          }
+        : company.types?.includes("برو")
+        ? {
+            basePrice: 35,
+            profitPrice: 10,
+            maxWeight: 10,
+            baseAdditionalweigth: 5,
+            profitAdditionalweigth: 2,
+            baseCODfees: 8,
+            profitCODfees: 2,
+            priceaddedtax: 0.15,
+          }
+        : // نوع أساسي
+          {
+            basePrice: 20,
+            profitPrice: 3,
+            maxWeight: 3,
+            baseAdditionalweigth: 2,
+            profitAdditionalweigth: 0.5,
+            baseCODfees: 3,
+            profitCODfees: 0.5,
+            priceaddedtax: 0.15,
+          };
+
+      // حساب السعر باستخدام shipmentAccount
+      const pricing = shipmentAccount.shipmentnorm(shippingType, orderData);
+
+      // بناء تفاصيل التكلفة
+      let breakdown = `الأساسي: ${
+        shippingType.basePrice + shippingType.profitPrice
+      } ريال`;
+      if (pricing.breakdown.additionalWeightCost > 0) {
+        breakdown += ` + وزن إضافي: ${pricing.breakdown.additionalWeightCost} ريال`;
+      }
+      if (pricing.breakdown.codFees > 0) {
+        breakdown += ` + دفع عند الاستلام: ${pricing.breakdown.codFees} ريال`;
+      }
+
+      pricingResults.push({
+        name: company.name,
+        total: pricing.total,
+        breakdown: breakdown,
+        type: company.types?.[0] || "أساسي",
+      });
+    } catch (error) {
+      console.error(`❌ [AI] Error calculating for ${company.name}:`, error);
+      pricingResults.push({
+        name: company.name,
+        total: 0,
+        breakdown: "خطأ في الحساب",
+        type: company.types?.[0] || "أساسي",
+      });
+    }
+  }
+
+  // ترتيب النتائج حسب السعر (الأقل سعراً أولاً)
+  return pricingResults.sort((a, b) => a.total - b.total);
+}
 
 module.exports = {
   sendToGemini,
