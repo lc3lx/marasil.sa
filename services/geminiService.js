@@ -319,13 +319,31 @@ function buildContext(recentMessages) {
 
   // إذا كان السياق الأخير يحتوي على كلمات مفتاحية، أبرزها
   let contextHint = "";
-  if (recentContext.includes("شحن") || recentContext.includes("طرد")) {
-    contextHint = "الموضوع الحالي: شحنات وتتبع";
-  } else if (recentContext.includes("رصيد") || recentContext.includes("فلوس")) {
+  if (
+    recentContext.includes("تتبع") ||
+    recentContext.includes("تابع") ||
+    recentContext.includes("tracking")
+  ) {
+    contextHint =
+      "الموضوع الحالي: تتبع شحنة محددة - المستخدم ينتظر معلومات عن شحنة مع رقم التتبع";
+  } else if (
+    recentContext.includes("شحنات") ||
+    recentContext.includes("قائمة") ||
+    recentContext.includes("shipments")
+  ) {
+    contextHint = "الموضوع الحالي: قائمة الشحنات - المستخدم يريد رؤية شحناته";
+  } else if (recentContext.includes("شحن") || recentContext.includes("طرد")) {
+    contextHint = "الموضوع الحالي: شحنات وتتبع عام";
+  } else if (
+    recentContext.includes("رصيد") ||
+    recentContext.includes("فلوس") ||
+    recentContext.includes("balance")
+  ) {
     contextHint = "الموضوع الحالي: الرصيد المالي";
   } else if (
     recentContext.includes("إنشاء") ||
-    recentContext.includes("جديد")
+    recentContext.includes("جديد") ||
+    recentContext.includes("create")
   ) {
     contextHint = "الموضوع الحالي: إنشاء شحنة";
   }
@@ -425,6 +443,38 @@ function quickKeywordParse(message, userInfo = null) {
     };
   }
 
+  // التحقق من رقم التتبع المستقل (مثل "50724610926")
+  const numberOnlyMatch = message.match(/^(\d{6,})$/);
+  if (
+    numberOnlyMatch &&
+    !lowerMessage.includes("كم") &&
+    !lowerMessage.includes("balance")
+  ) {
+    console.log("✅ [Quick Parse] Matched standalone tracking number");
+    return {
+      intent: "TRACK",
+      confidence: 0.95,
+      missing_fields: [],
+      message: `تمام ${userName}، خلني أجيبلك بيانات الشحنة الحين...`,
+      data: { tracking_number: numberOnlyMatch[1] },
+    };
+  }
+
+  // التحقق من رقم التتبع مع كلمات توضيحية (مثل "هاي رقم التتبع 50724610926")
+  const numberWithWordsMatch = message.match(
+    /(?:رقم|هاي|هذا|التتبع|الشحنة)\s*\:?\s*(\d{6,})/i
+  );
+  if (numberWithWordsMatch) {
+    console.log("✅ [Quick Parse] Matched tracking number with words");
+    return {
+      intent: "TRACK",
+      confidence: 0.95,
+      missing_fields: [],
+      message: `تمام ${userName}، خلني أجيبلك بيانات الشحنة الحين...`,
+      data: { tracking_number: numberWithWordsMatch[1] },
+    };
+  }
+
   // تتبع شحنة - أولوية عالية (مع أو بدون رقم)
   const trackPatterns = [
     "تتبع",
@@ -435,6 +485,11 @@ function quickKeywordParse(message, userInfo = null) {
     "أريد أتبع",
     "اتبع",
     "تبع",
+    "زبط الوضع",
+    "بدي اتبع",
+    "هاي رقم التتبع",
+    "رقم التتبع",
+    "رقم الشحنة",
     "وينها",
     "وين الشحنة",
     "فين الشحنة",
@@ -445,6 +500,9 @@ function quickKeywordParse(message, userInfo = null) {
     "وين الطرد",
     "فين الطرد",
     "اطلع الشحنة",
+    "بعتلك ايه",
+    "شو بعتلك",
+    "وش بعتلك",
   ];
 
   const hasTrackKeyword = trackPatterns.some((pattern) =>
@@ -644,35 +702,64 @@ function quickKeywordParse(message, userInfo = null) {
     "كيفها",
     "وين اللي",
     "فين اللي",
+    "بعتلك ايه",
+    "شو بعتلك",
+    "وش بعتلك",
+    "وين وصلت",
+    "فين وصلت",
+    "كيف وصلت",
+    "وش صار",
+    "شو صار",
   ];
 
   if (continuationPatterns.some((pattern) => cleanMessage.includes(pattern))) {
     console.log("✅ [Quick Parse] Matched CONTINUATION pattern");
 
-    // إذا كان السياق يحتوي على شحنات، نفترض أنه يسأل عن الشحنات
-    if (
-      context &&
-      (context.includes("شحنات") ||
-        context.includes("shipments") ||
-        context.includes("قائمة"))
-    ) {
-      return {
-        intent: "LIST",
-        confidence: 0.8,
-        missing_fields: [],
-        message: `تمام ${userName}، خلني أجيبلك قائمة شحناتك مع حالة كل شحنة...`,
-        data: {},
-      };
-    } else {
-      // إذا لم يكن هناك سياق واضح، اسأل للتوضيح
-      return {
-        intent: "CHAT",
-        confidence: 0.6,
-        missing_fields: [],
-        message: `${userName}، تقصد وين إيه بالضبط؟ الشحنات أو الطلبات أو إيه؟`,
-        data: {},
-      };
+    // تحقق من السياق بطريقة أكثر دقة
+    if (context) {
+      // إذا كان السياق يتعلق بتتبع شحنة محددة
+      if (
+        context.includes("تتبع شحنة محددة") ||
+        context.includes("tracking_number") ||
+        context.includes("رقم التتبع")
+      ) {
+        // ابحث عن رقم التتبع في السياق
+        const contextTrackingMatch = context.match(/(\d{6,})/);
+        if (contextTrackingMatch) {
+          console.log(
+            "✅ [Quick Parse] Found tracking number in context:",
+            contextTrackingMatch[1]
+          );
+          return {
+            intent: "TRACK",
+            confidence: 0.95,
+            missing_fields: [],
+            message: `تمام ${userName}، خلني أجيبلك بيانات الشحنة الحين...`,
+            data: { tracking_number: contextTrackingMatch[1] },
+          };
+        }
+      }
+
+      // إذا كان السياق يتعلق بقائمة الشحنات
+      if (context.includes("قائمة الشحنات") || context.includes("shipments")) {
+        return {
+          intent: "LIST",
+          confidence: 0.8,
+          missing_fields: [],
+          message: `تمام ${userName}، خلني أجيبلك قائمة شحناتك مع حالة كل شحنة...`,
+          data: {},
+        };
+      }
     }
+
+    // إذا لم يكن هناك سياق واضح، اسأل للتوضيح
+    return {
+      intent: "CHAT",
+      confidence: 0.6,
+      missing_fields: [],
+      message: `${userName}، تقصد وين إيه بالضبط؟ الشحنات أو الطلبات أو إيه؟`,
+      data: {},
+    };
   }
 
   // إذا لم يتطابق مع أي نمط - رد دردشة عام
