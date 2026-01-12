@@ -298,6 +298,57 @@ class ConversationStateManager {
 const stateManager = new ConversationStateManager();
 
 /**
+ * بناء سياق المحادثة من الرسائل السابقة
+ */
+function buildContext(recentMessages) {
+  if (!recentMessages || recentMessages.length === 0) {
+    return "لا يوجد سياق سابق.";
+  }
+
+  const contextLines = recentMessages.map(msg => {
+    const role = msg.sender === 'user' ? 'User' : 'Assistant';
+    const content = msg.message || msg.content || '';
+    return `${role}: ${content}`;
+  });
+
+  return contextLines.join('\n').substring(0, 1000); // حد أقصى 1000 حرف
+}
+
+/**
+ * استخراج intent من الرسالة
+ */
+function extractIntent(message) {
+  const lowerMessage = message.toLowerCase();
+
+  // تتبع شحنة
+  if (lowerMessage.includes('تتبع') || lowerMessage.includes('track')) {
+    return 'TRACK';
+  }
+
+  // إنشاء شحنة
+  if (lowerMessage.includes('إنشاء') || lowerMessage.includes('create') || lowerMessage.includes('جديد')) {
+    return 'CREATE';
+  }
+
+  // رصيد المحفظة
+  if (lowerMessage.includes('رصيد') || lowerMessage.includes('balance') || lowerMessage.includes('محفظة')) {
+    return 'BALANCE';
+  }
+
+  // قائمة الشحنات
+  if (lowerMessage.includes('شحنات') || lowerMessage.includes('shipments')) {
+    return 'LIST';
+  }
+
+  // إلغاء شحنة
+  if (lowerMessage.includes('إلغاء') || lowerMessage.includes('cancel')) {
+    return 'CANCEL';
+  }
+
+  return null; // لا يوجد intent محدد
+}
+
+/**
  * تحليل سريع للرسالة بناءً على الكلمات المفتاحية - محسن لمزيد من الحالات
  */
 function quickKeywordParse(message, userInfo = null) {
