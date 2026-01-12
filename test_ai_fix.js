@@ -24,6 +24,7 @@ async function testAI() {
     { message: "كيف أنشئ شحنة جديدة؟", description: "سؤال تعليمي" },
     { message: "ما هي خدماتكم؟", description: "أسئلة عن الخدمات" },
     { message: "كم رصيدي", description: "استعلام الرصيد" },
+    { message: "كم معي رصيد", description: "استعلام الرصيد بالعامية" },
   ];
 
   for (const testCase of testCases) {
