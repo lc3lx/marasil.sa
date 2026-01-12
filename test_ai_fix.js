@@ -39,8 +39,11 @@ async function testAI() {
       );
       console.log("✅ Quick Result:", JSON.stringify(quickResult, null, 2));
 
-      if (quickResult) {
-        console.log("🎯 تم التعرف عليها بواسطة Quick Parse");
+      if (quickResult && quickResult.intent) {
+        console.log(
+          "🎯 تم التعرف عليها بواسطة Quick Parse - Intent:",
+          quickResult.intent
+        );
       } else {
         console.log("🤔 لم يتم التعرف عليها، ستذهب إلى Gemini");
       }

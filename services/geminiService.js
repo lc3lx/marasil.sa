@@ -217,7 +217,13 @@ function quickKeywordParse(message, userInfo = null) {
     "عرضلي شحناتي",
   ];
   if (listPatterns.some((pattern) => cleanMessage.includes(pattern))) {
-    return { action: "LIST_SHIPMENTS" };
+    return {
+      intent: "LIST",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `تمام ${userName}، خلني أجيبلك قائمة بشحناتك...`,
+      data: {},
+    };
   }
 
   // إلغاء شحنة
@@ -229,8 +235,19 @@ function quickKeywordParse(message, userInfo = null) {
     const numberMatch = message.match(/(\d{3,})/);
     if (numberMatch) {
       return {
-        action: "CANCEL_SHIPMENT",
+        intent: "CANCEL",
+        confidence: 0.9,
+        missing_fields: [],
+        message: `تمام ${userName}، خلني ألغي الشحنة لك...`,
         data: { shipment_id: numberMatch[1] },
+      };
+    } else {
+      return {
+        intent: "CANCEL",
+        confidence: 0.8,
+        missing_fields: ["shipment_id"],
+        message: `أحتاج رقم الشحنة أو معرفها عشان ألغيها ${userName}. وش رقم الشحنة؟`,
+        data: {},
       };
     }
   }
@@ -239,18 +256,22 @@ function quickKeywordParse(message, userInfo = null) {
   if (lowerMessage.includes("كيفك") || lowerMessage.includes("كيف حالك")) {
     console.log("🚀 [Fallback] Detected 'كيفك' greeting!");
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        "الحمد لله بخير! 😊\n\nأنا **مساعد مراسيل الذكي** 🤖 جاهز لخدمتك 🇸🇦\n\n✨ أقدر أساعدك في:\n• 📦 إنشاء وتتبع الشحنات\n• 💰 معرفة رصيدك\n• 📋 عرض شحناتك\n• ❓ أي سؤال عن الشحن\n\nوش تحتاجه اليوم؟ 🚀",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `الحمد لله بخير ${userName}! 😊\n\nأنا **مساعد مراسيل الذكي** 🤖 جاهز لخدمتك 🇸🇦\n\n✨ أقدر أساعدك في:\n• 📦 إنشاء وتتبع الشحنات\n• 💰 معرفة رصيدك\n• 📋 عرض شحناتك\n• ❓ أي سؤال عن الشحن\n\nوش تحتاجه اليوم؟ 🚀`,
+      data: {},
     };
   }
 
   if (lowerMessage.includes("السلام عليكم")) {
     console.log("🚀 [Fallback] Detected Islamic greeting!");
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        "وعليكم السلام ورحمة الله وبركاته! 🤲\n\nأنا **مساعد مراسيل الذكي** 🤖 - متخصص في شحنات السعودية 🇸🇦\n\n✨ جاهز لخدمتك في كل ما يخص الشحن:\n• 📦 إنشاء شحنة جديدة\n• 🔍 تتبع شحناتك\n• 💰 رصيد محفظتك\n• 📋 شحناتك الموجودة\n\nكيف أقدر أساعدك؟ 😊",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `وعليكم السلام ورحمة الله وبركاته ${userName}! 🤲\n\nأنا **مساعد مراسيل الذكي** 🤖 - متخصص في شحنات السعودية 🇸🇦\n\n✨ جاهز لخدمتك في كل ما يخص الشحن:\n• 📦 إنشاء شحنة جديدة\n• 🔍 تتبع شحناتك\n• 💰 رصيد محفظتك\n• 📋 شحناتك الموجودة\n\nكيف أقدر أساعدك؟ 😊`,
+      data: {},
     };
   }
 
@@ -262,9 +283,11 @@ function quickKeywordParse(message, userInfo = null) {
   ) {
     console.log("🚀 [Fallback] Detected casual greeting!");
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        "هاي! مرحباً بك 🤝\n\nأنا **مساعد مراسيل الذكي** 🤖 - هنا عشان أساعدك في شحناتك 🇸🇦\n\n✨ أقدر أعمل لك:\n• 📦 شحنة جديدة\n• 🔍 تتبع شحنتك\n• 💰 شوف رصيدك\n• 📋 عرض شحناتك\n\nوش تبي تسوي؟ 😊",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `هاي! مرحباً بك ${userName} 🤝\n\nأنا **مساعد مراسيل الذكي** 🤖 - هنا عشان أساعدك في شحناتك 🇸🇦\n\n✨ أقدر أعمل لك:\n• 📦 شحنة جديدة\n• 🔍 تتبع شحنتك\n• 💰 شوف رصيدك\n• 📋 عرض شحناتك\n\nوش تبي تسوي؟ 😊`,
+      data: {},
     };
   }
 
@@ -287,9 +310,11 @@ function quickKeywordParse(message, userInfo = null) {
     identityPatterns.some((pattern) => cleanMessage.includes(pattern))
   ) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        "🤖 **أنا مساعد مراسيل الذكي!** 🛠️\n\nأنا نظام ذكاء اصطناعي متخصص في مساعدة تجار السعودية 🇸🇦 في كل ما يخص الشحن والشحنات.\n\n✨ **أقدر أساعدك في**:\n• 📦 إنشاء وتتبع الشحنات\n• 💰 معرفة رصيد المحفظة\n• 📋 عرض الشحنات الموجودة\n• 🏢 معلومات عن الشركات والأسعار\n• ❓ إجابة على أي سؤال\n\nقلي وش تحتاجه وسأساعدك فوراً! 🚀\n\n#مراسيل #شحن_ذكي",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `🤖 **أنا مساعد مراسيل الذكي!** 🛠️\n\nأنا نظام ذكاء اصطناعي متخصص في مساعدة تجار السعودية 🇸🇦 في كل ما يخص الشحن والشحنات.\n\n✨ **أقدر أساعدك في**:\n• 📦 إنشاء وتتبع الشحنات\n• 💰 معرفة رصيد المحفظة\n• 📋 عرض الشحنات الموجودة\n• 🏢 معلومات عن الشركات والأسعار\n• ❓ إجابة على أي سؤال\n\nقلي وش تحتاجه وسأساعدك فوراً ${userName}! 🚀\n\n#مراسيل #شحن_ذكي`,
+      data: {},
     };
   }
 
@@ -361,8 +386,11 @@ function quickKeywordParse(message, userInfo = null) {
   ) {
     console.log("✅ [Greetings] Detected 'كيفك' greeting!");
     return {
-      action: "CHAT_RESPONSE",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
       message: `الحمد لله بخير ${userName}! 😊\n\nأنا **مساعد مراسيل الذكي** 🤖 جاهز لخدمتك 🇸🇦\n\n✨ أقدر أساعدك في:\n• 📦 إنشاء وتتبع الشحنات\n• 💰 معرفة رصيدك\n• 📋 عرض شحناتك\n• ❓ أي سؤال عن الشحن\n\nوش تحتاجه اليوم؟ 🚀`,
+      data: {},
     };
   }
 
@@ -372,16 +400,22 @@ function quickKeywordParse(message, userInfo = null) {
   ) {
     console.log("✅ [Greetings] Detected Islamic greeting!");
     return {
-      action: "CHAT_RESPONSE",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
       message: `وعليكم السلام ورحمة الله وبركاته ${userName}! 🤲\n\nأنا **مساعد مراسيل الذكي** 🤖 - متخصص في شحنات السعودية 🇸🇦\n\n✨ جاهز لخدمتك في كل ما يخص الشحن:\n• 📦 إنشاء شحنة جديدة\n• 🔍 تتبع شحناتك\n• 💰 رصيد محفظتك\n• 📋 شحناتك الموجودة\n\nكيف أقدر أساعدك؟ 😊`,
+      data: {},
     };
   }
 
   if (greetingInLower || greetingInClean) {
     console.log("✅ [Greetings] Detected casual greeting!");
     return {
-      action: "CHAT_RESPONSE",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
       message: `هاي! مرحباً بك ${userName} 🤝\n\nأنا **مساعد مراسيل الذكي** 🤖 - هنا عشان أساعدك في شحناتك 🇸🇦\n\n✨ أقدر أعمل لك:\n• 📦 شحنة جديدة\n• 🔍 تتبع شحنتك\n• 💰 شوف رصيدك\n• 📋 عرض شحناتك\n\nوش تبي تسوي؟ 😊`,
+      data: {},
     };
   }
 
@@ -392,9 +426,11 @@ function quickKeywordParse(message, userInfo = null) {
     (cleanMessage.includes("هي") || cleanMessage.includes("مراسيل"))
   ) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        "🏢 **مراسيل - منصة الشحن الذكية في السعودية!** 🇸🇦\n\n⭐ **رؤيتنا**: نساعد التجار الإلكترونيين يشحنون بسهولة وأمان\n\n🚀 **خدماتنا الرائعة**:\n• شحن سريع لجميع مدن السعودية\n• تتبع فوري ورقمي\n• محفظة إلكترونية آمنة\n• دعم فني 24/7\n• شراكة مع أفضل شركات الشحن\n\n📞 **للتواصل**: support@marasil.com\n\nنحن هنا لنجعل الشحن أسهل عليك! 🤝",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `🏢 **مراسيل - منصة الشحن الذكية في السعودية!** 🇸🇦\n\n⭐ **رؤيتنا**: نساعد التجار الإلكترونيين يشحنون بسهولة وأمان\n\n🚀 **خدماتنا الرائعة**:\n• شحن سريع لجميع مدن السعودية\n• تتبع فوري ورقمي\n• محفظة إلكترونية آمنة\n• دعم فني 24/7\n• شراكة مع أفضل شركات الشحن\n\n📞 **للتواصل**: support@marasil.com\n\nنحن هنا لنجعل الشحن أسهل عليك ${userName}! 🤝`,
+      data: {},
     };
   }
 
@@ -409,9 +445,11 @@ function quickKeywordParse(message, userInfo = null) {
     shippingCompaniesPatterns.some((pattern) => cleanMessage.includes(pattern))
   ) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        "🚛 **شركاء الشحن في مراسيل - نختر لك الأحسن!**\n\n🏆 **ARAMEX - الأسرع!**\n• توصيل في نفس اليوم للمدن الكبيرة\n• تغطية شاملة لكل السعودية\n• تتبع متقدم ورائع\n\n🚚 **SMSA - الموثوقة**\n• مثالية للشحنات الكبيرة\n• خدمة آمنة ومحترفة\n• شبكة توصيل واسعة\n\n✈️ **DHL - العالمية**\n• شحن دولي ومحلي\n• ضمان عالي للسلامة\n• تتبع عالمي سريع\n\n💡 **نصيحة**: اختر الشركة حسب حجم الشحنة وسرعة التوصيل المطلوبة!\n\nقلي تفاصيل الشحنة وأختار لك الشركة المناسبة! 😉",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `🚛 **شركاء الشحن في مراسيل - نختر لك الأحسن ${userName}!**\n\n🏆 **ARAMEX - الأسرع!**\n• توصيل في نفس اليوم للمدن الكبيرة\n• تغطية شاملة لكل السعودية\n• تتبع متقدم ورائع\n\n🚚 **SMSA - الموثوقة**\n• مثالية للشحنات الكبيرة\n• خدمة آمنة ومحترفة\n• شبكة توصيل واسعة\n\n✈️ **DHL - العالمية**\n• شحن دولي ومحلي\n• ضمان عالي للسلامة\n• تتبع عالمي سريع\n\n💡 **نصيحة**: اختر الشركة حسب حجم الشحنة وسرعة التوصيل المطلوبة!\n\nقلي تفاصيل الشحنتك وأختار لك الشركة المناسبة! 😉`,
+      data: {},
     };
   }
 
@@ -425,9 +463,11 @@ function quickKeywordParse(message, userInfo = null) {
   ];
   if (servicesPatterns.some((pattern) => cleanMessage.includes(pattern))) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        "🎯 **خدمات مراسيل اللي راح تحبها!**\n\n📦 **إنشاء الشحنات**\n• سهلة وبسيطة زي الماء\n• حساب التكلفة تلقائي\n• اختيار الشركة المناسبة\n\n🔍 **تتبع الشحنات**\n• تتبع فوري برقم الشحنة\n• إشعارات على الجوال\n• تحديثات كل ساعة\n\n💳 **المحفظة الإلكترونية**\n• شحن رصيد سريع\n• دفع آمن 100%\n• تتبع معاملاتك\n\n📊 **تقارير وإحصائيات**\n• تقارير مفصلة\n• تحليل أداء الشحن\n• إحصائيات المبيعات\n\n🛡️ **أمان وضمان**\n• تشفير كامل\n• ضمان سلامة الشحنات\n• دعم فني على مدار الساعة\n\nراح تحب تجربتنا! 😍",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `🎯 **خدمات مراسيل اللي راح تحبها ${userName}!**\n\n📦 **إنشاء الشحنات**\n• سهلة وبسيطة زي الماء\n• حساب التكلفة تلقائي\n• اختيار الشركة المناسبة\n\n🔍 **تتبع الشحنات**\n• تتبع فوري برقم الشحنة\n• إشعارات على الجوال\n• تحديثات كل ساعة\n\n💳 **المحفظة الإلكترونية**\n• شحن رصيد سريع\n• دفع آمن 100%\n• تتبع معاملاتك\n\n📊 **تقارير وإحصائيات**\n• تقارير مفصلة\n• تحليل أداء الشحن\n• إحصائيات المبيعات\n\n🛡️ **أمان وضمان**\n• تشفير كامل\n• ضمان سلامة الشحنات\n• دعم فني على مدار الساعة\n\nراح تحب تجربتنا! 😍`,
+      data: {},
     };
   }
 
@@ -438,9 +478,11 @@ function quickKeywordParse(message, userInfo = null) {
     (cleanMessage.includes("شحن") || cleanMessage.includes("تكلفة"))
   ) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        '💰 **أسعارنا في مراسيل - تنافسية وواضحة!**\n\n📏 **حساب التكلفة التلقائي**:\n• حسب الوزن والمسافة\n• مختلف حسب الشركة\n• شفافية كاملة\n\n💡 **العوامل اللي تؤثر على السعر**:\n• وزن الشحنة (كيلو)\n• المسافة بين المدن\n• حجم الطرد\n• شركة الشحن\n\n🎁 **عروضنا الحلوة**:\n• خصم 20% على أول شحنة\n• شحن مجاني فوق 500 ريال\n• خصومات شهرية\n\n💬 قلي تفاصيل الشحنة وأحسب لك التكلفة بدقة!\n\nمثال: "شحنة 2 كيلو من الرياض لجدة" 🤔',
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `💰 **أسعارنا في مراسيل - تنافسية وواضحة ${userName}!**\n\n📏 **حساب التكلفة التلقائي**:\n• حسب الوزن والمسافة\n• مختلف حسب الشركة\n• شفافية كاملة\n\n💡 **العوامل اللي تؤثر على السعر**:\n• وزن الشحنة (كيلو)\n• المسافة بين المدن\n• حجم الطرد\n• شركة الشحن\n\n🎁 **عروضنا الحلوة**:\n• خصم 20% على أول شحنة\n• شحن مجاني فوق 500 ريال\n• خصومات شهرية\n\n💬 قلي تفاصيل الشحنتك وأحسب لك التكلفة بدقة!\n\nمثال: "شحنة 2 كيلو من الرياض لجدة" 🤔`,
+      data: {},
     };
   }
 
@@ -451,9 +493,11 @@ function quickKeywordParse(message, userInfo = null) {
     lowerMessage.includes("كيف أتتبع")
   ) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        '🔍 **كيف تتبع شحناتك في مراسيل**:\n\n📱 **طرق التتبع**:\n• من خلال لوحة التحكم\n• عبر رقم الشحنة\n• تطبيق الهاتف\n• إشعارات البريد الإلكتروني\n\n📊 **حالات الشحنة**:\n• تم الاستلام\n• في المستودع\n• في الطريق\n• تم التسليم\n• فشل في التسليم\n\n⚡ **التحديثات الفورية**:\n• تحديث كل ساعة\n• إشعارات فورية\n• تاريخ زمني مفصل\n\n💬 قل لي: "تتبع الشحنة رقم 123456" وسأساعدك فوراً!',
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `🔍 **كيف تتبع شحناتك في مراسيل ${userName}**:\n\n📱 **طرق التتبع**:\n• من خلال لوحة التحكم\n• عبر رقم الشحنة\n• تطبيق الهاتف\n• إشعارات البريد الإلكتروني\n\n📊 **حالات الشحنة**:\n• تم الاستلام\n• في المستودع\n• في الطريق\n• تم التسليم\n• فشل في التسليم\n\n⚡ **التحديثات الفورية**:\n• تحديث كل ساعة\n• إشعارات فورية\n• تاريخ زمني مفصل\n\n💬 قل لي: "تتبع الشحنة رقم 123456" وسأساعدك فوراً!`,
+      data: {},
     };
   }
 
@@ -467,9 +511,11 @@ function quickKeywordParse(message, userInfo = null) {
     lowerMessage.includes("problem")
   ) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        "🛠️ **دعم مراسيل - نحن هنا لمساعدتك!**\n\n📞 **طرق التواصل**:\n• الدردشة الذكية (أنا هنا!)\n• البريد الإلكتروني: support@marasil.com\n• الهاتف: 9200xxxxx\n• الواتساب: +966xxxxxxxx\n\n🕐 **أوقات العمل**:\n• 24/7 للطوارئ\n• الدعم الفني: 8 صباحاً - 8 مساءً\n• الدعم المالي: 9 صباحاً - 5 مساءً\n\n❓ **الأسئلة الشائعة**:\n• مشاكل التتبع\n• مشاكل الدفع\n• إلغاء الشحنات\n• استرداد الأموال\n\n💬 قل لي ما المشكلة التي تواجهها وسأساعدك!",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `🛠️ **دعم مراسيل - نحن هنا لمساعدتك ${userName}!**\n\n📞 **طرق التواصل**:\n• الدردشة الذكية (أنا هنا!)\n• البريد الإلكتروني: support@marasil.com\n• الهاتف: 9200xxxxx\n• الواتساب: +966xxxxxxxx\n\n🕐 **أوقات العمل**:\n• 24/7 للطوارئ\n• الدعم الفني: 8 صباحاً - 8 مساءً\n• الدعم المالي: 9 صباحاً - 5 مساءً\n\n❓ **الأسئلة الشائعة**:\n• مشاكل التتبع\n• مشاكل الدفع\n• إلغاء الشحنات\n• استرداد الأموال\n\n💬 قل لي ما المشكلة التي تواجهها وسأساعدك!`,
+      data: {},
     };
   }
 
@@ -482,9 +528,11 @@ function quickKeywordParse(message, userInfo = null) {
     (lowerMessage.includes("جديد") && lowerMessage.includes("عميل"))
   ) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        '📝 **إنشاء حساب في مراسيل - سهل وبسيط!**\n\n✨ **خطوات التسجيل**:\n1. اضغط على "إنشاء حساب"\n2. أدخل بريدك الإلكتروني\n3. أدخل معلوماتك الأساسية\n4. فعل حسابك عبر البريد\n\n🎁 **مزايا العضوية**:\n• حفظ عناوين الشحن\n• تتبع سريع للطلبات\n• محفظة إلكترونية\n• تقارير مفصلة\n• دعم فني مخصص\n\n🔐 **الأمان والخصوصية**:\n• تشفير البيانات\n• حماية معلوماتك\n• معاملات آمنة 100%\n\n🚀 سجل الآن وبدأ رحلتك مع أفضل خدمات الشحن في السعودية!',
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `📝 **إنشاء حساب في مراسيل - سهل وبسيط ${userName}!**\n\n✨ **خطوات التسجيل**:\n1. اضغط على "إنشاء حساب"\n2. أدخل بريدك الإلكتروني\n3. أدخل معلوماتك الأساسية\n4. فعل حسابك عبر البريد\n\n🎁 **مزايا العضوية**:\n• حفظ عناوين الشحن\n• تتبع سريع للطلبات\n• محفظة إلكترونية\n• تقارير مفصلة\n• دعم فني مخصص\n\n🔐 **الأمان والخصوصية**:\n• تشفير البيانات\n• حماية معلوماتك\n• معاملات آمنة 100%\n\n🚀 سجل الآن وبدأ رحلتك مع أفضل خدمات الشحن في السعودية!`,
+      data: {},
     };
   }
 
@@ -495,9 +543,11 @@ function quickKeywordParse(message, userInfo = null) {
     lowerMessage.includes("thanks")
   ) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        "🙏 **العفو! يسعدني مساعدتك**\n\n⭐ إذا كان لديك أي استفسار آخر، لا تتردد في السؤال. نحن في مراسيل دائماً هنا لخدمتك!\n\n🌟 **نصيحة**: تابعنا على وسائل التواصل للعروض والتحديثات:\n📘 فيسبوك | 📷 إنستغرام | 🐦 تويتر\n\nمع خالص التحية،\nفريق مراسيل 🤝",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `🙏 **العفو ${userName}! يسعدني مساعدتك**\n\n⭐ إذا كان لديك أي استفسار آخر، لا تتردد في السؤال. نحن في مراسيل دائماً هنا لخدمتك!\n\n🌟 **نصيحة**: تابعنا على وسائل التواصل للعروض والتحديثات:\n📘 فيسبوك | 📷 إنستغرام | 🐦 تويتر\n\nمع خالص التحية،\nفريق مراسيل 🤝`,
+      data: {},
     };
   }
 
@@ -510,9 +560,11 @@ function quickKeywordParse(message, userInfo = null) {
     lowerMessage.includes("أين تشحنون")
   ) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        "🗺️ **تغطية مراسيل الشاملة في السعودية**:\n\n🏙️ **المدن الرئيسية**:\n• الرياض - التغطية الكاملة\n• جدة - ميناء ووسط المدينة\n• مكة المكرمة - المنطقة المقدسة\n• المدينة المنورة - التغطية الشاملة\n• الدمام - المنطقة الشرقية\n• الخبر - الميناء الشرقي\n\n🏘️ **المدن الأخرى**:\n• الطائف • تبوك • حائل\n• أبها • جازان • نجران\n• الباحة • القصيم • حفر الباطن\n\n⚡ **خدماتنا تشمل**:\n• التوصيل للمنازل والشركات\n• نقاط الاستلام في جميع المدن\n• التوصيل في نفس اليوم للمدن الرئيسية\n• تغطية 100% من أراضي المملكة\n\n🚀 **سرعة التوصيل**:\n• داخل المدينة: 1-2 أيام\n• بين المدن: 2-4 أيام\n• الطلبات العاجلة: في نفس اليوم",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `🗺️ **تغطية مراسيل الشاملة في السعودية ${userName}**:\n\n🏙️ **المدن الرئيسية**:\n• الرياض - التغطية الكاملة\n• جدة - ميناء ووسط المدينة\n• مكة المكرمة - المنطقة المقدسة\n• المدينة المنورة - التغطية الشاملة\n• الدمام - المنطقة الشرقية\n• الخبر - الميناء الشرقي\n\n🏘️ **المدن الأخرى**:\n• الطائف • تبوك • حائل\n• أبها • جازان • نجران\n• الباحة • القصيم • حفر الباطن\n\n⚡ **خدماتنا تشمل**:\n• التوصيل للمنازل والشركات\n• نقاط الاستلام في جميع المدن\n• التوصيل في نفس اليوم للمدن الرئيسية\n• تغطية 100% من أراضي المملكة\n\n🚀 **سرعة التوصيل**:\n• داخل المدينة: 1-2 أيام\n• بين المدن: 2-4 أيام\n• الطلبات العاجلة: في نفس اليوم`,
+      data: {},
     };
   }
 
@@ -526,9 +578,11 @@ function quickKeywordParse(message, userInfo = null) {
     lowerMessage.includes("آمن")
   ) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        "🔒 **الأمان والضمان في مراسيل - أولويتنا الأولى!**\n\n🛡️ **أمان البيانات**:\n• تشفير SSL لجميع المعاملات\n• حماية بياناتك الشخصية 100%\n• نظام أمان مصرفي معتمد\n\n📦 **سلامة الشحنات**:\n• تغليف آمن لجميع الطرود\n• تتبع GPS لكل شحنة\n• تأمين شامل على الشحنات الثمينة\n• مسؤولية كاملة عن الخسائر\n\n💰 **الضمان المالي**:\n• استرداد كامل في حال الضياع\n• تعويض فوري للتلف\n• ضمان جودة الخدمة\n\n📋 **الشهادات والاعتمادات**:\n• اعتماد الهيئة العامة للنقل\n• شهادة الأيزو للجودة\n• عضوية غرفة التجارة\n\n✨ **نحن نضمن سلامة شحناتك 100%**",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `🔒 **الأمان والضمان في مراسيل - أولويتنا الأولى ${userName}!**\n\n🛡️ **أمان البيانات**:\n• تشفير SSL لجميع المعاملات\n• حماية بياناتك الشخصية 100%\n• نظام أمان مصرفي معتمد\n\n📦 **سلامة الشحنات**:\n• تغليف آمن لجميع الطرود\n• تتبع GPS لكل شحنة\n• تأمين شامل على الشحنات الثمينة\n• مسؤولية كاملة عن الخسائر\n\n💰 **الضمان المالي**:\n• استرداد كامل في حال الضياع\n• تعويض فوري للتلف\n• ضمان جودة الخدمة\n\n📋 **الشهادات والاعتمادات**:\n• اعتماد الهيئة العامة للنقل\n• شهادة الأيزو للجودة\n• عضوية غرفة التجارة\n\n✨ **نحن نضمن سلامة شحناتك 100%**`,
+      data: {},
     };
   }
 
@@ -541,9 +595,11 @@ function quickKeywordParse(message, userInfo = null) {
     lowerMessage.includes("تخفيض")
   ) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        "🎉 **عروض وخصومات مراسيل الحالية!**\n\n🔥 **عروض شهر نوفمبر**:\n• خصم 20% على أول شحنة\n• شحن مجاني للطلبات فوق 500 ريال\n• خصم 15% على الشحن الشهري\n\n🎁 **عروض خاصة للعملاء الجدد**:\n• رصيد مجاني 50 ريال عند التسجيل\n• خصم 30% على أول 3 شحنات\n• استشارة مجانية لتحسين الشحن\n\n🏆 **عروض للعملاء الدائمين**:\n• نقاط مكافآت على كل شحنة\n• خصومات تصل إلى 50% للكميات الكبيرة\n• أولوية في التوصيل\n\n📱 **كيف تحصل على العروض**:\n• اشترك في النشرة البريدية\n• تابعنا على وسائل التواصل\n• سجل في التطبيق\n\n💬 اسألني عن كود خصم محدد لتحصل على عرض خاص!",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `🎉 **عروض وخصومات مراسيل الحالية ${userName}!**\n\n🔥 **عروض شهر نوفمبر**:\n• خصم 20% على أول شحنة\n• شحن مجاني للطلبات فوق 500 ريال\n• خصم 15% على الشحن الشهري\n\n🎁 **عروض خاصة للعملاء الجدد**:\n• رصيد مجاني 50 ريال عند التسجيل\n• خصم 30% على أول 3 شحنات\n• استشارة مجانية لتحسين الشحن\n\n🏆 **عروض للعملاء الدائمين**:\n• نقاط مكافآت على كل شحنة\n• خصومات تصل إلى 50% للكميات الكبيرة\n• أولوية في التوصيل\n\n📱 **كيف تحصل على العروض**:\n• اشترك في النشرة البريدية\n• تابعنا على وسائل التواصل\n• سجل في التطبيق\n\n💬 اسألني عن كود خصم محدد لتحصل على عرض خاص!`,
+      data: {},
     };
   }
 
@@ -556,9 +612,11 @@ function quickKeywordParse(message, userInfo = null) {
     lowerMessage.includes("منصة")
   ) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        "📱 **تطبيق وموقع مراسيل - سهولة في متناول يديك!**\n\n🌐 **الموقع الإلكتروني**:\n• تصميم متجاوب مع جميع الأجهزة\n• واجهة سهلة باللغة العربية\n• لوحة تحكم شاملة\n• متاح 24/7\n\n📲 **تطبيق الهاتف**:\n• متاح للأندرويد والآيفون\n• إشعارات فورية للشحنات\n• مسح QR للتتبع السريع\n• واجهة مبسطة للاستخدام\n\n✨ **مميزات إضافية**:\n• حفظ العناوين المفضلة\n• تاريخ الشحنات الكامل\n• تقارير مفصلة\n• دعم فني مباشر\n\n⬇️ **تحميل التطبيق**:\n• 📱 Google Play: [رابط]\n• 🍎 App Store: [رابط]\n\n💻 **زور موقعنا**: www.marasil.com",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `📱 **تطبيق وموقع مراسيل - سهولة في متناول يديك ${userName}!**\n\n🌐 **الموقع الإلكتروني**:\n• تصميم متجاوب مع جميع الأجهزة\n• واجهة سهلة باللغة العربية\n• لوحة تحكم شاملة\n• متاح 24/7\n\n📲 **تطبيق الهاتف**:\n• متاح للأندرويد والآيفون\n• إشعارات فورية للشحنات\n• مسح QR للتتبع السريع\n• واجهة مبسطة للاستخدام\n\n✨ **مميزات إضافية**:\n• حفظ العناوين المفضلة\n• تاريخ الشحنات الكامل\n• تقارير مفصلة\n• دعم فني مباشر\n\n⬇️ **تحميل التطبيق**:\n• 📱 Google Play: [رابط]\n• 🍎 App Store: [رابط]\n\n💻 **زور موقعنا**: www.marasil.com`,
+      data: {},
     };
   }
 
@@ -571,9 +629,11 @@ function quickKeywordParse(message, userInfo = null) {
     lowerMessage.includes("متى يصل")
   ) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        "⚡ **أوقات التوصيل في مراسيل - سرعة ودقة!**\n\n🚀 **خدمة التوصيل السريع**:\n• **نفس اليوم**: للطلبات قبل الظهر\n• **غداً**: للطلبات المسائية\n• **2-3 أيام**: بين المدن الرئيسية\n\n📅 **مواعيد التوصيل**:\n• السبت - الخميس: 8 صباحاً - 8 مساءً\n• الجمعة: 4 مساءً - 12 صباحاً\n• العطلات الرسمية: حسب الجدول\n\n🏙️ **التوصيل حسب المناطق**:\n• **الرياض**: 1-2 يوم\n• **جدة**: 1-2 يوم\n• **مكة**: 1-3 أيام\n• **المدن البعيدة**: 3-5 أيام\n\n📦 **عوامل تؤثر على الوقت**:\n• حجم ووزن الشحنة\n• المسافة والمنطقة\n• شركة الشحن المختارة\n• الظروف الجوية\n\n💡 **نصائح لتسريع التوصيل**:\n• أكمل البيانات بدقة\n• اختر خدمة VIP\n• استخدم نقاط الاستلام",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `⚡ **أوقات التوصيل في مراسيل - سرعة ودقة ${userName}!**\n\n🚀 **خدمة التوصيل السريع**:\n• **نفس اليوم**: للطلبات قبل الظهر\n• **غداً**: للطلبات المسائية\n• **2-3 أيام**: بين المدن الرئيسية\n\n📅 **مواعيد التوصيل**:\n• السبت - الخميس: 8 صباحاً - 8 مساءً\n• الجمعة: 4 مساءً - 12 صباحاً\n• العطلات الرسمية: حسب الجدول\n\n🏙️ **التوصيل حسب المناطق**:\n• **الرياض**: 1-2 يوم\n• **جدة**: 1-2 يوم\n• **مكة**: 1-3 أيام\n• **المدن البعيدة**: 3-5 أيام\n\n📦 **عوامل تؤثر على الوقت**:\n• حجم ووزن الشحنة\n• المسافة والمنطقة\n• شركة الشحن المختارة\n• الظروف الجوية\n\n💡 **نصائح لتسريع التوصيل**:\n• أكمل البيانات بدقة\n• اختر خدمة VIP\n• استخدم نقاط الاستلام`,
+      data: {},
     };
   }
 
@@ -584,9 +644,11 @@ function quickKeywordParse(message, userInfo = null) {
     lowerMessage.includes("كيف ألغي")
   ) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        '❌ **سياسة إلغاء الشحنات في مراسيل**:\n\n⏰ **فترة الإلغاء المسموحة**:\n• قبل مغادرة الشحنة من المستودع\n• خلال 24 ساعة من إنشاء الطلب\n• قبل تأكيد الاستلام من الشركة\n\n💰 **سياسة الاسترداد**:\n• استرداد كامل خلال 24 ساعة\n• استرداد جزئي بعد 24 ساعة\n• رسوم إلغاء 10 ريال للطلبات الكبيرة\n\n📋 **خطوات الإلغاء**:\n1. اذهب إلى قائمة الشحنات\n2. اختر الشحنة المطلوب إلغاؤها\n3. اضغط "إلغاء الطلب"\n4. حدد سبب الإلغاء\n\n⚠️ **ملاحظات مهمة**:\n• لا يمكن إلغاء الشحنات المسلمة\n• الشحنات في الطريق قد تكلف رسوم\n• الاسترداد يستغرق 3-5 أيام عمل\n\n💬 قل لي: "ألغِ الشحنة رقم 123" وسأساعدك فوراً!',
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `❌ **سياسة إلغاء الشحنات في مراسيل ${userName}**:\n\n⏰ **فترة الإلغاء المسموحة**:\n• قبل مغادرة الشحنة من المستودع\n• خلال 24 ساعة من إنشاء الطلب\n• قبل تأكيد الاستلام من الشركة\n\n💰 **سياسة الاسترداد**:\n• استرداد كامل خلال 24 ساعة\n• استرداد جزئي بعد 24 ساعة\n• رسوم إلغاء 10 ريال للطلبات الكبيرة\n\n📋 **خطوات الإلغاء**:\n1. اذهب إلى قائمة الشحنات\n2. اختر الشحنة المطلوب إلغاؤها\n3. اضغط "إلغاء الطلب"\n4. حدد سبب الإلغاء\n\n⚠️ **ملاحظات مهمة**:\n• لا يمكن إلغاء الشحنات المسلمة\n• الشحنات في الطريق قد تكلف رسوم\n• الاسترداد يستغرق 3-5 أيام عمل\n\n💬 قل لي: "ألغِ الشحنة رقم 123" وسأساعدك فوراً!`,
+      data: {},
     };
   }
 
@@ -610,9 +672,11 @@ function quickKeywordParse(message, userInfo = null) {
   ];
   if (confusionPatterns.some((pattern) => cleanMessage.includes(pattern))) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        '😅 **يا عيوني! أنا مساعد مراسيل الذكي هنا عشان أساعدك** 🤝\n\nأنا أفهم اللهجة السعودية بس أحياناً أحتاج شرح أوضح! 📝\n\n✨ قلي بوضوح وش تبي أعمل:\n• 📦 "أريد أنشئ شحنة جديدة"\n• 🔍 "تابع شحنة رقم 123456"\n• 💰 "شوف رصيدي كم"\n• 📋 "وريني شحناتي"\n\nأو قلي المشكلة بالتفصيل وأحلها لك فوراً! 🔧\n\nما تيأس، أنا هنا دايماً لخدمتك! 😊',
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `😅 **يا عيوني! أنا مساعد مراسيل الذكي هنا عشان أساعدك ${userName}** 🤝\n\nأنا أفهم اللهجة السعودية بس أحياناً أحتاج شرح أوضح! 📝\n\n✨ قلي بوضوح وش تبي أعمل:\n• 📦 "أريد أنشئ شحنة جديدة"\n• 🔍 "تابع شحنة رقم 123456"\n• 💰 "شوف رصيدي كم"\n• 📋 "وريني شحناتي"\n\nأو قلي المشكلة بالتفصيل وأحلها لك فوراً! 🔧\n\nما تيأس، أنا هنا دايماً لخدمتك! 😊`,
+      data: {},
     };
   }
 
@@ -638,9 +702,11 @@ function quickKeywordParse(message, userInfo = null) {
     generalQuestionsPatterns.some((pattern) => cleanMessage.includes(pattern))
   ) {
     return {
-      action: "CHAT_RESPONSE",
-      message:
-        '🎯 **أنا مساعد مراسيل الذكي!** 🤖\n\nأنا متخصص في مساعدة تجار السعودية في كل ما يخص الشحن 🇸🇦\n\n✨ **أقدر أساعدك في كلشي**:\n\n📦 **الشحنات**:\n• أنشئ شحنة جديدة لك\n• أتبع شحناتك لحظة بلحظة\n• ألغي أو أعدل في الشحنات\n\n💰 **المحفظة والفلوس**:\n• أشوف رصيدك كم\n• أشحن رصيد جديد\n• أراقب معاملاتك\n\n🏢 **معلومات الشركة**:\n• أحكي لك عن مراسيل\n• أعرفك على شركات الشحن\n• أوضح الأسعار والعروض\n\n📞 **الدعم والمساعدة**:\n• أحل مشاكلك\n• أجاوب على أسئلتك\n• أوصلك بالفريق\n\n💬 **جرب تسألني**:\n• "كم رصيدي؟"\n• "أريد أشحن شيء"\n• "ما هي شركات الشحن؟"\n• "كيف أتبع الشحنة؟"\n\nأنا هنا دايماً لخدمتك! 🚀',
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `🎯 **أنا مساعد مراسيل الذكي ${userName}!** 🤖\n\nأنا متخصص في مساعدة تجار السعودية في كل ما يخص الشحن 🇸🇦\n\n✨ **أقدر أساعدك في كلشي**:\n\n📦 **الشحنات**:\n• أنشئ شحنة جديدة لك\n• أتبع شحناتك لحظة بلحظة\n• ألغي أو أعدل في الشحنات\n\n💰 **المحفظة والفلوس**:\n• أشوف رصيدك كم\n• أشحن رصيد جديد\n• أراقب معاملاتك\n\n🏢 **معلومات الشركة**:\n• أحكي لك عن مراسيل\n• أعرفك على شركات الشحن\n• أوضح الأسعار والعروض\n\n📞 **الدعم والمساعدة**:\n• أحل مشاكلك\n• أجاوب على أسئلتك\n• أوصلك بالفريق\n\n💬 **جرب تسألني**:\n• "كم رصيدي؟"\n• "أريد أشحن شيء"\n• "ما هي شركات الشحن؟"\n• "كيف أتبع الشحنة؟"\n\nأنا هنا دايماً لخدمتك! 🚀`,
+      data: {},
     };
   }
 
@@ -668,11 +734,23 @@ function quickKeywordParse(message, userInfo = null) {
   ];
   if (balancePatterns.some((pattern) => cleanMessage.includes(pattern))) {
     console.log("💰 [Balance] Detected balance pattern in cleanMessage!");
-    return { action: "GET_WALLET_BALANCE" };
+    return {
+      intent: "BALANCE",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `تمام ${userName}، خلني أجيبلك بيانات رصيدك من النظام...`,
+      data: {},
+    };
   }
   if (balancePatterns.some((pattern) => lowerMessage.includes(pattern))) {
     console.log("💰 [Balance] Detected balance pattern in lowerMessage!");
-    return { action: "GET_WALLET_BALANCE" };
+    return {
+      intent: "BALANCE",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `تمام ${userName}، خلني أجيبلك بيانات رصيدك من النظام...`,
+      data: {},
+    };
   }
 
   // أسئلة عن إنشاء شحنة - بالعامية السعودية
@@ -700,7 +778,13 @@ function quickKeywordParse(message, userInfo = null) {
   if (
     createShipmentPatterns.some((pattern) => cleanMessage.includes(pattern))
   ) {
-    return { action: "CREATE_SHIPMENT", data: {} };
+    return {
+      intent: "CREATE",
+      confidence: 0.8,
+      missing_fields: ["recipient_name", "phone", "weight"],
+      message: `تمام ${userName} 👍 لمين الشحنة؟`,
+      data: {},
+    };
   }
 
   // أسئلة عن المساعدة العامة
@@ -717,8 +801,11 @@ function quickKeywordParse(message, userInfo = null) {
   if (helpPatterns.some((pattern) => cleanMessage.includes(pattern))) {
     console.log("✅ [Quick Parse] Matched HELP pattern");
     return {
-      action: "CHAT_RESPONSE",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
       message: `تمام ${userName} 👍 أنا هنا عشان أساعدك! 🤝\n\n✨ **أقدر أساعدك في**:\n• 📦 **إنشاء شحنة جديدة** - قل "أريد أشحن"\n• 🔍 **تتبع شحنة** - قل "تابع رقم الشحنة"\n• 💰 **رصيد المحفظة** - قل "كم رصيدي"\n• 📋 **شحناتي** - قل "عرض شحناتي"\n• 🏢 **معلومات عن مراسيل** - قل "ما هي مراسيل"\n\nوش تحب أعمل لك اليوم؟ 😊`,
+      data: {},
     };
   }
 
@@ -746,11 +833,21 @@ function quickKeywordParse(message, userInfo = null) {
     if (numberMatch) {
       console.log("✅ [Quick Parse] Found tracking number:", numberMatch[1]);
       return {
-        action: "TRACK_SHIPMENT",
+        intent: "TRACK",
+        confidence: 0.95,
+        missing_fields: [],
+        message: `تمام ${userName}، خلني أجيبلك بيانات الشحنة الحين...`,
         data: { tracking_number: numberMatch[1] },
       };
     } else {
       console.log("❌ [Quick Parse] No tracking number found");
+      return {
+        intent: "TRACK",
+        confidence: 0.8,
+        missing_fields: ["tracking_number"],
+        message: `أحتاج رقم التتبع عشان أتبع الشحنة لك ${userName}. وش رقم التتبع؟`,
+        data: {},
+      };
     }
   }
 
@@ -768,8 +865,11 @@ function quickKeywordParse(message, userInfo = null) {
   if (howToCreatePatterns.some((pattern) => cleanMessage.includes(pattern))) {
     console.log("✅ [Quick Parse] Matched HOW_TO_CREATE pattern");
     return {
-      action: "CHAT_RESPONSE",
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
       message: `تمام ${userName} 👍 إنشاء شحنة سهل جداً! 📦\n\n**خطوات إنشاء الشحنة**:\n\n1️⃣ **أخبرني ببيانات المستلم**\n• اسم المستلم الكامل\n• رقم جواله\n• عنوان التوصيل\n• مدينة الوصول\n\n2️⃣ **أخبرني بتفاصيل الشحنة**\n• وزن الشحنة بالكيلو\n• نوع الشحنة (وثائق/بضائع/أخرى)\n• أي ملاحظات خاصة\n\n3️⃣ **أنا أختار لك الشركة المناسبة**\n• حسب المسافة والوزن\n• أحسب التكلفة تلقائياً\n• أعطيك أفضل سعر\n\n💡 **مثال**: "أريد أشحن شيء لأحمد في الرياض، رقم جواله 0501234567، وزن 2 كيلو"\n\nقلي تفاصيل شحنتك وسأساعدك فوراً! 🚀`,
+      data: {},
     };
   }
 
@@ -1036,7 +1136,10 @@ ${context}
             trackingMatch[1]
           );
           return {
-            action: "TRACK_SHIPMENT",
+            intent: "TRACK",
+            confidence: 0.95,
+            missing_fields: [],
+            message: "تمام، خلني أجيبلك بيانات الشحنة الحين...",
             data: { tracking_number: trackingMatch[1] },
           };
         }
@@ -1046,7 +1149,10 @@ ${context}
       if (createKeywords.some((keyword) => originalText.includes(keyword))) {
         console.log("🔄 [Gemini] Fallback: CREATE_SHIPMENT detected");
         return {
-          action: "CREATE_SHIPMENT",
+          intent: "CREATE",
+          confidence: 0.8,
+          missing_fields: ["recipient_name", "phone", "weight"],
+          message: "تمام 👍 لمين الشحنة؟",
           data: {},
         };
       }
@@ -1055,7 +1161,11 @@ ${context}
       if (balanceKeywords.some((keyword) => originalText.includes(keyword))) {
         console.log("🔄 [Gemini] Fallback: GET_WALLET_BALANCE detected");
         return {
-          action: "GET_WALLET_BALANCE",
+          intent: "BALANCE",
+          confidence: 0.9,
+          missing_fields: [],
+          message: "تمام، خلني أجيبلك بيانات رصيدك من النظام...",
+          data: {},
         };
       }
 
@@ -1063,7 +1173,11 @@ ${context}
       if (listKeywords.some((keyword) => originalText.includes(keyword))) {
         console.log("🔄 [Gemini] Fallback: LIST_SHIPMENTS detected");
         return {
-          action: "LIST_SHIPMENTS",
+          intent: "LIST",
+          confidence: 0.9,
+          missing_fields: [],
+          message: "تمام، خلني أجيبلك قائمة بشحناتك...",
+          data: {},
         };
       }
 
@@ -1076,7 +1190,10 @@ ${context}
             cancelMatch[1]
           );
           return {
-            action: "CANCEL_SHIPMENT",
+            intent: "CANCEL",
+            confidence: 0.9,
+            missing_fields: [],
+            message: "تمام، خلني ألغي الشحنة لك...",
             data: { shipment_id: cancelMatch[1] },
           };
         }
@@ -1085,8 +1202,11 @@ ${context}
       // إذا فشل كل شيء، أعد رسالة عدم فهم
       console.log("🔄 [Gemini] Fallback: Using CHAT_RESPONSE");
       return {
-        action: "CHAT_RESPONSE",
+        intent: "CHAT",
+        confidence: 0.5,
+        missing_fields: [],
         message: "عذراً، لم أفهم طلبك. يرجى المحاولة مرة أخرى.",
+        data: {},
       };
     }
   } catch (error) {
@@ -1107,8 +1227,11 @@ ${context}
     }
 
     return {
-      action: "CHAT_RESPONSE",
+      intent: "CHAT",
+      confidence: 0.5,
+      missing_fields: [],
       message: errorMessage,
+      data: {},
     };
   }
 }
@@ -1165,7 +1288,7 @@ async function processGeminiResponse(
     if (intent !== "CHAT" && confidence < 0.8) {
       return {
         success: true,
-        action: "CHAT_RESPONSE",
+        intent: "CHAT",
         result: { message: "ما فهمت قصدك تماماً. وش تقصد بالضبط؟" },
         message: "ما فهمت قصدك تماماً. وش تقصد بالضبط؟",
       };
@@ -1176,7 +1299,7 @@ async function processGeminiResponse(
         if (!data || !data.tracking_number) {
           return {
             success: true,
-            action: "CHAT_RESPONSE",
+            intent: "TRACK",
             result: {
               message: "أحتاج رقم التتبع عشان أتبع الشحنة لك. وش رقم التتبع؟",
             },
@@ -1188,10 +1311,10 @@ async function processGeminiResponse(
         );
         return {
           success: true,
-          action: "TRACK_SHIPMENT",
+          intent: "TRACK",
           result: trackingResult,
           message: trackingResult.success
-            ? `تمام 👍 الشحنة ${trackingResult.status || "وصلت"}`
+            ? `تمام ${userName} 👍 الشحنة ${trackingResult.status || "وصلت"}`
             : "ما لقيت شحنة بهالرقم. تأكد من الرقم وجرب مرة ثانية.",
         };
 
@@ -1210,7 +1333,7 @@ async function processGeminiResponse(
             fieldMessages[field] || `أحتاج ${field}. وش قيمته ${userName}؟`;
           return {
             success: true,
-            action: "CHAT_RESPONSE",
+            intent: "CREATE",
             result: { message: question },
             message: question,
           };
@@ -1230,10 +1353,10 @@ async function processGeminiResponse(
           }
           return {
             success: createResult.success,
-            action: "CREATE_SHIPMENT",
+            intent: "CREATE",
             result: createResult,
             message: createResult.success
-              ? `تمام 👍 تم إنشاء الشحنة! رقم التتبع: ${
+              ? `تمام ${userName} 👍 تم إنشاء الشحنة! رقم التتبع: ${
                   createResult.trackingNumber || "غير محدد"
                 }`
               : createResult.message || "صار خطأ في إنشاء الشحنة.",
@@ -1242,7 +1365,7 @@ async function processGeminiResponse(
 
         return {
           success: true,
-          action: "CHAT_RESPONSE",
+          intent: "CREATE",
           result: {
             message:
               "ما عندي معلومات كافية. أحتاج اسم المستلم ورقم الجوال والوزن على الأقل.",
@@ -1255,7 +1378,7 @@ async function processGeminiResponse(
         if (!data || !data.shipment_id) {
           return {
             success: true,
-            action: "CHAT_RESPONSE",
+            intent: "CANCEL",
             result: {
               message: "أحتاج رقم الشحنة أو معرفها عشان ألغيها. وش رقم الشحنة؟",
             },
@@ -1267,10 +1390,10 @@ async function processGeminiResponse(
         );
         return {
           success: cancelResult.success,
-          action: "CANCEL_SHIPMENT",
+          intent: "CANCEL",
           result: cancelResult,
           message: cancelResult.success
-            ? "تمام 👍 تم إلغاء الشحنة."
+            ? `تمام ${userName} 👍 تم إلغاء الشحنة.`
             : cancelResult.message || "ما قدرت ألغي الشحنة.",
         };
 
@@ -1280,9 +1403,11 @@ async function processGeminiResponse(
         console.log("💰 [Balance] Balance result:", balanceResult);
         return {
           success: true,
-          action: "GET_WALLET_BALANCE",
+          intent: "BALANCE",
           result: balanceResult,
-          message: `رصيدك الحين: ${balanceResult.balance || 0} ريال 👍`,
+          message: `رصيدك الحين ${userName}: ${
+            balanceResult.balance || 0
+          } ريال 👍`,
         };
 
       case "LIST":
@@ -1290,11 +1415,13 @@ async function processGeminiResponse(
           await services.shipmentService.getUserShipments();
         return {
           success: true,
-          action: "LIST_SHIPMENTS",
+          intent: "LIST",
           result: shipmentsResult,
           message:
             shipmentsResult.shipments && shipmentsResult.shipments.length > 0
-              ? `عندك ${shipmentsResult.shipments.length} شحنة. آخر شحنة: ${
+              ? `عندك ${
+                  shipmentsResult.shipments.length
+                } شحنة ${userName}. آخر شحنة: ${
                   shipmentsResult.shipments[0].trackingId || "غير محدد"
                 }`
               : "ما عندك شحنات حالية.",
@@ -1304,7 +1431,7 @@ async function processGeminiResponse(
       default:
         return {
           success: true,
-          action: "CHAT_RESPONSE",
+          intent: "CHAT",
           result: {
             message: message || "أهلاً! كيف أقدر أساعدك في شحناتك اليوم؟",
           },
@@ -1315,7 +1442,7 @@ async function processGeminiResponse(
     console.error("❌ [Gemini] Error executing intent:", intent, error);
     return {
       success: false,
-      action: "CHAT_RESPONSE",
+      intent: "CHAT",
       result: { message: "صار خطأ تقني. جرب مرة ثانية بعد شوي." },
       message: "صار خطأ تقني. جرب مرة ثانية بعد شوي.",
     };
