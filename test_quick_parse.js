@@ -28,10 +28,23 @@ const testCases = [
   { input: "ألغِ الشحنة رقم 789", expected: "CANCEL_SHIPMENT" },
   { input: "cancel shipment 456", expected: "CANCEL_SHIPMENT" },
 
-  // تحيات
+  // تحيات متعددة الأشكال
   { input: "مرحبا", expected: "CHAT_RESPONSE" },
-  { input: "hello", expected: "CHAT_RESPONSE" },
+  { input: "مرحباً", expected: "CHAT_RESPONSE" },
+  { input: "أهلا", expected: "CHAT_RESPONSE" },
+  { input: "أهلاً", expected: "CHAT_RESPONSE" },
+  { input: "هاي", expected: "CHAT_RESPONSE" },
+  { input: "هلا", expected: "CHAT_RESPONSE" },
+  { input: "السلام عليكم", expected: "CHAT_RESPONSE" },
+  { input: "كيفك", expected: "CHAT_RESPONSE" },
   { input: "كيف حالك", expected: "CHAT_RESPONSE" },
+  { input: "صباح الخير", expected: "CHAT_RESPONSE" },
+  { input: "مساء الخير", expected: "CHAT_RESPONSE" },
+  { input: "أهلين", expected: "CHAT_RESPONSE" },
+  { input: "أهلين وسهلين", expected: "CHAT_RESPONSE" },
+  { input: "ياعمري", expected: "CHAT_RESPONSE" },
+  { input: "ياخي", expected: "CHAT_RESPONSE" },
+  { input: "hello", expected: "CHAT_RESPONSE" },
 
   // شكر
   { input: "شكراً لك", expected: "CHAT_RESPONSE" },
@@ -94,6 +107,31 @@ const testCases = [
   { input: "لي ما عم تفهم", expected: "CHAT_RESPONSE" },
   { input: "ما تفهم", expected: "CHAT_RESPONSE" },
   { input: "غبي", expected: "CHAT_RESPONSE" },
+  { input: "شو ما كنت", expected: "CHAT_RESPONSE" },
+  { input: "مش فاهم", expected: "CHAT_RESPONSE" },
+
+  // أسئلة عامة بالعامية
+  { input: "وش تقدر تسوي", expected: "CHAT_RESPONSE" },
+  { input: "شو تقدر تسوي", expected: "CHAT_RESPONSE" },
+  { input: "وش تسوي", expected: "CHAT_RESPONSE" },
+
+  // أسئلة الرصيد بالعامية
+  { input: "فلوسي كم", expected: "GET_WALLET_BALANCE" },
+  { input: "فلوسي قديش", expected: "GET_WALLET_BALANCE" },
+  { input: "رصيدي قديش", expected: "GET_WALLET_BALANCE" },
+  { input: "شوف رصيدي", expected: "GET_WALLET_BALANCE" },
+  { input: "وريني رصيدي", expected: "GET_WALLET_BALANCE" },
+
+  // إنشاء شحنة بالعامية
+  { input: "بدي أشحن شيء", expected: "CREATE_SHIPMENT" },
+  { input: "أريد أشحن", expected: "CREATE_SHIPMENT" },
+  { input: "أبي أشحن", expected: "CREATE_SHIPMENT" },
+  { input: "شحن لي", expected: "CREATE_SHIPMENT" },
+
+  // تتبع شحنة بالعامية
+  { input: "تابع الشحنة 123456", expected: "TRACK_SHIPMENT" },
+  { input: "شوف وين الشحنة 123456", expected: "TRACK_SHIPMENT" },
+  { input: "وريني وين وصلت 123456", expected: "TRACK_SHIPMENT" },
 
   // أسئلة عامة
   { input: "وش تقدر تسوي", expected: "CHAT_RESPONSE" },

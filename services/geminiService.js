@@ -37,18 +37,32 @@ function quickKeywordParse(message) {
     .replace(/كيفك/g, "كيف حالك")
     .replace(/شو/g, "ما")
     .replace(/ايه/g, "ما")
+    .replace(/ايش/g, "ما")
     .replace(/شحنة/g, "شحنة")
     .replace(/شحنات/g, "شحنات")
     .replace(/شحنخاتي/g, "شحناتي") // خطأ إملائي شائع
+    .replace(/شحناتك/g, "شحناتي") // خطأ إملائي شائع
     .replace(/خدماتكم/g, "خدماتكم")
+    .replace(/خدماتك/g, "خدماتكم")
     .replace(/انشاء/g, "إنشاء")
     .replace(/الغاء/g, "إلغاء")
     .replace(/كم/g, "كم")
     .replace(/عدد/g, "عدد")
     .replace(/قديش/g, "كم") // لهجة سعودية
     .replace(/قداش/g, "كم") // لهجة سعودية
+    .replace(/كمية/g, "كم")
     .replace(/وش/g, "ما") // لهجة سعودية
+    .replace(/شوية/g, "قليل")
+    .replace(/كلش/g, "كل شيء")
+    .replace(/كلشي/g, "كل شيء")
+    .replace(/بدي/g, "أريد")
+    .replace(/عندي/g, "لدي")
+    .replace(/عندك/g, "لديك")
+    .replace(/مشكلة/g, "مشكلة")
     .replace(/لي/g, "لي"); // إزالة كلمة "لي" الزائدة في بعض الأحيان
+
+  console.log("🧹 [Quick Parse] Original:", lowerMessage);
+  console.log("🧹 [Quick Parse] Cleaned:", cleanMessage);
 
   // تتبع شحنة - أولوية عالية
   if (lowerMessage.includes("تتبع") || lowerMessage.includes("track")) {
@@ -84,7 +98,7 @@ function quickKeywordParse(message) {
     };
   }
 
-  // قائمة الشحنات - أنماط شاملة
+  // قائمة الشحنات - أنماط شاملة بالعامية السعودية
   const listPatterns = [
     "شحناتي",
     "قائمة",
@@ -101,6 +115,13 @@ function quickKeywordParse(message) {
     "شحناتي قديش",
     "شحناتي قداش",
     "شحنخاتي", // خطأ إملائي شائع
+    "شحناتك",
+    "طلباتك",
+    "شحناتي كلها",
+    "كل شحناتي",
+    "شوف شحناتي",
+    "وريني شحناتي",
+    "عرضلي شحناتي",
   ];
   if (listPatterns.some((pattern) => cleanMessage.includes(pattern))) {
     return { action: "LIST_SHIPMENTS" };
@@ -120,21 +141,51 @@ function quickKeywordParse(message) {
   // تحيات وأسئلة عامة - باللهجة السعودية
   const greetingPatterns = [
     "مرحبا",
+    "مرحباً",
+    "أهلا",
+    "أهلاً",
+    "هاي",
+    "هلا",
+    "السلام عليكم",
+    "سلام",
+    "صباح الخير",
+    "مساء الخير",
+    "كيفك",
+    "كيف حالك",
+    "كيف الأحوال",
+    "كيف الحال",
     "hello",
     "hi",
-    "هاي",
-    "أهلا",
+    "hey",
+    "أهلين",
+    "أهلين وسهلين",
+    "أهلين وسهلين فيك",
     "كيف",
     "help",
     "مساعدة",
-    "كيفك",
-    "كيف حالك",
+    "أهلين",
+    "أهلين يا",
+    "أهلين ياعمري",
+    "ياعمري",
+    "ياعيوني",
+    "ياخي",
+    "يا أخ",
+    "شلونك",
+    "شلونك",
+    "تمام",
+    "تمام الحمد لله",
+    "الحمد لله",
   ];
-  if (greetingPatterns.some((pattern) => lowerMessage.includes(pattern))) {
+  console.log(
+    "🗣️ [Greetings] Checking patterns:",
+    greetingPatterns.filter((p) => cleanMessage.includes(p))
+  );
+  if (greetingPatterns.some((pattern) => cleanMessage.includes(pattern))) {
+    console.log("✅ [Greetings] Detected greeting pattern!");
     return {
       action: "CHAT_RESPONSE",
       message:
-        "🌟 أهلاً وسهلاً فيك في منصة مراسيل! 🤝\n\nأنا مساعدك الذكي اللي يفهم لهجتك السعودية 🇸🇦\n\n✨ أقدر أساعدك في:\n• 📦 إنشاء وتتبع الشحنات\n• 💰 معرفة رصيد محفظتك\n• 📋 عرض شحناتك\n• 🏢 معلومات عن الشركات\n• ❓ إجابة على أسئلتك\n\nقلي وش تريد أساعدك فيه! 😊",
+        "🌟 أهلاً وسهلاً فيك! 🤝\n\nأنا **مساعد مراسيل الذكي** 🤖 - متخصص في شحنات السعودية 🇸🇦\n\n✨ أقدر أساعدك في كل شيء بخصوص الشحن:\n• 📦 إنشاء شحنة جديدة\n• 🔍 تتبع شحناتك\n• 💰 معرفة رصيد محفظتك\n• 📋 عرض جميع شحناتك\n• 🏢 معلومات عن شركات الشحن\n• ❓ إجابة على أي سؤال\n\nقلي وش تبي أساعدك فيه اليوم! 😊\n\n#مراسيل #شحن_ذكي",
     };
   }
 
@@ -343,7 +394,7 @@ function quickKeywordParse(message) {
     };
   }
 
-  // أسئلة عن عدم الفهم أو المشاكل
+  // أسئلة عن عدم الفهم أو المشاكل - بالعامية السعودية
   const confusionPatterns = [
     "ما تفهم",
     "ما عم تفهم",
@@ -351,16 +402,25 @@ function quickKeywordParse(message) {
     "غبي",
     "مش فاهم",
     "don't understand",
+    "شو ما كنت",
+    "شو ما كان",
+    "ما فهمت",
+    "مش فاهما",
+    "ما أفهم",
+    "ما تعرف",
+    "ما تدري",
+    "ما تعرف تسوي",
+    "ما تشوف",
   ];
   if (confusionPatterns.some((pattern) => cleanMessage.includes(pattern))) {
     return {
       action: "CHAT_RESPONSE",
       message:
-        '😅 **يا عيوني! أنا هنا عشان أساعدك** 🤝\n\nأنا مساعد ذكي بس أحياناً أحتاج شرح أكثر وضوح! 📝\n\n✨ قلي بوضوح وش تبي:\n• 📦 "أريد إنشاء شحنة"\n• 🔍 "تتبع الشحنة رقم 123456"\n• 💰 "كم رصيدي"\n• 📋 "عرض شحناتي"\n\nأو قلي المشكلة بالتفصيل وأحلها لك! 🔧\n\nما تيأس، نحن هنا لخدمتك! 😊',
+        '😅 **يا عيوني! أنا مساعد مراسيل الذكي هنا عشان أساعدك** 🤝\n\nأنا أفهم اللهجة السعودية بس أحياناً أحتاج شرح أوضح! 📝\n\n✨ قلي بوضوح وش تبي أعمل:\n• 📦 "أريد أنشئ شحنة جديدة"\n• 🔍 "تابع شحنة رقم 123456"\n• 💰 "شوف رصيدي كم"\n• 📋 "وريني شحناتي"\n\nأو قلي المشكلة بالتفصيل وأحلها لك فوراً! 🔧\n\nما تيأس، أنا هنا دايماً لخدمتك! 😊',
     };
   }
 
-  // أسئلة عامة عن الوظائف
+  // أسئلة عامة عن الوظائف - بالعامية السعودية
   const generalQuestionsPatterns = [
     "وش تقدر تسوي",
     "وش يقدر",
@@ -370,6 +430,13 @@ function quickKeywordParse(message) {
     "how can you help",
     "وظائفك",
     "your functions",
+    "شو تقدر تسوي",
+    "شو يقدر",
+    "ايش تقدر تسوي",
+    "وش تسوي",
+    "كيف تشوف",
+    "كيف تعرف تساعد",
+    "ماذا تعرف تسوي",
   ];
   if (
     generalQuestionsPatterns.some((pattern) => cleanMessage.includes(pattern))
@@ -377,8 +444,68 @@ function quickKeywordParse(message) {
     return {
       action: "CHAT_RESPONSE",
       message:
-        '🎯 **أنا مساعدك الشامل في مراسيل!** 🛠️\n\n✨ **أقدر أساعدك في**:\n\n📦 **الشحنات**:\n• إنشاء شحنات جديدة\n• تتبع الشحنات الموجودة\n• إلغاء أو تعديل الشحنات\n\n💰 **المحفظة**:\n• معرفة رصيدك\n• شحن رصيد جديد\n• تتبع المعاملات\n\n🏢 **معلومات الشركة**:\n• عن مراسيل وخدماتنا\n• شركات الشحن المتاحة\n• الأسعار والعروض\n\n📞 **الدعم**:\n• حل المشاكل\n• إجابة الأسئلة\n• تواصل مع الفريق\n\n💬 **جرب سؤال من هالأمثلة**:\n• "كم رصيدي"\n• "أريد إنشاء شحنة"\n• "ما هي شركات الشحن"\n\nقلي وش تحتاجه وسأساعدك فوراً! 🚀',
+        '🎯 **أنا مساعد مراسيل الذكي!** 🤖\n\nأنا متخصص في مساعدة تجار السعودية في كل ما يخص الشحن 🇸🇦\n\n✨ **أقدر أساعدك في كلشي**:\n\n📦 **الشحنات**:\n• أنشئ شحنة جديدة لك\n• أتبع شحناتك لحظة بلحظة\n• ألغي أو أعدل في الشحنات\n\n💰 **المحفظة والفلوس**:\n• أشوف رصيدك كم\n• أشحن رصيد جديد\n• أراقب معاملاتك\n\n🏢 **معلومات الشركة**:\n• أحكي لك عن مراسيل\n• أعرفك على شركات الشحن\n• أوضح الأسعار والعروض\n\n📞 **الدعم والمساعدة**:\n• أحل مشاكلك\n• أجاوب على أسئلتك\n• أوصلك بالفريق\n\n💬 **جرب تسألني**:\n• "كم رصيدي؟"\n• "أريد أشحن شيء"\n• "ما هي شركات الشحن؟"\n• "كيف أتبع الشحنة؟"\n\nأنا هنا دايماً لخدمتك! 🚀',
     };
+  }
+
+  // أسئلة عن الرصيد - بالعامية السعودية
+  const balancePatterns = [
+    "كم رصيدي",
+    "رصيدي كم",
+    "رصيدي قديش",
+    "رصيدي قداش",
+    "شوف رصيدي",
+    "وريني رصيدي",
+    "رصيدك كم",
+    "فلوسي كم",
+    "فلوسي قديش",
+    "عندي كم فلوس",
+    "balance",
+  ];
+  if (balancePatterns.some((pattern) => cleanMessage.includes(pattern))) {
+    return { action: "GET_WALLET_BALANCE" };
+  }
+
+  // أسئلة عن إنشاء شحنة - بالعامية السعودية
+  const createShipmentPatterns = [
+    "أريد أشحن",
+    "بدي أشحن",
+    "أريد أرسل",
+    "بدي أرسل",
+    "أريد أنشئ شحنة",
+    "بدي أنشئ شحنة",
+    "أريد أضيف شحنة",
+    "شحن لي",
+    "أرسل لي",
+    "أحتاج أشحن",
+    "أبي أشحن",
+  ];
+  if (
+    createShipmentPatterns.some((pattern) => cleanMessage.includes(pattern))
+  ) {
+    return { action: "CREATE_SHIPMENT", data: {} };
+  }
+
+  // أسئلة عن التتبع - بالعامية السعودية
+  const trackShipmentPatterns = [
+    "تابع",
+    "شوف وين",
+    "وريني وين",
+    "فين الشحنة",
+    "وين وصلت",
+    "كيف الشحنة",
+    "شوف الشحنة",
+    "وريني الشحنة",
+    "track",
+  ];
+  if (trackShipmentPatterns.some((pattern) => cleanMessage.includes(pattern))) {
+    const numberMatch = message.match(/(\d{6,})/);
+    if (numberMatch) {
+      return {
+        action: "TRACK_SHIPMENT",
+        data: { tracking_number: numberMatch[1] },
+      };
+    }
   }
 
   return null; // لم يتم التعرف على نمط معروف
@@ -544,25 +671,54 @@ ${context}
       console.log("🔄 [Gemini] Starting fallback parsing...");
       console.log("🔄 [Gemini] Lower text:", lowerText);
 
-      // فحص أقوى للكلمات المفتاحية
+      // فحص أقوى للكلمات المفتاحية بالعامية السعودية
       const trackKeywords = [
         "track",
         "تتبع",
+        "تابع",
         "شحنة",
         "رقم",
         "tracking",
         "shipment",
+        "شوف وين",
+        "وريني وين",
+        "فين",
+        "وين وصلت",
       ];
       const createKeywords = [
         "create",
         "إنشاء",
+        "انشاء",
         "جديدة",
         "شحنة جديدة",
         "إضافة",
+        "أشحن",
+        "أرسل",
+        "أحتاج أشحن",
+        "أبي أشحن",
       ];
-      const balanceKeywords = ["balance", "رصيد", "محفظة", "كم رصيد"];
-      const listKeywords = ["list", "عرض", "شحناتي", "قائمة", "shipments"];
-      const cancelKeywords = ["cancel", "إلغاء", "ألغ"];
+      const balanceKeywords = [
+        "balance",
+        "رصيد",
+        "محفظة",
+        "كم رصيد",
+        "فلوس",
+        "فلوسي",
+        "رصيدي",
+        "رصيدك",
+      ];
+      const listKeywords = [
+        "list",
+        "عرض",
+        "شحناتي",
+        "قائمة",
+        "shipments",
+        "شحنات",
+        "كم شحناتي",
+        "عدد شحناتي",
+        "شحناتي كلها",
+      ];
+      const cancelKeywords = ["cancel", "إلغاء", "الغاء", "ألغي"];
 
       // تتبع شحنة - أولوية عالية
       if (trackKeywords.some((keyword) => originalText.includes(keyword))) {
