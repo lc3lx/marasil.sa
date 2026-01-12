@@ -751,12 +751,16 @@ function quickKeywordParse(message, userInfo = null) {
     "بدي اعرف كم",
     "أبي أعرف كم",
     "أريد أعرف كم",
+    "دي اعرف كم",
     "كم تكلفني",
     "كم سعر",
     "شو سعر",
     "وش سعر",
     "كم يكلفني",
     "كم السعر لـ",
+    "كم سعر الشحنة",
+    "كم سعر الشحنة في",
+    "سعر الشحنة",
   ];
   if (pricingPatterns.some((pattern) => cleanMessage.includes(pattern))) {
     console.log("✅ [Quick Parse] Matched PRICING pattern");
@@ -981,6 +985,11 @@ function quickKeywordParse(message, userInfo = null) {
     /\d+\s*x\s*\d+\s*x\s*\d+/i, // أبعاد مثل "30x20x10"
     /\d+\s*×\s*\d+\s*×\s*\d+/i, // أبعاد بالضرب "30×20×10"
     /شحنة\s+\d+/i, // مثل "شحنة 10"
+    /وزن الشحنة\s+\d+/i, // مثل "وزن الشحنة 10"
+    /نوعها\s+شحن/i, // مثل "نوعها شحن عادي"
+    /سمسا\s+الاقتصادية/i, // مثل "سمسا الاقتصادية"
+    /سمسا\s+البرو/i, // مثل "سمسا البرو"
+    /أرامكس\s+البرو/i, // مثل "أرامكس البرو"
   ];
 
   if (shipmentDetailsPatterns.some((pattern) => pattern.test(cleanMessage))) {
@@ -1245,11 +1254,36 @@ async function processGeminiResponse(
             };
           }
 
-          // حساب الأسعار لكل شركة
-          const pricingComparison = await calculatePricingForAllCompanies(
-            companiesResult.companies,
-            shipmentDetails
-          );
+          let pricingComparison;
+
+          // إذا كان هناك شركة محددة، احسب لها فقط
+          if (shipmentDetails.company) {
+            const specificCompany = companiesResult.companies.find(
+              (c) => c.name === shipmentDetails.company
+            );
+
+            if (specificCompany) {
+              console.log(
+                `🎯 [AI] Calculating for specific company: ${shipmentDetails.company}`
+              );
+              pricingComparison = await calculatePricingForSpecificCompany(
+                specificCompany,
+                shipmentDetails
+              );
+            } else {
+              // الشركة غير موجودة، احسب للجميع
+              pricingComparison = await calculatePricingForAllCompanies(
+                companiesResult.companies,
+                shipmentDetails
+              );
+            }
+          } else {
+            // حساب الأسعار لكل شركة
+            pricingComparison = await calculatePricingForAllCompanies(
+              companiesResult.companies,
+              shipmentDetails
+            );
+          }
 
           // بناء رسالة المقارنة
           let pricingMessage = `💰 **حساب الأسعار لشحنتك:**\n\n`;
@@ -1258,14 +1292,26 @@ async function processGeminiResponse(
             shipmentDetails.paymentMethod === "COD" ? "دفع عند الاستلام" : "كاش"
           }\n\n`;
 
-          pricingComparison.forEach((company, index) => {
-            const emoji = ["🚚", "📦", "🚛", "✈️"][index] || "📮";
+          // إذا كانت شركة واحدة، غير الرسالة
+          if (
+            Array.isArray(pricingComparison) &&
+            pricingComparison.length === 1
+          ) {
+            const company = pricingComparison[0];
+            const emoji = "🚚";
             pricingMessage += `${emoji} **${company.name}**\n`;
             pricingMessage += `💰 السعر: ${company.total} ريال\n`;
             pricingMessage += `📋 التفاصيل: ${company.breakdown}\n\n`;
-          });
-
-          pricingMessage += `🛒 أي شركة تفضلها لإنشاء الشحنة؟`;
+            pricingMessage += `🛒 موافق على إنشاء الشحنة مع ${company.name}؟`;
+          } else {
+            pricingComparison.forEach((company, index) => {
+              const emoji = ["🚚", "📦", "🚛", "✈️"][index] || "📮";
+              pricingMessage += `${emoji} **${company.name}**\n`;
+              pricingMessage += `💰 السعر: ${company.total} ريال\n`;
+              pricingMessage += `📋 التفاصيل: ${company.breakdown}\n\n`;
+            });
+            pricingMessage += `🛒 أي شركة تفضلها لإنشاء الشحنة؟`;
+          }
 
           return {
             success: true,
@@ -1438,6 +1484,8 @@ function extractShipmentDetails(message) {
     weight: null,
     paymentMethod: null,
     dimensions: null,
+    shipmentType: null,
+    company: null,
   };
 
   // استخراج الوزن - دعم جميع الاختلافات العامية
@@ -1448,12 +1496,40 @@ function extractShipmentDetails(message) {
     details.weight = parseFloat(weightMatch[1]);
     console.log("⚖️ [AI] Extracted weight:", details.weight);
   } else {
-    // محاولة استخراج من "شحنة X كليو"
-    const shipmentWeightMatch = message.match(/شحنة\s+(\d+(?:\.\d+)?)/i);
+    // محاولة استخراج من "شحنة X" أو "وزن الشحنة X"
+    const shipmentWeightMatch = message.match(
+      /(?:شحنة|وزن الشحنة)\s+(\d+(?:\.\d+)?)/i
+    );
     if (shipmentWeightMatch) {
       details.weight = parseFloat(shipmentWeightMatch[1]);
       console.log("⚖️ [AI] Extracted weight from shipment:", details.weight);
     }
+  }
+
+  // استخراج نوع الشحن
+  if (
+    message.includes("شحن عادي") ||
+    message.includes("عادي") ||
+    message.includes("اقتصادي")
+  ) {
+    details.shipmentType = "اقتصادي";
+  } else if (
+    message.includes("شحن برو") ||
+    message.includes("برو") ||
+    message.includes("سريع")
+  ) {
+    details.shipmentType = "برو";
+  }
+
+  // استخراج الشركة
+  if (message.includes("سمسا")) {
+    details.company = "سمسا";
+  } else if (message.includes("أرامكس") || message.includes("ارامكس")) {
+    details.company = "أرامكس";
+  } else if (message.includes("ريد بوكس")) {
+    details.company = "ريد بوكس";
+  } else if (message.includes("لاما بوكس") || message.includes("ولما بوكس")) {
+    details.company = "لاما بوكس";
   }
 
   // استخراج طريقة الدفع
@@ -1482,7 +1558,90 @@ function extractShipmentDetails(message) {
     console.log("📏 [AI] Extracted dimensions:", details.dimensions);
   }
 
+  console.log("📋 [AI] Complete extracted details:", details);
+
   return details;
+}
+
+// حساب الأسعار لشركة محددة
+async function calculatePricingForSpecificCompany(company, shipmentDetails) {
+  console.log(
+    `🏢 [AI] Calculating pricing for specific company: ${company.name}`
+  );
+
+  const shipmentAccount = require("./shipmentAccount");
+  const pricingResults = [];
+
+  // بيانات الشحنة الموحدة
+  const orderData = {
+    weight: shipmentDetails.weight,
+    paymentMethod: shipmentDetails.paymentMethod,
+    dimension: shipmentDetails.dimensions || {
+      length: 0,
+      width: 0,
+      height: 0,
+    },
+  };
+
+  try {
+    console.log(`🏢 [AI] Calculating for ${company.name}`);
+
+    // اختيار نوع الشحن المناسب (افتراضياً اقتصادي)
+    const shippingType =
+      shipmentDetails.shipmentType === "برو"
+        ? {
+            basePrice: 35,
+            profitPrice: 10,
+            maxWeight: 10,
+            baseAdditionalweigth: 5,
+            profitAdditionalweigth: 2,
+            baseCODfees: 8,
+            profitCODfees: 2,
+            priceaddedtax: 0.15,
+          }
+        : // اقتصادي
+          {
+            basePrice: 25,
+            profitPrice: 5,
+            maxWeight: 5,
+            baseAdditionalweigth: 3,
+            profitAdditionalweigth: 1,
+            baseCODfees: 5,
+            profitCODfees: 1,
+            priceaddedtax: 0.15,
+          };
+
+    // حساب السعر باستخدام shipmentAccount
+    const pricing = shipmentAccount.shipmentnorm(shippingType, orderData);
+
+    // بناء تفاصيل التكلفة
+    let breakdown = `الأساسي: ${
+      shippingType.basePrice + shippingType.profitPrice
+    } ريال`;
+    if (pricing.breakdown.additionalWeightCost > 0) {
+      breakdown += ` + وزن إضافي: ${pricing.breakdown.additionalWeightCost} ريال`;
+    }
+    if (pricing.breakdown.codFees > 0) {
+      breakdown += ` + دفع عند الاستلام: ${pricing.breakdown.codFees} ريال`;
+    }
+
+    pricingResults.push({
+      name: company.name,
+      total: pricing.total,
+      breakdown: breakdown,
+      type: shipmentDetails.shipmentType || "اقتصادي",
+    });
+  } catch (error) {
+    console.error(`❌ [AI] Error calculating for ${company.name}:`, error);
+    pricingResults.push({
+      name: company.name,
+      total: 0,
+      breakdown: "خطأ في الحساب",
+      type: shipmentDetails.shipmentType || "اقتصادي",
+    });
+  }
+
+  return pricingResults;
 }
 
 // حساب الأسعار لكل شركة
