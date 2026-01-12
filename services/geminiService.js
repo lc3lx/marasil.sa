@@ -957,7 +957,7 @@ async function processGeminiResponse(geminiResponse, services) {
 
       case "CHAT_RESPONSE":
         const message =
-          data && data.message
+          geminiResponse.message || (data && data.message)
             ? data.message
             : "عذراً، لم أفهم طلبك. يرجى المحاولة مرة أخرى.";
         return {
