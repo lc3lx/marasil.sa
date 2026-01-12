@@ -760,7 +760,14 @@ async function processGeminiResponse(
     };
   }
 
-  // (الباقي كما هو للـ intents الأخرى)
+  // للـ intents الأخرى (CHAT, إلخ) أعد النتيجة كما هي
+  console.log("📝 [AI] Processing non-API intent:", intent);
+  return {
+    success: true,
+    intent,
+    result: geminiResponse,
+    message: geminiResponse.message || "تم معالجة الطلب",
+  };
 }
 
 // (الباقي من الوظائف كما هو)

@@ -119,6 +119,7 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
       {
         shipmentService: aiServices,
         walletService: aiServices,
+        generalService: aiServices,
       },
       user_id,
       customer
