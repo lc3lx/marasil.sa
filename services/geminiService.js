@@ -6,17 +6,25 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 /**
  * System Prompt الصارم للمساعد الذكي
  */
-const SYSTEM_PROMPT = `Respond ONLY with JSON. No other text.
+const SYSTEM_PROMPT = `You are a Saudi shipping assistant. Respond ONLY with valid JSON.
 
-Actions:
-{"action": "TRACK_SHIPMENT", "data": {"tracking_number": "NUMBER"}}
-{"action": "CREATE_SHIPMENT", "data": {}}
-{"action": "CANCEL_SHIPMENT", "data": {"shipment_id": "ID"}}
-{"action": "GET_WALLET_BALANCE"}
-{"action": "LIST_SHIPMENTS"}
-{"action": "CHAT_RESPONSE", "message": "Arabic text"}
+CRITICAL: Return ONLY one of these exact JSON formats:
 
-For unclear requests: {"action": "CHAT_RESPONSE", "message": "Helpful response in Arabic"}`;
+FOR TRACKING: {"action": "TRACK_SHIPMENT", "data": {"tracking_number": "NUMBER"}}
+FOR CREATING: {"action": "CREATE_SHIPMENT", "data": {}}
+FOR CANCELING: {"action": "CANCEL_SHIPMENT", "data": {"shipment_id": "ID"}}
+FOR BALANCE: {"action": "GET_WALLET_BALANCE"}
+FOR LISTING: {"action": "LIST_SHIPMENTS"}
+FOR CHAT: {"action": "CHAT_RESPONSE", "message": "Arabic response"}
+
+Arabic examples:
+- "تتبع شحنة 123" → {"action": "TRACK_SHIPMENT", "data": {"tracking_number": "123"}}
+- "أريد شحنة جديدة" → {"action": "CREATE_SHIPMENT", "data": {}}
+- "كم رصيدي" → {"action": "GET_WALLET_BALANCE"}
+- "شحناتي" → {"action": "LIST_SHIPMENTS"}
+- "مرحبا" → {"action": "CHAT_RESPONSE", "message": "أهلاً! كيف أساعدك؟"}
+
+If unsure: {"action": "CHAT_RESPONSE", "message": "وضح لي أكثر ما تريده"}`;
 
 /**
  * تحليل سريع للرسالة بناءً على الكلمات المفتاحية
@@ -31,9 +39,16 @@ function quickKeywordParse(message) {
     .replace(/ايه/g, "ما")
     .replace(/شحنة/g, "شحنة")
     .replace(/شحنات/g, "شحنات")
+    .replace(/شحنخاتي/g, "شحناتي") // خطأ إملائي شائع
     .replace(/خدماتكم/g, "خدماتكم")
     .replace(/انشاء/g, "إنشاء")
-    .replace(/الغاء/g, "إلغاء");
+    .replace(/الغاء/g, "إلغاء")
+    .replace(/كم/g, "كم")
+    .replace(/عدد/g, "عدد")
+    .replace(/قديش/g, "كم") // لهجة سعودية
+    .replace(/قداش/g, "كم") // لهجة سعودية
+    .replace(/وش/g, "ما") // لهجة سعودية
+    .replace(/لي/g, "لي"); // إزالة كلمة "لي" الزائدة في بعض الأحيان
 
   // تتبع شحنة - أولوية عالية
   if (lowerMessage.includes("تتبع") || lowerMessage.includes("track")) {
@@ -69,16 +84,26 @@ function quickKeywordParse(message) {
     };
   }
 
-  // قائمة الشحنات
-  if (
-    lowerMessage.includes("شحناتي") ||
-    lowerMessage.includes("قائمة") ||
-    lowerMessage.includes("عرض") ||
-    lowerMessage.includes("list")
-  ) {
-    return {
-      action: "LIST_SHIPMENTS",
-    };
+  // قائمة الشحنات - أنماط شاملة
+  const listPatterns = [
+    "شحناتي",
+    "قائمة",
+    "عرض",
+    "list",
+    "شحنات",
+    "طلباتي",
+    "كم شحناتي",
+    "كم عدد شحناتي",
+    "قديش شحناتي",
+    "قداش شحناتي",
+    "عدد شحناتي",
+    "شحناتي كم",
+    "شحناتي قديش",
+    "شحناتي قداش",
+    "شحنخاتي", // خطأ إملائي شائع
+  ];
+  if (listPatterns.some((pattern) => cleanMessage.includes(pattern))) {
+    return { action: "LIST_SHIPMENTS" };
   }
 
   // إلغاء شحنة
@@ -315,6 +340,44 @@ function quickKeywordParse(message) {
       action: "CHAT_RESPONSE",
       message:
         '❌ **سياسة إلغاء الشحنات في مراسيل**:\n\n⏰ **فترة الإلغاء المسموحة**:\n• قبل مغادرة الشحنة من المستودع\n• خلال 24 ساعة من إنشاء الطلب\n• قبل تأكيد الاستلام من الشركة\n\n💰 **سياسة الاسترداد**:\n• استرداد كامل خلال 24 ساعة\n• استرداد جزئي بعد 24 ساعة\n• رسوم إلغاء 10 ريال للطلبات الكبيرة\n\n📋 **خطوات الإلغاء**:\n1. اذهب إلى قائمة الشحنات\n2. اختر الشحنة المطلوب إلغاؤها\n3. اضغط "إلغاء الطلب"\n4. حدد سبب الإلغاء\n\n⚠️ **ملاحظات مهمة**:\n• لا يمكن إلغاء الشحنات المسلمة\n• الشحنات في الطريق قد تكلف رسوم\n• الاسترداد يستغرق 3-5 أيام عمل\n\n💬 قل لي: "ألغِ الشحنة رقم 123" وسأساعدك فوراً!',
+    };
+  }
+
+  // أسئلة عن عدم الفهم أو المشاكل
+  const confusionPatterns = [
+    "ما تفهم",
+    "ما عم تفهم",
+    "لي ما",
+    "غبي",
+    "مش فاهم",
+    "don't understand",
+  ];
+  if (confusionPatterns.some((pattern) => cleanMessage.includes(pattern))) {
+    return {
+      action: "CHAT_RESPONSE",
+      message:
+        '😅 **يا عيوني! أنا هنا عشان أساعدك** 🤝\n\nأنا مساعد ذكي بس أحياناً أحتاج شرح أكثر وضوح! 📝\n\n✨ قلي بوضوح وش تبي:\n• 📦 "أريد إنشاء شحنة"\n• 🔍 "تتبع الشحنة رقم 123456"\n• 💰 "كم رصيدي"\n• 📋 "عرض شحناتي"\n\nأو قلي المشكلة بالتفصيل وأحلها لك! 🔧\n\nما تيأس، نحن هنا لخدمتك! 😊',
+    };
+  }
+
+  // أسئلة عامة عن الوظائف
+  const generalQuestionsPatterns = [
+    "وش تقدر تسوي",
+    "وش يقدر",
+    "ماذا تفعل",
+    "what can you do",
+    "كيف تساعد",
+    "how can you help",
+    "وظائفك",
+    "your functions",
+  ];
+  if (
+    generalQuestionsPatterns.some((pattern) => cleanMessage.includes(pattern))
+  ) {
+    return {
+      action: "CHAT_RESPONSE",
+      message:
+        '🎯 **أنا مساعدك الشامل في مراسيل!** 🛠️\n\n✨ **أقدر أساعدك في**:\n\n📦 **الشحنات**:\n• إنشاء شحنات جديدة\n• تتبع الشحنات الموجودة\n• إلغاء أو تعديل الشحنات\n\n💰 **المحفظة**:\n• معرفة رصيدك\n• شحن رصيد جديد\n• تتبع المعاملات\n\n🏢 **معلومات الشركة**:\n• عن مراسيل وخدماتنا\n• شركات الشحن المتاحة\n• الأسعار والعروض\n\n📞 **الدعم**:\n• حل المشاكل\n• إجابة الأسئلة\n• تواصل مع الفريق\n\n💬 **جرب سؤال من هالأمثلة**:\n• "كم رصيدي"\n• "أريد إنشاء شحنة"\n• "ما هي شركات الشحن"\n\nقلي وش تحتاجه وسأساعدك فوراً! 🚀',
     };
   }
 

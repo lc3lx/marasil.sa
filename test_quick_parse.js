@@ -90,6 +90,21 @@ const testCases = [
   { input: "كيف ألغي الشحنة", expected: "CHAT_RESPONSE" },
   { input: "how to cancel", expected: "CHAT_RESPONSE" },
 
+  // أسئلة عدم الفهم
+  { input: "لي ما عم تفهم", expected: "CHAT_RESPONSE" },
+  { input: "ما تفهم", expected: "CHAT_RESPONSE" },
+  { input: "غبي", expected: "CHAT_RESPONSE" },
+
+  // أسئلة عامة
+  { input: "وش تقدر تسوي", expected: "CHAT_RESPONSE" },
+  { input: "ماذا تفعل", expected: "CHAT_RESPONSE" },
+  { input: "what can you do", expected: "CHAT_RESPONSE" },
+
+  // أسئلة بأخطاء إملائية
+  { input: "شحنخاتي", expected: "LIST_SHIPMENTS" },
+  { input: "كم شحنخاتي", expected: "LIST_SHIPMENTS" },
+  { input: "قديش شحناتي", expected: "LIST_SHIPMENTS" },
+
   // غير معروف (يجب أن يرجع null)
   { input: "ما هو الطقس اليوم", expected: null },
   { input: "random text", expected: null },
