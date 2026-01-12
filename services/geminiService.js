@@ -6,25 +6,92 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 /**
  * System Prompt الصارم للمساعد الذكي
  */
-const SYSTEM_PROMPT = `You are a Saudi shipping assistant. Respond ONLY with valid JSON.
+// State Manager للمحادثات
+class ConversationStateManager {
+  constructor() {
+    this.states = new Map(); // userId -> state
+  }
 
-CRITICAL: Return ONLY one of these exact JSON formats:
+  getState(userId) {
+    return (
+      this.states.get(userId) || {
+        currentIntent: null,
+        collectedData: {},
+        lastAction: null,
+        conversationStep: 0,
+      }
+    );
+  }
 
-FOR TRACKING: {"action": "TRACK_SHIPMENT", "data": {"tracking_number": "NUMBER"}}
-FOR CREATING: {"action": "CREATE_SHIPMENT", "data": {}}
-FOR CANCELING: {"action": "CANCEL_SHIPMENT", "data": {"shipment_id": "ID"}}
-FOR BALANCE: {"action": "GET_WALLET_BALANCE"}
-FOR LISTING: {"action": "LIST_SHIPMENTS"}
-FOR CHAT: {"action": "CHAT_RESPONSE", "message": "Arabic response"}
+  updateState(userId, updates) {
+    const currentState = this.getState(userId);
+    const newState = { ...currentState, ...updates };
+    this.states.set(userId, newState);
+    return newState;
+  }
 
-Arabic examples:
-- "تتبع شحنة 123" → {"action": "TRACK_SHIPMENT", "data": {"tracking_number": "123"}}
-- "أريد شحنة جديدة" → {"action": "CREATE_SHIPMENT", "data": {}}
-- "كم رصيدي" → {"action": "GET_WALLET_BALANCE"}
-- "شحناتي" → {"action": "LIST_SHIPMENTS"}
-- "مرحبا" → {"action": "CHAT_RESPONSE", "message": "أهلاً! كيف أساعدك؟"}
+  clearState(userId) {
+    this.states.delete(userId);
+  }
 
-If unsure: {"action": "CHAT_RESPONSE", "message": "وضح لي أكثر ما تريده"}`;
+  addCollectedData(userId, key, value) {
+    const state = this.getState(userId);
+    state.collectedData[key] = value;
+    this.updateState(userId, { collectedData: state.collectedData });
+  }
+
+  getCollectedData(userId) {
+    return this.getState(userId).collectedData;
+  }
+}
+
+const stateManager = new ConversationStateManager();
+
+const SYSTEM_PROMPT = `أنت مساعد خدمة عملاء شحنات سعودي ذكي ومحترف جداً. أنت تتحدث بالعربية الفصحى مع اللهجة السعودية الطبيعية.
+
+مهمتك: فهم النية من رسائل العملاء ومساعدتهم بطريقة طبيعية جداً مثل موظف خدمة عملاء سعودي محترف.
+
+=== قواعد هامة ===
+1. استخدم السياق من المحادثات السابقة دائماً
+2. لا تكرر أسئلة تم الإجابة عليها
+3. كن ودوداً ومحترفاً ومباشراً
+4. إذا كنت بحاجة لمعلومات إضافية، اسأل بلباقة
+5. اللهجة السعودية الطبيعية: "تمام 👍", "ما عندك مشكلة", "بالضبط", "وش تحتاجه"
+
+=== صيغة الرد (JSON فقط) ===
+{
+  "intent": "CREATE | TRACK | CANCEL | BALANCE | LIST | CHAT",
+  "confidence": 0.0-1.0,
+  "missing_fields": ["recipient_name", "phone", "weight"],
+  "message": "رسالة ودية بالعامية السعودية",
+  "data": {"tracking_number": "123", "recipient_name": "أحمد"}
+}
+
+=== أمثلة للردود ===
+
+بدء إنشاء شحنة:
+{"intent": "CREATE", "confidence": 0.8, "missing_fields": ["recipient_name"], "message": "تمام 👍 لمين الشحنة؟", "data": {}}
+
+تتبع شحنة:
+{"intent": "TRACK", "confidence": 0.95, "missing_fields": [], "message": "", "data": {"tracking_number": "50724610926"}}
+
+عرض الرصيد:
+{"intent": "BALANCE", "confidence": 0.9, "missing_fields": [], "message": "", "data": {}}
+
+قائمة الشحنات:
+{"intent": "LIST", "confidence": 0.9, "missing_fields": [], "message": "", "data": {}}
+
+محادثة عامة:
+{"intent": "CHAT", "confidence": 0.6, "missing_fields": [], "message": "أهلاً! وش أقدر أساعدك فيه اليوم؟", "data": {}}
+
+إلغاء شحنة:
+{"intent": "CANCEL", "confidence": 0.9, "missing_fields": [], "message": "", "data": {"shipment_id": "123"}}
+
+=== تذكير ===
+- intent=CHAT للتحيات والأسئلة العامة
+- confidence >= 0.8 لتنفيذ العمليات الفعلية
+- missing_fields فارغ للعمليات الجاهزة
+- كن مباشراً ولطيفاً`;
 
 /**
  * تحليل سريع للرسالة بناءً على الكلمات المفتاحية
@@ -156,20 +223,36 @@ function quickKeywordParse(message) {
     }
   }
 
-  // تحقق سريع للكلمات الأساسية (fallback)
-  if (
-    lowerMessage.includes("كيفك") ||
-    lowerMessage.includes("هاي") ||
-    lowerMessage.includes("هلا") ||
-    lowerMessage.includes("السلام عليكم") ||
-    lowerMessage.includes("مرحبا") ||
-    lowerMessage.includes("أهلا")
-  ) {
-    console.log("🚀 [Fallback] Detected greeting via direct check!");
+  // تحقق سريع للكلمات الأساسية مع ردود ذكية متنوعة
+  if (lowerMessage.includes("كيفك") || lowerMessage.includes("كيف حالك")) {
+    console.log("🚀 [Fallback] Detected 'كيفك' greeting!");
     return {
       action: "CHAT_RESPONSE",
       message:
-        "🌟 أهلاً وسهلاً فيك! 🤝\n\nأنا **مساعد مراسيل الذكي** 🤖 - متخصص في شحنات السعودية 🇸🇦\n\n✨ أقدر أساعدك في كل شيء بخصوص الشحن:\n• 📦 إنشاء شحنة جديدة\n• 🔍 تتبع شحناتك\n• 💰 معرفة رصيد محفظتك\n• 📋 عرض جميع شحناتك\n• 🏢 معلومات عن شركات الشحن\n• ❓ إجابة على أي سؤال\n\nقلي وش تبي أساعدك فيه اليوم! 😊\n\n#مراسيل #شحن_ذكي",
+        "الحمد لله بخير! 😊\n\nأنا **مساعد مراسيل الذكي** 🤖 جاهز لخدمتك 🇸🇦\n\n✨ أقدر أساعدك في:\n• 📦 إنشاء وتتبع الشحنات\n• 💰 معرفة رصيدك\n• 📋 عرض شحناتك\n• ❓ أي سؤال عن الشحن\n\nوش تحتاجه اليوم؟ 🚀",
+    };
+  }
+
+  if (lowerMessage.includes("السلام عليكم")) {
+    console.log("🚀 [Fallback] Detected Islamic greeting!");
+    return {
+      action: "CHAT_RESPONSE",
+      message:
+        "وعليكم السلام ورحمة الله وبركاته! 🤲\n\nأنا **مساعد مراسيل الذكي** 🤖 - متخصص في شحنات السعودية 🇸🇦\n\n✨ جاهز لخدمتك في كل ما يخص الشحن:\n• 📦 إنشاء شحنة جديدة\n• 🔍 تتبع شحناتك\n• 💰 رصيد محفظتك\n• 📋 شحناتك الموجودة\n\nكيف أقدر أساعدك؟ 😊",
+    };
+  }
+
+  if (
+    lowerMessage.includes("هاي") ||
+    lowerMessage.includes("هلا") ||
+    lowerMessage.includes("مرحبا") ||
+    lowerMessage.includes("أهلا")
+  ) {
+    console.log("🚀 [Fallback] Detected casual greeting!");
+    return {
+      action: "CHAT_RESPONSE",
+      message:
+        "هاي! مرحباً بك 🤝\n\nأنا **مساعد مراسيل الذكي** 🤖 - هنا عشان أساعدك في شحناتك 🇸🇦\n\n✨ أقدر أعمل لك:\n• 📦 شحنة جديدة\n• 🔍 تتبع شحنتك\n• 💰 شوف رصيدك\n• 📋 عرض شحناتك\n\nوش تبي تسوي؟ 😊",
     };
   }
 
@@ -257,12 +340,39 @@ function quickKeywordParse(message) {
   console.log("🗣️ [Greetings] greetingInLower:", greetingInLower);
   console.log("🗣️ [Greetings] greetingInClean:", greetingInClean);
 
-  if (greetingInLower || greetingInClean) {
-    console.log("✅ [Greetings] Detected greeting pattern!");
+  // ردود ذكية حسب نوع التحية
+  if (
+    lowerMessage.includes("كيفك") ||
+    cleanMessage.includes("كيفك") ||
+    lowerMessage.includes("كيف حالك") ||
+    cleanMessage.includes("كيف حالك")
+  ) {
+    console.log("✅ [Greetings] Detected 'كيفك' greeting!");
     return {
       action: "CHAT_RESPONSE",
       message:
-        "🌟 أهلاً وسهلاً فيك! 🤝\n\nأنا **مساعد مراسيل الذكي** 🤖 - متخصص في شحنات السعودية 🇸🇦\n\n✨ أقدر أساعدك في كل شيء بخصوص الشحن:\n• 📦 إنشاء شحنة جديدة\n• 🔍 تتبع شحناتك\n• 💰 معرفة رصيد محفظتك\n• 📋 عرض جميع شحناتك\n• 🏢 معلومات عن شركات الشحن\n• ❓ إجابة على أي سؤال\n\nقلي وش تبي أساعدك فيه اليوم! 😊\n\n#مراسيل #شحن_ذكي",
+        "الحمد لله بخير! 😊\n\nأنا **مساعد مراسيل الذكي** 🤖 جاهز لخدمتك 🇸🇦\n\n✨ أقدر أساعدك في:\n• 📦 إنشاء وتتبع الشحنات\n• 💰 معرفة رصيدك\n• 📋 عرض شحناتك\n• ❓ أي سؤال عن الشحن\n\nوش تحتاجه اليوم؟ 🚀",
+    };
+  }
+
+  if (
+    lowerMessage.includes("السلام عليكم") ||
+    cleanMessage.includes("السلام عليكم")
+  ) {
+    console.log("✅ [Greetings] Detected Islamic greeting!");
+    return {
+      action: "CHAT_RESPONSE",
+      message:
+        "وعليكم السلام ورحمة الله وبركاته! 🤲\n\nأنا **مساعد مراسيل الذكي** 🤖 - متخصص في شحنات السعودية 🇸🇦\n\n✨ جاهز لخدمتك في كل ما يخص الشحن:\n• 📦 إنشاء شحنة جديدة\n• 🔍 تتبع شحناتك\n• 💰 رصيد محفظتك\n• 📋 شحناتك الموجودة\n\nكيف أقدر أساعدك؟ 😊",
+    };
+  }
+
+  if (greetingInLower || greetingInClean) {
+    console.log("✅ [Greetings] Detected casual greeting!");
+    return {
+      action: "CHAT_RESPONSE",
+      message:
+        "هاي! مرحباً بك 🤝\n\nأنا **مساعد مراسيل الذكي** 🤖 - هنا عشان أساعدك في شحناتك 🇸🇦\n\n✨ أقدر أعمل لك:\n• 📦 شحنة جديدة\n• 🔍 تتبع شحنتك\n• 💰 شوف رصيدك\n• 📋 عرض شحناتك\n\nوش تبي تسوي؟ 😊",
     };
   }
 
@@ -650,7 +760,7 @@ function buildContext(recentMessages) {
 /**
  * إرسال رسالة لـ Gemini والحصول على رد
  */
-async function sendToGemini(userMessage, context = "") {
+async function sendToGemini(userMessage, context = "", userId = null) {
   try {
     console.log("🎯 [Gemini] Processing user message:", userMessage);
 
@@ -677,15 +787,31 @@ async function sendToGemini(userMessage, context = "") {
 
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
-    // بناء الـ prompt الكامل
+    // الحصول على الحالة الحالية للمستخدم
+    const currentState = userId ? stateManager.getState(userId) : null;
+
+    // بناء الـ prompt الكامل مع سياق متقدم
     const fullPrompt = `${SYSTEM_PROMPT}
 
-سياق المحادثة السابق:
+=== معلومات العميل ===
+العميل: ${userId || "غير محدد"}
+
+=== الحالة الحالية للمحادثة ===
+${
+  currentState
+    ? `البيانات المجموعة: ${JSON.stringify(currentState.collectedData, null, 2)}
+النية الحالية: ${currentState.currentIntent || "غير محدد"}
+الخطوة الحالية: ${currentState.conversationStep || 0}`
+    : "محادثة جديدة"
+}
+
+=== تاريخ المحادثة ===
 ${context}
 
-رسالة العميل الحالية: "${userMessage}"
+=== الرسالة الحالية ===
+"${userMessage}"
 
-أجب بالصيغة المطلوبة فقط:`;
+أجب بـ JSON صالح فقط حسب الصيغة المطلوبة:`;
 
     // تقييد طول الـ prompt
     const maxPromptLength = 2000;
@@ -888,18 +1014,54 @@ ${context}
 /**
  * معالجة الرد من Gemini وتنفيذ العمليات
  */
-async function processGeminiResponse(geminiResponse, services) {
-  const { action, data } = geminiResponse;
+async function processGeminiResponse(geminiResponse, services, userId = null) {
+  const { intent, confidence, missing_fields, message, data } = geminiResponse;
 
-  console.log("🔄 [Gemini] Processing action:", action, "with data:", data);
+  console.log(
+    "🔄 [Gemini] Processing intent:",
+    intent,
+    "confidence:",
+    confidence,
+    "missing_fields:",
+    missing_fields
+  );
 
   try {
-    switch (action) {
-      case "TRACK_SHIPMENT":
+    // تحديث stateManager إذا كان userId متوفر
+    if (userId && intent !== "CHAT") {
+      stateManager.updateState(userId, {
+        currentIntent: intent,
+        lastAction: intent,
+      });
+
+      // حفظ البيانات المجموعة
+      if (data) {
+        Object.keys(data).forEach((key) => {
+          stateManager.addCollectedData(userId, key, data[key]);
+        });
+      }
+    }
+
+    // التحقق من confidence قبل تنفيذ العمليات
+    if (intent !== "CHAT" && confidence < 0.8) {
+      return {
+        success: true,
+        action: "CHAT_RESPONSE",
+        result: { message: "ما فهمت قصدك تماماً. وش تقصد بالضبط؟" },
+        message: "ما فهمت قصدك تماماً. وش تقصد بالضبط؟",
+      };
+    }
+
+    switch (intent) {
+      case "TRACK":
         if (!data || !data.tracking_number) {
           return {
-            success: false,
-            message: "يرجى توفير رقم التتبع لتتبع الشحنة.",
+            success: true,
+            action: "CHAT_RESPONSE",
+            result: {
+              message: "أحتاج رقم التتبع عشان أتبع الشحنة لك. وش رقم التتبع؟",
+            },
+            message: "أحتاج رقم التتبع عشان أتبع الشحنة لك. وش رقم التتبع؟",
           };
         }
         const trackingResult = await services.shipmentService.trackShipment(
@@ -910,40 +1072,74 @@ async function processGeminiResponse(geminiResponse, services) {
           action: "TRACK_SHIPMENT",
           result: trackingResult,
           message: trackingResult.success
-            ? `تم العثور على الشحنة: ${trackingResult.status || "غير محدد"}`
-            : "لم يتم العثور على الشحنة بهذا الرقم.",
+            ? `تمام 👍 الشحنة ${trackingResult.status || "وصلت"}`
+            : "ما لقيت شحنة بهالرقم. تأكد من الرقم وجرب مرة ثانية.",
         };
 
-      case "CREATE_SHIPMENT":
-        if (
-          !data ||
-          !data.receiver_name ||
-          !data.receiver_phone ||
-          !data.weight
-        ) {
+      case "CREATE":
+        if (missing_fields && missing_fields.length > 0) {
+          // اسأل عن الحقل المفقود الأول
+          const field = missing_fields[0];
+          const fieldMessages = {
+            recipient_name: "وش اسم المستلم؟",
+            phone: "وش رقم جوال المستلم؟",
+            weight: "كم وزن الشحنة بالكيلو؟",
+            address: "وش عنوان المستلم؟",
+            city: "وش مدينة المستلم؟",
+          };
+          const question = fieldMessages[field] || `أحتاج ${field}. وش قيمته؟`;
           return {
-            success: false,
-            message: "يرجى توفير جميع البيانات المطلوبة لإنشاء الشحنة.",
+            success: true,
+            action: "CHAT_RESPONSE",
+            result: { message: question },
+            message: question,
           };
         }
-        const createResult =
-          await services.shipmentService.createShipmentFromAI(data);
+
+        if (
+          confidence >= 0.8 &&
+          (!missing_fields || missing_fields.length === 0)
+        ) {
+          const createResult =
+            await services.shipmentService.createShipmentFromAI(data);
+          if (createResult.success) {
+            // مسح الحالة بعد الإنشاء الناجح
+            if (userId) {
+              stateManager.clearState(userId);
+            }
+          }
+          return {
+            success: createResult.success,
+            action: "CREATE_SHIPMENT",
+            result: createResult,
+            message: createResult.success
+              ? `تمام 👍 تم إنشاء الشحنة! رقم التتبع: ${
+                  createResult.trackingNumber || "غير محدد"
+                }`
+              : createResult.message || "صار خطأ في إنشاء الشحنة.",
+          };
+        }
+
         return {
-          success: createResult.success,
-          action: "CREATE_SHIPMENT",
-          result: createResult,
-          message: createResult.success
-            ? `تم إنشاء الشحنة بنجاح. رقم التتبع: ${
-                createResult.trackingNumber || "غير محدد"
-              }`
-            : createResult.message || "فشل في إنشاء الشحنة.",
+          success: true,
+          action: "CHAT_RESPONSE",
+          result: {
+            message:
+              "ما عندي معلومات كافية. أحتاج اسم المستلم ورقم الجوال والوزن على الأقل.",
+          },
+          message:
+            "ما عندي معلومات كافية. أحتاج اسم المستلم ورقم الجوال والوزن على الأقل.",
         };
 
-      case "CANCEL_SHIPMENT":
+      case "CANCEL":
         if (!data || !data.shipment_id) {
           return {
-            success: false,
-            message: "يرجى توفير معرف الشحنة للإلغاء.",
+            success: true,
+            action: "CHAT_RESPONSE",
+            result: {
+              message: "أحتاج رقم الشحنة أو معرفها عشان ألغيها. وش رقم الشحنة؟",
+            },
+            message: "أحتاج رقم الشحنة أو معرفها عشان ألغيها. وش رقم الشحنة؟",
           };
         }
         const cancelResult = await services.shipmentService.cancelShipment(
@@ -954,20 +1150,20 @@ async function processGeminiResponse(geminiResponse, services) {
           action: "CANCEL_SHIPMENT",
           result: cancelResult,
           message: cancelResult.success
-            ? "تم إلغاء الشحنة بنجاح."
-            : cancelResult.message || "فشل في إلغاء الشحنة.",
+            ? "تمام 👍 تم إلغاء الشحنة."
+            : cancelResult.message || "ما قدرت ألغي الشحنة.",
         };
 
-      case "GET_WALLET_BALANCE":
+      case "BALANCE":
         const balanceResult = await services.walletService.getBalance();
         return {
           success: true,
           action: "GET_WALLET_BALANCE",
           result: balanceResult,
-          message: `رصيد محفظتك الحالي: ${balanceResult.balance || 0} ريال.`,
+          message: `رصيدك الحين: ${balanceResult.balance || 0} ريال 👍`,
         };
 
-      case "LIST_SHIPMENTS":
+      case "LIST":
         const shipmentsResult =
           await services.shipmentService.getUserShipments();
         return {
@@ -976,35 +1172,30 @@ async function processGeminiResponse(geminiResponse, services) {
           result: shipmentsResult,
           message:
             shipmentsResult.shipments && shipmentsResult.shipments.length > 0
-              ? `لديك ${shipmentsResult.shipments.length} شحنة. آخر شحنة: ${
+              ? `عندك ${shipmentsResult.shipments.length} شحنة. آخر شحنة: ${
                   shipmentsResult.shipments[0].trackingId || "غير محدد"
                 }`
-              : "لا توجد شحنات حالية.",
+              : "ما عندك شحنات حالية.",
         };
 
-      case "CHAT_RESPONSE":
-        const message =
-          geminiResponse.message ||
-          (data && data.message) ||
-          "عذراً، لم أفهم طلبك. يرجى المحاولة مرة أخرى.";
+      case "CHAT":
+      default:
         return {
           success: true,
           action: "CHAT_RESPONSE",
-          result: { message: message },
-          message: message,
-        };
-
-      default:
-        return {
-          success: false,
-          message: "عذراً، لم أفهم طلبك. يرجى المحاولة مرة أخرى.",
+          result: {
+            message: message || "أهلاً! كيف أقدر أساعدك في شحناتك اليوم؟",
+          },
+          message: message || "أهلاً! كيف أقدر أساعدك في شحناتك اليوم؟",
         };
     }
   } catch (error) {
-    console.error("❌ [Gemini] Error executing action:", action, error);
+    console.error("❌ [Gemini] Error executing intent:", intent, error);
     return {
       success: false,
-      message: "حدث خطأ أثناء تنفيذ العملية. يرجى المحاولة لاحقاً.",
+      action: "CHAT_RESPONSE",
+      result: { message: "صار خطأ تقني. جرب مرة ثانية بعد شوي." },
+      message: "صار خطأ تقني. جرب مرة ثانية بعد شوي.",
     };
   }
 }
@@ -1015,4 +1206,5 @@ module.exports = {
   extractIntent,
   buildContext,
   quickKeywordParse,
+  stateManager,
 };

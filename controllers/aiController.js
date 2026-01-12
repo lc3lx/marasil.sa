@@ -66,7 +66,7 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
 
     // 4. إرسال لـ Gemini
     console.log("🚀 [AI-Controller] Sending to Gemini...");
-    const geminiResponse = await geminiService.sendToGemini(message, context);
+    const geminiResponse = await geminiService.sendToGemini(message, context, user_id);
 
     if (!geminiResponse || typeof geminiResponse !== 'object') {
       console.error("❌ [AI-Controller] Invalid Gemini response:", geminiResponse);
@@ -86,7 +86,7 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
     const executionResult = await geminiService.processGeminiResponse(geminiResponse, {
       shipmentService: aiServices,
       walletService: aiServices
-    });
+    }, user_id);
 
     console.log("✅ [AI-Controller] Execution result:", executionResult);
 
@@ -117,12 +117,15 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
     // 8. إرجاع الرد النهائي
     res.status(200).json({
       success: true,
+      intent: geminiResponse.intent || 'CHAT',
+      confidence: geminiResponse.confidence || 0.5,
+      missing_fields: geminiResponse.missing_fields || [],
       message: executionResult.message,
-      action: geminiResponse.action,
       data: {
         conversation_id: conversation._id,
         session_id: conversation.sessionId,
-        execution_result: executionResult.success ? executionResult.result : null
+        execution_result: executionResult.success ? executionResult.result : null,
+        collected_data: geminiResponse.data || {}
       },
       timestamp: new Date().toISOString()
     });
