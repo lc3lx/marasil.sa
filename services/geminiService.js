@@ -462,7 +462,7 @@ function quickKeywordParse(message, userInfo = null) {
 
   // التحقق من رقم التتبع مع كلمات توضيحية (مثل "هاي رقم التتبع 50724610926")
   const numberWithWordsMatch = message.match(
-    /(?:رقم|هاي|هذا|التتبع|الشحنة)\s*\:?\s*(\d{6,})/i
+    /(?:رقم|هاي|هذا|التتبع|الشحنة|هاي الرقم)\s*\:?\s*(\d{6,})/i
   );
   if (numberWithWordsMatch) {
     console.log("✅ [Quick Parse] Matched tracking number with words");
@@ -892,11 +892,129 @@ async function processGeminiResponse(
   userInfo = null
 ) {
   // (الكود الأصلي)
-  const { intent, api_call } = geminiResponse;
+  const { intent, api_call, data } = geminiResponse;
 
+  // تنفيذ الـ API بناءً على الـ intent
+  let apiResult;
+  let shouldCallAPI = false;
+
+  // معالجة intents المباشرة من Quick Parse
+  switch (intent) {
+    case "TRACK":
+      if (data && data.tracking_number) {
+        console.log("🔄 [AI] Executing trackShipment:", data.tracking_number);
+        apiResult = await services.shipmentService.trackShipment(
+          data.tracking_number
+        );
+        shouldCallAPI = true;
+      } else {
+        // لا يوجد رقم تتبع، أعد الرسالة الأصلية
+        return {
+          success: true,
+          intent,
+          result: geminiResponse,
+          message: geminiResponse.message || "يرجى تقديم رقم التتبع",
+        };
+      }
+      break;
+
+    case "BALANCE":
+      console.log("🔄 [AI] Executing getBalance");
+      apiResult = await services.walletService.getBalance();
+      shouldCallAPI = true;
+      break;
+
+    case "LIST":
+      console.log("🔄 [AI] Executing getUserShipments");
+      apiResult = await services.shipmentService.getUserShipments();
+      shouldCallAPI = true;
+      break;
+
+    case "CREATE":
+      // لا نستدعي API هنا لأننا نحتاج تفاصيل أكثر
+      return {
+        success: true,
+        intent,
+        result: geminiResponse,
+        message: geminiResponse.message || "يرجى تقديم تفاصيل الشحنة",
+      };
+
+    case "CANCEL":
+      if (data && data.shipment_id) {
+        console.log("🔄 [AI] Executing cancelShipment:", data.shipment_id);
+        apiResult = await services.shipmentService.cancelShipment(
+          data.shipment_id
+        );
+        shouldCallAPI = true;
+      } else {
+        return {
+          success: true,
+          intent,
+          result: geminiResponse,
+          message:
+            geminiResponse.message || "يرجى تحديد رقم الشحنة المراد إلغاؤها",
+        };
+      }
+      break;
+  }
+
+  // إذا تم استدعاء API، أعد النتيجة
+  if (shouldCallAPI && apiResult) {
+    // تحسين رسالة الاستجابة بناءً على نوع العملية
+    let finalMessage = apiResult.success
+      ? "تم التنفيذ بنجاح"
+      : apiResult.message;
+
+    if (intent === "TRACK" && apiResult.success) {
+      finalMessage =
+        `📦 شحنتك رقم ${data.tracking_number}:\n` +
+        `📍 الحالة: ${apiResult.status || "غير محدد"}\n` +
+        `👤 المستلم: ${apiResult.receiver?.name || "غير محدد"}\n` +
+        `📞 رقم الهاتف: ${apiResult.receiver?.phone || "غير محدد"}\n` +
+        `📅 تاريخ الإنشاء: ${
+          apiResult.createdAt
+            ? new Date(apiResult.createdAt).toLocaleDateString("ar-SA")
+            : "غير محدد"
+        }\n` +
+        `💰 التكلفة: ${
+          apiResult.details?.totalPrice
+            ? apiResult.details.totalPrice + " ريال"
+            : "غير محدد"
+        }`;
+    } else if (intent === "BALANCE" && apiResult.success) {
+      finalMessage = `💰 رصيدك الحالي: ${apiResult.balance || 0} ${
+        apiResult.currency || "ريال"
+      }`;
+    } else if (intent === "LIST" && apiResult.success) {
+      if (apiResult.shipments && apiResult.shipments.length > 0) {
+        finalMessage =
+          `📋 شحناتك (${apiResult.shipments.length} شحنة):\n\n` +
+          apiResult.shipments
+            .slice(0, 3)
+            .map(
+              (ship, index) =>
+                `${index + 1}. رقم ${ship.trackingId} - حالة: ${
+                  ship.status
+                } - ${ship.totalPrice} ريال`
+            )
+            .join("\n") +
+          (apiResult.shipments.length > 3 ? "\n\n... وغيرها" : "");
+      } else {
+        finalMessage = "📭 ليس لديك شحنات حالياً";
+      }
+    }
+
+    return {
+      success: apiResult.success,
+      intent,
+      result: apiResult,
+      message: finalMessage,
+    };
+  }
+
+  // معالجة API calls من Gemini (function calling)
   if (intent === "API_CALL" && api_call) {
     // تنفيذ الـ API بناءً على الاسم
-    let apiResult;
     switch (api_call.name) {
       case "trackShipment":
         console.log(
