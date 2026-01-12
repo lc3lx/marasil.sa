@@ -156,6 +156,23 @@ function quickKeywordParse(message) {
     }
   }
 
+  // تحقق سريع للكلمات الأساسية (fallback)
+  if (
+    lowerMessage.includes("كيفك") ||
+    lowerMessage.includes("هاي") ||
+    lowerMessage.includes("هلا") ||
+    lowerMessage.includes("السلام عليكم") ||
+    lowerMessage.includes("مرحبا") ||
+    lowerMessage.includes("أهلا")
+  ) {
+    console.log("🚀 [Fallback] Detected greeting via direct check!");
+    return {
+      action: "CHAT_RESPONSE",
+      message:
+        "🌟 أهلاً وسهلاً فيك! 🤝\n\nأنا **مساعد مراسيل الذكي** 🤖 - متخصص في شحنات السعودية 🇸🇦\n\n✨ أقدر أساعدك في كل شيء بخصوص الشحن:\n• 📦 إنشاء شحنة جديدة\n• 🔍 تتبع شحناتك\n• 💰 معرفة رصيد محفظتك\n• 📋 عرض جميع شحناتك\n• 🏢 معلومات عن شركات الشحن\n• ❓ إجابة على أي سؤال\n\nقلي وش تبي أساعدك فيه اليوم! 😊\n\n#مراسيل #شحن_ذكي",
+    };
+  }
+
   // أسئلة هوية وتعريف الذات
   const identityPatterns = [
     "مين انت",
@@ -221,18 +238,26 @@ function quickKeywordParse(message) {
     "الحمد لله",
   ];
   console.log("🗣️ [Greetings] Available patterns:", greetingPatterns);
-  console.log(
-    "🗣️ [Greetings] Checking patterns:",
-    greetingPatterns.filter((p) => cleanMessage.includes(p))
-  );
+  console.log("🗣️ [Greetings] lowerMessage:", lowerMessage);
+  console.log("🗣️ [Greetings] cleanMessage:", cleanMessage);
   console.log(
     "🗣️ [Greetings] Checking patterns in lowerMessage:",
     greetingPatterns.filter((p) => lowerMessage.includes(p))
   );
-  if (
-    greetingPatterns.some((pattern) => lowerMessage.includes(pattern)) ||
-    greetingPatterns.some((pattern) => cleanMessage.includes(pattern))
-  ) {
+  console.log(
+    "🗣️ [Greetings] Checking patterns in cleanMessage:",
+    greetingPatterns.filter((p) => cleanMessage.includes(p))
+  );
+  const greetingInLower = greetingPatterns.some((pattern) =>
+    lowerMessage.includes(pattern)
+  );
+  const greetingInClean = greetingPatterns.some((pattern) =>
+    cleanMessage.includes(pattern)
+  );
+  console.log("🗣️ [Greetings] greetingInLower:", greetingInLower);
+  console.log("🗣️ [Greetings] greetingInClean:", greetingInClean);
+
+  if (greetingInLower || greetingInClean) {
     console.log("✅ [Greetings] Detected greeting pattern!");
     return {
       action: "CHAT_RESPONSE",
@@ -630,7 +655,9 @@ async function sendToGemini(userMessage, context = "") {
     console.log("🎯 [Gemini] Processing user message:", userMessage);
 
     // أولاً: محاولة keyword-based parsing للأوامر البسيطة
+    console.log("🎯 [Gemini] Processing user message:", userMessage);
     const quickResult = quickKeywordParse(userMessage);
+    console.log("🎯 [Gemini] Quick result:", quickResult);
     if (quickResult) {
       console.log("⚡ [Gemini] Quick parse success:", quickResult.action);
       return quickResult;
@@ -957,9 +984,9 @@ async function processGeminiResponse(geminiResponse, services) {
 
       case "CHAT_RESPONSE":
         const message =
-          geminiResponse.message || (data && data.message)
-            ? data.message
-            : "عذراً، لم أفهم طلبك. يرجى المحاولة مرة أخرى.";
+          geminiResponse.message ||
+          (data && data.message) ||
+          "عذراً، لم أفهم طلبك. يرجى المحاولة مرة أخرى.";
         return {
           success: true,
           action: "CHAT_RESPONSE",
