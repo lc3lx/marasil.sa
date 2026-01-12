@@ -305,13 +305,13 @@ function buildContext(recentMessages) {
     return "لا يوجد سياق سابق.";
   }
 
-  const contextLines = recentMessages.map(msg => {
-    const role = msg.sender === 'user' ? 'User' : 'Assistant';
-    const content = msg.message || msg.content || '';
+  const contextLines = recentMessages.map((msg) => {
+    const role = msg.sender === "user" ? "User" : "Assistant";
+    const content = msg.message || msg.content || "";
     return `${role}: ${content}`;
   });
 
-  return contextLines.join('\n').substring(0, 1000); // حد أقصى 1000 حرف
+  return contextLines.join("\n").substring(0, 1000); // حد أقصى 1000 حرف
 }
 
 /**
@@ -321,28 +321,36 @@ function extractIntent(message) {
   const lowerMessage = message.toLowerCase();
 
   // تتبع شحنة
-  if (lowerMessage.includes('تتبع') || lowerMessage.includes('track')) {
-    return 'TRACK';
+  if (lowerMessage.includes("تتبع") || lowerMessage.includes("track")) {
+    return "TRACK";
   }
 
   // إنشاء شحنة
-  if (lowerMessage.includes('إنشاء') || lowerMessage.includes('create') || lowerMessage.includes('جديد')) {
-    return 'CREATE';
+  if (
+    lowerMessage.includes("إنشاء") ||
+    lowerMessage.includes("create") ||
+    lowerMessage.includes("جديد")
+  ) {
+    return "CREATE";
   }
 
   // رصيد المحفظة
-  if (lowerMessage.includes('رصيد') || lowerMessage.includes('balance') || lowerMessage.includes('محفظة')) {
-    return 'BALANCE';
+  if (
+    lowerMessage.includes("رصيد") ||
+    lowerMessage.includes("balance") ||
+    lowerMessage.includes("محفظة")
+  ) {
+    return "BALANCE";
   }
 
   // قائمة الشحنات
-  if (lowerMessage.includes('شحنات') || lowerMessage.includes('shipments')) {
-    return 'LIST';
+  if (lowerMessage.includes("شحنات") || lowerMessage.includes("shipments")) {
+    return "LIST";
   }
 
   // إلغاء شحنة
-  if (lowerMessage.includes('إلغاء') || lowerMessage.includes('cancel')) {
-    return 'CANCEL';
+  if (lowerMessage.includes("إلغاء") || lowerMessage.includes("cancel")) {
+    return "CANCEL";
   }
 
   return null; // لا يوجد intent محدد
@@ -573,7 +581,16 @@ async function sendToGemini(
   userInfo = null
 ) {
   try {
-    // (الكود الأصلي للـ quick parse)
+    // 1. أولاً جرب Quick Parse للأسئلة البسيطة
+    console.log("🎯 [Gemini] Processing user message:", userMessage);
+    const quickResult = quickKeywordParse(userMessage, userInfo);
+
+    if (quickResult) {
+      console.log("⚡ [Gemini] Quick parse success:", quickResult.intent);
+      return quickResult;
+    }
+
+    console.log("🚀 [Gemini] Quick parse returned null, going to Gemini API");
 
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-pro",
@@ -599,9 +616,73 @@ async function sendToGemini(
       };
     }
 
-    // (الباقي كما هو لتحليل JSON)
+    // تحليل JSON response من Gemini
+    console.log("📄 [Gemini] Raw response text:", text);
+
+    try {
+      // محاولة استخراج JSON من النص
+      let jsonStart = text.indexOf("{");
+      let jsonEnd = text.lastIndexOf("}") + 1;
+
+      if (jsonStart !== -1 && jsonEnd > jsonStart) {
+        const jsonText = text.substring(jsonStart, jsonEnd);
+        console.log("🔍 [Gemini] Extracted JSON:", jsonText);
+
+        const geminiData = JSON.parse(jsonText);
+
+        // التأكد من وجود الحقول المطلوبة
+        if (geminiData.intent && geminiData.message) {
+          return {
+            intent: geminiData.intent,
+            confidence: geminiData.confidence || 0.5,
+            missing_fields: geminiData.missing_fields || [],
+            message: geminiData.message,
+            data: geminiData.data || {},
+            api_call: geminiData.api_call,
+          };
+        }
+      }
+
+      // إذا لم نجد JSON صحيح، أعد رد دردشة عام
+      console.log("⚠️ [Gemini] No valid JSON found, returning chat response");
+      return {
+        intent: "CHAT",
+        confidence: 0.3,
+        missing_fields: [],
+        message: "عذراً، لم أفهم طلبك. يرجى المحاولة مرة أخرى.",
+        data: {},
+      };
+    } catch (parseError) {
+      console.error("❌ [Gemini] JSON parse error:", parseError.message);
+      return {
+        intent: "CHAT",
+        confidence: 0.2,
+        missing_fields: [],
+        message: "عذراً، حدث خطأ في معالجة الطلب. يرجى المحاولة مرة أخرى.",
+        data: {},
+      };
+    }
   } catch (error) {
-    // (الكود الأصلي)
+    console.error(
+      "❌ [Gemini] Error communicating with Gemini API:",
+      error.message
+    );
+
+    // في حالة الخطأ، أعد رد Quick Parse أو رد عام
+    const quickFallback = quickKeywordParse(userMessage, userInfo);
+    if (quickFallback) {
+      console.log("🔄 [Gemini] Using quick parse fallback");
+      return quickFallback;
+    }
+
+    // إذا فشل كل شيء، أعد رد خطأ
+    return {
+      intent: "CHAT",
+      confidence: 0.1,
+      missing_fields: [],
+      message: "عذراً، حدث خطأ تقني. يرجى المحاولة لاحقاً.",
+      data: {},
+    };
   }
 }
 
