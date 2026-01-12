@@ -64,6 +64,25 @@ function quickKeywordParse(message) {
   console.log("🧹 [Quick Parse] Original:", lowerMessage);
   console.log("🧹 [Quick Parse] Cleaned:", cleanMessage);
 
+  // اختبار سريع للتحيات
+  console.log(
+    "🗣️ [Test] Checking 'السلام عليكم' in lowerMessage:",
+    lowerMessage.includes("السلام عليكم")
+  );
+  console.log(
+    "🗣️ [Test] Checking 'كيفك' in lowerMessage:",
+    lowerMessage.includes("كيفك")
+  );
+  console.log(
+    "🗣️ [Test] Checking 'مين انت' in lowerMessage:",
+    lowerMessage.includes("مين انت")
+  );
+  console.log("🗣️ [Greetings] Available patterns:", greetingPatterns);
+  console.log(
+    "🗣️ [Greetings] Matching patterns:",
+    greetingPatterns.filter((p) => cleanMessage.includes(p))
+  );
+
   // تتبع شحنة - أولوية عالية
   if (lowerMessage.includes("تتبع") || lowerMessage.includes("track")) {
     const numberMatch = message.match(/(\d{6,})/);
@@ -128,7 +147,11 @@ function quickKeywordParse(message) {
   }
 
   // إلغاء شحنة
-  if (lowerMessage.includes("إلغاء") || lowerMessage.includes("cancel")) {
+  if (
+    cleanMessage.includes("إلغاء") ||
+    cleanMessage.includes("cancel") ||
+    cleanMessage.includes("الغاء")
+  ) {
     const numberMatch = message.match(/(\d{3,})/);
     if (numberMatch) {
       return {
@@ -136,6 +159,31 @@ function quickKeywordParse(message) {
         data: { shipment_id: numberMatch[1] },
       };
     }
+  }
+
+  // أسئلة هوية وتعريف الذات
+  const identityPatterns = [
+    "مين انت",
+    "من أنت",
+    "من انت",
+    "بتحكي عربي",
+    "بتتكلم عربي",
+    "شو فيك تساعدني",
+    "بتقدر تساعدني",
+    "هل تساعدني",
+    "من هو",
+    "وش اسمك",
+    "اسمك وش",
+  ];
+  if (
+    identityPatterns.some((pattern) => cleanMessage.includes(pattern)) ||
+    identityPatterns.some((pattern) => lowerMessage.includes(pattern))
+  ) {
+    return {
+      action: "CHAT_RESPONSE",
+      message:
+        "🤖 **أنا مساعد مراسيل الذكي!** 🛠️\n\nأنا نظام ذكاء اصطناعي متخصص في مساعدة تجار السعودية 🇸🇦 في كل ما يخص الشحن والشحنات.\n\n✨ **أقدر أساعدك في**:\n• 📦 إنشاء وتتبع الشحنات\n• 💰 معرفة رصيد المحفظة\n• 📋 عرض الشحنات الموجودة\n• 🏢 معلومات عن الشركات والأسعار\n• ❓ إجابة على أي سؤال\n\nقلي وش تحتاجه وسأساعدك فوراً! 🚀\n\n#مراسيل #شحن_ذكي",
+    };
   }
 
   // تحيات وأسئلة عامة - باللهجة السعودية
@@ -180,7 +228,10 @@ function quickKeywordParse(message) {
     "🗣️ [Greetings] Checking patterns:",
     greetingPatterns.filter((p) => cleanMessage.includes(p))
   );
-  if (greetingPatterns.some((pattern) => cleanMessage.includes(pattern))) {
+  if (
+    greetingPatterns.some((pattern) => cleanMessage.includes(pattern)) ||
+    greetingPatterns.some((pattern) => lowerMessage.includes(pattern))
+  ) {
     console.log("✅ [Greetings] Detected greeting pattern!");
     return {
       action: "CHAT_RESPONSE",
