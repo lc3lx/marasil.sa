@@ -232,6 +232,143 @@ class AIServices {
       };
     }
   }
+
+  /**
+   * خدمة المعلومات العامة (للأسئلة غير المباشرة المرتبطة ببيانات المستخدم)
+   */
+  async getCompanyInfo() {
+    try {
+      console.log("ℹ️ [AI-General] Getting company info");
+
+      return {
+        success: true,
+        companyInfo: {
+          name: "مراسيل",
+          description: "منصة شحن إلكترونية متخصصة في خدمة التجار والشركات في المملكة العربية السعودية",
+          services: [
+            "إنشاء وتتبع الشحنات",
+            "ربط المتاجر الإلكترونية",
+            "إدارة المحفظة المالية",
+            "إدارة المرتجعات والاستبدال",
+            "تخصيص صفحات التتبع"
+          ],
+          vision: "تسهيل عمليات الشحن للتجار وتحسين تجربة العملاء",
+          contact: {
+            email: "support@marasil.sa",
+            phone: "920000000"
+          }
+        }
+      };
+
+    } catch (error) {
+      console.error("❌ [AI-General] Company info error:", error);
+      return {
+        success: false,
+        message: "حدث خطأ في الحصول على معلومات الشركة"
+      };
+    }
+  }
+
+  /**
+   * خدمة الحصول على شركات الشحن المتاحة
+   */
+  async getShippingCompanies() {
+    try {
+      console.log("🚚 [AI-General] Getting shipping companies");
+
+      return {
+        success: true,
+        companies: [
+          {
+            name: "سمسا",
+            types: ["اقتصادي", "برو"],
+            pricing: "حسب الوزن والمسافة",
+            deliveryTime: "1-5 أيام",
+            description: "خدمة موثوقة للشحنات المحلية"
+          },
+          {
+            name: "أرامكس",
+            types: ["برو"],
+            pricing: "أعلى من سمسا",
+            deliveryTime: "1-3 أيام",
+            description: "خدمة سريعة وموثوقة"
+          },
+          {
+            name: "ريد بوكس",
+            types: ["أساسي"],
+            pricing: "مناسب للشحنات الصغيرة",
+            deliveryTime: "2-7 أيام",
+            description: "خدمة اقتصادية"
+          },
+          {
+            name: "لاما بوكس",
+            types: ["أساسي"],
+            pricing: "مناسب للشحنات المتوسطة",
+            deliveryTime: "2-5 أيام",
+            description: "خدمة موثوقة للمتاجر"
+          }
+        ],
+        recommendation: "ننصح بسمسا لمعظم الشحنات للتوازن بين السعر والسرعة"
+      };
+
+    } catch (error) {
+      console.error("❌ [AI-General] Shipping companies error:", error);
+      return {
+        success: false,
+        message: "حدث خطأ في الحصول على شركات الشحن"
+      };
+    }
+  }
+
+  /**
+   * خدمة حساب الأسعار
+   */
+  async getPricingInfo(data) {
+    try {
+      console.log("💰 [AI-General] Calculating pricing for:", data);
+
+      const { weight, distance } = data;
+      let basePrice = 0;
+      let totalPrice = 0;
+
+      // حساب أساسي للأسعار (يمكن تحسينه لاحقاً)
+      if (weight <= 1) {
+        basePrice = 25;
+      } else if (weight <= 5) {
+        basePrice = 35;
+      } else if (weight <= 10) {
+        basePrice = 50;
+      } else {
+        basePrice = 50 + (weight - 10) * 5; // 5 ريال لكل كيلو إضافي
+      }
+
+      // إضافة رسوم المسافة إذا كانت بعيدة
+      if (distance && (distance.includes("جدة") || distance.includes("الرياض"))) {
+        totalPrice = basePrice;
+      } else {
+        totalPrice = basePrice + 10; // رسوم إضافية للمسافات البعيدة
+      }
+
+      return {
+        success: true,
+        pricing: {
+          weight: weight,
+          basePrice: basePrice,
+          totalPrice: totalPrice,
+          currency: "SAR",
+          notes: "السعر التقريبي وقد يختلف حسب الشركة والمنطقة"
+        },
+        recommendation: weight <= 5 ? "ننصح بشركة سمسا اقتصادي" : "ننصح بشركة سمسا برو"
+      };
+
+    } catch (error) {
+      console.error("❌ [AI-General] Pricing error:", error);
+      return {
+        success: false,
+        message: "حدث خطأ في حساب الأسعار"
+      };
+    }
+  }
 }
 
 module.exports = AIServices;

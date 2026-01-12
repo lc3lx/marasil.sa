@@ -57,16 +57,67 @@ const SYSTEM_PROMPT = `أنت مساعد ذكاء اصطناعي رسمي لمن
 3. الوصول إلى البيانات: إذا لزم، استدعي الـ API للوصول إلى قاعدة البيانات
 4. بناء الرد: اجعل الرد ودي، مفيد، ومطمئن
 
-=== وصف الـ APIs المتاحة في الباك إند ===
-استخدم هذه الـ APIs للرد على الأسئلة:
-- shipmentService.trackShipment(tracking_number): يرد بتفاصيل الشحنة (status, location, etc.)
-- shipmentService.createShipmentFromAI(data): ينشئ شحنة جديدة (يتطلب recipient_name, phone, weight, address, city)
-- shipmentService.cancelShipment(shipment_id): يلغي شحنة
-- shipmentService.getUserShipments(): يرد بقائمة الشحنات
-- walletService.getBalance(): يرد برصيد المحفظة
-- generalService.getCompanyInfo(): يرد بمعلومات عن الشركة
-- generalService.getShippingCompanies(): يرد بشركات الشحن المتاحة
-- generalService.getPricingInfo(data): يحسب الأسعار بناءً على وزن ومسافة
+=== شرح مفصل للـ APIs المتاحة ===
+
+استخدم هذه الـ APIs بناءً على فهم نية السؤال. لكل API شرح مفصل عن متى وكيف تستخدمه:
+
+1. **shipmentService.trackShipment(tracking_number)**
+   - **متى تستخدمه:** عندما يسأل التاجر عن حالة شحنة معينة أو يريد تتبع شحنة
+   - **المعطيات:** tracking_number (رقم التتبع)
+   - **ما يرد به:** حالة الشحنة، تاريخ الإنشاء، بيانات المستلم، التفاصيل
+   - **أمثلة أسئلة:** "وين شحنتي رقم 123456"، "كيف حالة الشحنة"، "تابع الشحنة"
+   - **عدم استخدامه:** إذا لم يحدد رقم التتبع
+
+2. **shipmentService.createShipmentFromAI(data)**
+   - **متى تستخدمه:** عندما يريد التاجر إنشاء شحنة جديدة ولديه جميع البيانات المطلوبة
+   - **المعطيات المطلوبة:** recipient_name, phone, weight, address, city
+   - **ما يرد به:** رقم التتبع الجديد، تأكيد الإنشاء
+   - **أمثلة أسئلة:** "أريد أشحن شيء لأحمد"، "أضف شحنة جديدة"
+   - **ملاحظة:** لا تستخدم إلا إذا كانت جميع البيانات متوفرة
+
+3. **shipmentService.cancelShipment(shipment_id)**
+   - **متى تستخدمه:** عندما يريد التاجر إلغاء شحنة محددة
+   - **المعطيات:** shipment_id (معرف الشحنة)
+   - **ما يرد به:** تأكيد الإلغاء أو رسالة خطأ إذا تعذر الإلغاء
+   - **أمثلة أسئلة:** "ألغِ الشحنة رقم 123"، "أريد ألغي شحنتي"
+   - **قيود:** لا يمكن إلغاء الشحنات التي تم تسليمها أو التي في الطريق
+
+4. **shipmentService.getUserShipments()**
+   - **متى تستخدمه:** عندما يسأل التاجر عن شحناته أو يريد رؤية قائمة الشحنات
+   - **المعطيات:** لا يحتاج معطيات (يستخدم userId من الجلسة)
+   - **ما يرد به:** قائمة الشحنات الأخيرة مع الحالات والتفاصيل
+   - **أمثلة أسئلة:** "شحناتي"، "وريني شحناتي"، "كم شحنة عندي"
+
+5. **walletService.getBalance()**
+   - **متى تستخدمه:** عندما يسأل التاجر عن رصيده أو أمواله في المحفظة
+   - **المعطيات:** لا يحتاج معطيات
+   - **ما يرد به:** الرصيد الحالي بالريال السعودي
+   - **أمثلة أسئلة:** "كم رصيدي"، "فلوسي كم"، "رصيد محفظتي"
+
+6. **generalService.getCompanyInfo()**
+   - **متى تستخدمه:** عندما يسأل التاجر عن مراسيل كشركة أو معلومات عامة
+   - **المعطيات:** لا يحتاج معطيات
+   - **ما يرد به:** معلومات عن الرؤية والخدمات والتواصل
+   - **أمثلة أسئلة:** "ما هي مراسيل"، "معلومات عن الشركة"، "عن مراسيل"
+
+7. **generalService.getShippingCompanies()**
+   - **متى تستخدمه:** عندما يسأل التاجر عن شركات الشحن المتاحة أو يريد مقارنة
+   - **المعطيات:** لا يحتاج معطيات
+   - **ما يرد به:** قائمة شركات الشحن مع أسعارها ومدد التوصيل
+   - **أمثلة أسئلة:** "ما هي شركات الشحن"، "أي شركة أختار"، "شركات التوصيل"
+
+8. **generalService.getPricingInfo(data)**
+   - **متى تستخدمه:** عندما يسأل التاجر عن الأسعار أو يريد حساب تكلفة شحنة
+   - **المعطيات:** weight (الوزن)، distance (المسافة - اختياري)
+   - **ما يرد به:** حساب التكلفة بناءً على الوزن والمسافة
+   - **أمثلة أسئلة:** "كم تكلفة شحنة 2 كيلو"، "كم السعر للشحن"
+
+=== كيفية اختيار الـ API المناسب ===
+
+1. **فهم النية:** اقرأ السؤال بعناية وحدد ما يريده التاجر بالضبط
+2. **التحقق من البيانات:** تأكد من توفر البيانات المطلوبة للـ API
+3. **اختيار الـ API:** اختر الـ API الأنسب للنية
+4. **استدعاء الـ API:** استخدم function calling لاستدعاء الـ API
 
 إذا كان السؤال يتطلب API، حدد الـ intent واستدعيها عبر function calling.
 
@@ -87,8 +138,30 @@ const SYSTEM_PROMPT = `أنت مساعد ذكاء اصطناعي رسمي لمن
 // (ابقِ كما هو)
 
 === أمثلة للردود مع أسماء العملاء ===
-// (ابقِ كما هو، أضف أمثلة جديدة)
-{"intent": "COMPANY_INFO", "confidence": 0.9, "missing_fields": [], "message": "تمام محمد، هذي معلومات عن مراسيل...", "data": {}, "api_call": {"name": "getCompanyInfo", "params": {}}}
+
+**مثال 1: تتبع شحنة**
+السؤال: "وين شحنتي رقم 123456"
+الرد: {"intent": "TRACK", "confidence": 0.95, "missing_fields": [], "message": "تمام أحمد، خلني أجيبلك بيانات الشحنة الحين...", "data": {"tracking_number": "123456"}, "api_call": {"name": "trackShipment", "params": {"tracking_number": "123456"}}}
+
+**مثال 2: رصيد المحفظة**
+السؤال: "كم رصيدي"
+الرد: {"intent": "BALANCE", "confidence": 0.9, "missing_fields": [], "message": "تمام سعد، خلني أجيبلك بيانات رصيدك من النظام...", "data": {}, "api_call": {"name": "getBalance", "params": {}}}
+
+**مثال 3: إنشاء شحنة (بيانات ناقصة)**
+السؤال: "أريد أشحن شيء"
+الرد: {"intent": "CREATE", "confidence": 0.8, "missing_fields": ["recipient_name", "phone", "weight"], "message": "تمام، لإنشاء الشحنة أحتاج أعرف: اسم المستلم، رقم جواله، وزن الشحنة", "data": {}}
+
+**مثال 4: معلومات الشركة**
+السؤال: "ما هي مراسيل"
+الرد: {"intent": "COMPANY_INFO", "confidence": 0.9, "missing_fields": [], "message": "مراسيل هي منصة شحن إلكترونية متخصصة في خدمة التجار...", "data": {}, "api_call": {"name": "getCompanyInfo", "params": {}}}
+
+**مثال 5: شركات الشحن**
+السؤال: "أي شركة شحن أختار"
+الرد: {"intent": "SHIPPING_COMPANIES", "confidence": 0.85, "missing_fields": [], "message": "تمام، خلني أوضحلك شركات الشحن المتاحة عندنا...", "data": {}, "api_call": {"name": "getShippingCompanies", "params": {}}}
+
+**مثال 6: حساب الأسعار**
+السؤال: "كم تكلفة شحنة 2 كيلو"
+الرد: {"intent": "PRICING", "confidence": 0.9, "missing_fields": [], "message": "تمام، لحساب تكلفة شحنة 2 كيلو...", "data": {"weight": 2}, "api_call": {"name": "getPricingInfo", "params": {"weight": 2}}}
 
 === مخرجات الرد المثالي ===
 // (ابقِ كما هو)
@@ -97,55 +170,73 @@ const SYSTEM_PROMPT = `أنت مساعد ذكاء اصطناعي رسمي لمن
 // (ابقِ كما هو)
 `;
 
-// State Manager للمحادثات (ابقِ كما هو)
-class ConversationStateManager {
-  // (الكود الأصلي)
-}
-
-const stateManager = new ConversationStateManager();
-
 // تعريف الـ tools لـ function calling في Gemini
 const TOOLS = [
   {
     name: "trackShipment",
-    description: "تتبع شحنة باستخدام رقم التتبع",
+    description:
+      "تتبع شحنة باستخدام رقم التتبع. استخدم هذا عندما يسأل التاجر عن حالة شحنة معينة أو يريد معلومات عن شحنة.",
     parameters: {
       type: "object",
       properties: {
-        tracking_number: { type: "string" },
+        tracking_number: {
+          type: "string",
+          description: "رقم التتبع للشحنة (مثل: 123456 أو MRSL123456)",
+        },
       },
       required: ["tracking_number"],
     },
   },
   {
     name: "createShipment",
-    description: "إنشاء شحنة جديدة",
+    description:
+      "إنشاء شحنة جديدة. استخدم هذا فقط إذا كان لديك جميع البيانات المطلوبة: اسم المستلم، رقم الهاتف، الوزن، العنوان، المدينة.",
     parameters: {
       type: "object",
       properties: {
-        recipient_name: { type: "string" },
-        phone: { type: "string" },
-        weight: { type: "number" },
-        address: { type: "string" },
-        city: { type: "string" },
+        recipient_name: {
+          type: "string",
+          description: "اسم المستلم الكامل",
+        },
+        phone: {
+          type: "string",
+          description: "رقم هاتف المستلم",
+        },
+        weight: {
+          type: "number",
+          description: "وزن الشحنة بالكيلوغرام",
+        },
+        address: {
+          type: "string",
+          description: "عنوان المستلم الكامل",
+        },
+        city: {
+          type: "string",
+          description: "مدينة المستلم",
+        },
       },
       required: ["recipient_name", "phone", "weight"],
     },
   },
   {
     name: "cancelShipment",
-    description: "إلغاء شحنة",
+    description:
+      "إلغاء شحنة موجودة. استخدم هذا عندما يطلب التاجر إلغاء شحنة محددة.",
     parameters: {
       type: "object",
       properties: {
-        shipment_id: { type: "string" },
+        shipment_id: {
+          type: "string",
+          description: "معرف الشحنة المراد إلغاؤها",
+        },
       },
       required: ["shipment_id"],
     },
   },
   {
     name: "getBalance",
-    description: "الحصول على رصيد المحفظة",
+    description:
+      "الحصول على رصيد المحفظة الحالي. استخدم هذا عندما يسأل التاجر عن رصيده أو أمواله.",
     parameters: {
       type: "object",
       properties: {},
@@ -153,7 +244,8 @@ const TOOLS = [
   },
   {
     name: "getUserShipments",
-    description: "الحصول على قائمة الشحنات",
+    description:
+      "الحصول على قائمة شحنات المستخدم. استخدم هذا عندما يريد التاجر رؤية شحناته.",
     parameters: {
       type: "object",
       properties: {},
@@ -161,7 +253,8 @@ const TOOLS = [
   },
   {
     name: "getCompanyInfo",
-    description: "الحصول على معلومات الشركة",
+    description:
+      "الحصول على معلومات عن شركة مراسيل. استخدم هذا عندما يسأل التاجر عن الشركة.",
     parameters: {
       type: "object",
       properties: {},
@@ -169,7 +262,8 @@ const TOOLS = [
   },
   {
     name: "getShippingCompanies",
-    description: "الحصول على شركات الشحن",
+    description:
+      "الحصول على قائمة شركات الشحن المتاحة. استخدم هذا عندما يسأل التاجر عن شركات الشحن أو يريد مقارنة.",
     parameters: {
       type: "object",
       properties: {},
@@ -177,38 +271,195 @@ const TOOLS = [
   },
   {
     name: "getPricingInfo",
-    description: "حساب الأسعار",
+    description:
+      "حساب أسعار الشحن. استخدم هذا عندما يسأل التاجر عن الأسعار أو يريد حساب تكلفة شحنة.",
     parameters: {
       type: "object",
       properties: {
-        weight: { type: "number" },
-        distance: { type: "string" },
+        weight: {
+          type: "number",
+          description: "وزن الشحنة بالكيلوغرام",
+        },
+        distance: {
+          type: "string",
+          description: "المسافة أو المدينة (اختياري)",
+        },
       },
       required: ["weight"],
     },
   },
 ];
 
+// State Manager للمحادثات (ابقِ كما هو)
+class ConversationStateManager {
+  // (الكود الأصلي)
+}
+
+const stateManager = new ConversationStateManager();
+
 /**
  * تحليل سريع للرسالة بناءً على الكلمات المفتاحية - محسن لمزيد من الحالات
  */
 function quickKeywordParse(message, userInfo = null) {
-  // (الكود الأصلي مع إضافات لمزيد من الأنماط)
-  // أضف أنماط جديدة مثل:
-  if (
-    lowerMessage.includes("معلومات الشركة") ||
-    lowerMessage.includes("about company")
-  ) {
+  const userName = userInfo?.firstName || "عميلنا الكريم";
+  const lowerMessage = message.toLowerCase();
+  const cleanMessage = message.trim();
+
+  // تعريف أنماط الترحيب
+  const greetingPatterns = [
+    "كيفك",
+    "هاي",
+    "هلا",
+    "السلام عليكم",
+    "مرحبا",
+    "أهلا",
+    "أهلاً",
+    "صباح الخير",
+    "مساء الخير",
+    "كيف حالك",
+    "كيف الحال",
+    "hello",
+    "hi",
+    "hey",
+    "أهلين",
+    "أهلين وسهلين",
+    "ياخي",
+    "يا أخ",
+    "شلونك",
+    "تمام",
+    "الحمد لله",
+    "تمام الحمد لله",
+  ];
+
+  // أنماط الترحيب - أولوية عالية
+  if (greetingPatterns.some((pattern) => lowerMessage.includes(pattern))) {
+    console.log("✅ [Quick Parse] Matched GREETING");
     return {
-      intent: "COMPANY_INFO",
-      confidence: 0.9,
+      intent: "CHAT",
+      confidence: 0.95,
       missing_fields: [],
-      message: `تمام ${userName}، خلني أجيبلك معلومات عن مراسيل...`,
+      message: `أهلاً ${userName} 👋 كيف أقدر أساعدك في شحناتك اليوم؟`,
       data: {},
     };
   }
 
-  // أسئلة عن شركات الشحن
+  // تتبع شحنة - أولوية عالية
+  if (lowerMessage.includes("تتبع") || lowerMessage.includes("track")) {
+    const numberMatch = message.match(/(\d{6,})/);
+    if (numberMatch) {
+      console.log("✅ [Quick Parse] Matched old TRACK pattern");
+      return {
+        intent: "TRACK",
+        confidence: 0.95,
+        missing_fields: [],
+        message: `تمام ${userName}، خلني أجيبلك بيانات الشحنة الحين...`,
+        data: { tracking_number: numberMatch[1] },
+      };
+    }
+  }
+
+  // إنشاء شحنة
+  if (
+    lowerMessage.includes("إنشاء") ||
+    lowerMessage.includes("create") ||
+    lowerMessage.includes("جديدة")
+  ) {
+    console.log("✅ [Quick Parse] Matched old CREATE pattern");
+    return {
+      intent: "CREATE",
+      confidence: 0.8,
+      missing_fields: ["recipient_name", "phone", "weight"],
+      message: `تمام ${userName} 👍 لمين الشحنة؟`,
+      data: {},
+    };
+  }
+
+  // رصيد المحفظة - أنماط شاملة
+  const balancePatterns = [
+    "رصيد",
+    "balance",
+    "محفظة",
+    "wallet",
+    "فلوسي",
+    "فلوس",
+    "كم عندي",
+    "كم رصيدي",
+    "رصيدي كم",
+    "كم معي",
+    "معي كم",
+    "رصيد محفظتي",
+    "كم في محفظتي",
+    "كم رصيد بالمحفظة",
+    "رصيدي",
+    "فلوسي كم",
+  ];
+  if (balancePatterns.some((pattern) => cleanMessage.includes(pattern))) {
+    console.log("✅ [Quick Parse] Matched BALANCE pattern");
+    return {
+      intent: "BALANCE",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `تمام ${userName}، خلني أجيبلك بيانات رصيدك من النظام...`,
+      data: {},
+    };
+  }
+
+  // قائمة الشحنات
+  if (
+    lowerMessage.includes("شحناتي") ||
+    lowerMessage.includes("my shipments") ||
+    lowerMessage.includes("قائمة الشحنات") ||
+    lowerMessage.includes("شحنات")
+  ) {
+    console.log("✅ [Quick Parse] Matched LIST_SHIPMENTS pattern");
+    return {
+      intent: "LIST",
+      confidence: 0.85,
+      missing_fields: [],
+      message: `تمام ${userName}، خلني أجيبلك قائمة شحناتك...`,
+      data: {},
+    };
+  }
+
+  // إلغاء شحنة
+  if (
+    lowerMessage.includes("إلغاء") ||
+    lowerMessage.includes("cancel") ||
+    lowerMessage.includes("ألغي")
+  ) {
+    console.log("✅ [Quick Parse] Matched CANCEL pattern");
+    return {
+      intent: "CANCEL",
+      confidence: 0.8,
+      missing_fields: ["shipment_id"],
+      message: `${userName}، لإلغاء الشحنة أحتاج أعرف رقم الشحنة أو معرفها`,
+      data: {},
+    };
+  }
+
+  // معلومات الشركة
+  const companyPatterns = [
+    "معلومات الشركة",
+    "about company",
+    "ما هي مراسيل",
+    "عن مراسيل",
+    "من هي مراسيل",
+    "مراسيل هي",
+    "ما هي خدماتكم",
+    "خدماتكم",
+  ];
+  if (companyPatterns.some((pattern) => cleanMessage.includes(pattern))) {
+    console.log("✅ [Quick Parse] Matched COMPANY_INFO pattern");
+    return {
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: `مراسيل هي منصة شحن إلكترونية متخصصة في خدمة التجار والشركات في السعودية. نقدم خدمات إنشاء وتتبع الشحنات، ربط المتاجر، إدارة المحفظة، والمزيد. كيف أقدر أساعدك؟`,
+      data: {},
+    };
+  }
+
+  // شركات الشحن
   const shippingCompaniesPatterns = [
     "شركات الشحن",
     "shipping companies",
@@ -216,21 +467,22 @@ function quickKeywordParse(message, userInfo = null) {
     "شركات متوفرة",
     "أي شركات",
     "شركات التوصيل",
+    "شركات الشحن المتاحة",
   ];
   if (
     shippingCompaniesPatterns.some((pattern) => cleanMessage.includes(pattern))
   ) {
     console.log("✅ [Quick Parse] Matched SHIPPING_COMPANIES pattern");
     return {
-      intent: "SHIPPING_COMPANIES",
+      intent: "CHAT",
       confidence: 0.9,
       missing_fields: [],
-      message: `تمام ${userName}، خلني أجيبلك معلومات عن شركات الشحن المتاحة...`,
+      message: `عندنا عدة شركات شحن موثوقة: سمسا (اقتصادي وبرو)، أرامكس برو، ريد بوكس، ولما بوكس. كل شركة لها مميزاتها حسب نوع الشحنة. أي نوع شحنة عندك؟`,
       data: {},
     };
   }
 
-  // أسئلة عن الأسعار والتكلفة
+  // الأسعار والتكلفة
   const pricingPatterns = [
     "كم التكلفة",
     "كم السعر",
@@ -242,19 +494,22 @@ function quickKeywordParse(message, userInfo = null) {
     "cost",
     "كم يكلف",
     "كم تكلفة",
+    "كم سعر الشحن",
   ];
   if (pricingPatterns.some((pattern) => cleanMessage.includes(pattern))) {
     console.log("✅ [Quick Parse] Matched PRICING pattern");
     return {
-      intent: "PRICING",
+      intent: "CHAT",
       confidence: 0.8,
       missing_fields: ["weight"],
-      message: `تمام ${userName}، لحساب التكلفة أحتاج أعرف:\n• وزن الشحنة بالكيلو\n• المسافة أو المدينة\n\nقلي تفاصيل الشحنتك وسأحسب لك التكلفة بدقة! 💰`,
+      message: `تمام ${userName}، لحساب التكلفة أحتاج أعرف وزن الشحنة ونوعها. قلي تفاصيل شحنتك وسأحسب لك التكلفة بدقة! 💰`,
       data: {},
     };
   }
 
-  // (ابقِ الباقي كما هو)
+  // إذا لم يتطابق مع أي نمط - رد دردشة عام
+  console.log("⚡ [Quick Parse] No match, returning null for Gemini");
+  return null;
 }
 
 /**
@@ -316,39 +571,53 @@ async function processGeminiResponse(
     let apiResult;
     switch (api_call.name) {
       case "trackShipment":
+        console.log(
+          "🔄 [AI] Executing trackShipment:",
+          api_call.params.tracking_number
+        );
         apiResult = await services.shipmentService.trackShipment(
           api_call.params.tracking_number
         );
         break;
       case "createShipment":
+        console.log("🔄 [AI] Executing createShipment:", api_call.params);
         apiResult = await services.shipmentService.createShipmentFromAI(
           api_call.params
         );
         break;
       case "cancelShipment":
+        console.log(
+          "🔄 [AI] Executing cancelShipment:",
+          api_call.params.shipment_id
+        );
         apiResult = await services.shipmentService.cancelShipment(
           api_call.params.shipment_id
         );
         break;
       case "getBalance":
+        console.log("🔄 [AI] Executing getBalance");
         apiResult = await services.walletService.getBalance();
         break;
       case "getUserShipments":
+        console.log("🔄 [AI] Executing getUserShipments");
         apiResult = await services.shipmentService.getUserShipments();
         break;
       case "getCompanyInfo":
+        console.log("🔄 [AI] Executing getCompanyInfo");
         apiResult = await services.generalService.getCompanyInfo();
         break;
       case "getShippingCompanies":
+        console.log("🔄 [AI] Executing getShippingCompanies");
         apiResult = await services.generalService.getShippingCompanies();
         break;
       case "getPricingInfo":
+        console.log("🔄 [AI] Executing getPricingInfo:", api_call.params);
         apiResult = await services.generalService.getPricingInfo(
           api_call.params
         );
         break;
-      // ... حالات أخرى إذا لزم
       default:
+        console.log("❌ [AI] Unknown API call:", api_call.name);
         apiResult = { success: false, message: "API غير مدعوم" };
     }
     return {
