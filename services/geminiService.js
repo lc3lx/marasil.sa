@@ -49,14 +49,16 @@ const stateManager = new ConversationStateManager();
 
 const SYSTEM_PROMPT = `أنت مساعد خدمة عملاء شحنات سعودي ذكي ومحترف جداً. أنت تتحدث بالعربية الفصحى مع اللهجة السعودية الطبيعية.
 
-مهمتك: فهم النية من رسائل العملاء ومساعدتهم بطريقة طبيعية جداً مثل موظف خدمة عملاء سعودي محترف.
+مهمتك: فهم النية من رسائل العملاء ومساعدتهم بطريقة طبيعية جداً مثل موظف خدمة عملاء سعودي محترف شخصي.
 
 === قواعد هامة ===
 1. استخدم السياق من المحادثات السابقة دائماً
 2. لا تكرر أسئلة تم الإجابة عليها
-3. كن ودوداً ومحترفاً ومباشراً
-4. إذا كنت بحاجة لمعلومات إضافية، اسأل بلباقة
-5. اللهجة السعودية الطبيعية: "تمام 👍", "ما عندك مشكلة", "بالضبط", "وش تحتاجه"
+3. كن ودوداً ومحترفاً ومباشراً مثل موظف خدمة عملاء شخصي
+4. استخدم اسم العميل في الردود عند الإمكان: "تمام {اسم العميل} 👍"
+5. إذا كنت بحاجة لمعلومات إضافية، اسأل بلباقة
+6. اللهجة السعودية الطبيعية: "تمام {اسم} 👍", "ما عندك مشكلة", "بالضبط", "وش تحتاجه"
+7. استخدم البيانات الحقيقية من قاعدة البيانات، لا تفترض
 
 === صيغة الرد (JSON فقط) ===
 {
@@ -67,25 +69,25 @@ const SYSTEM_PROMPT = `أنت مساعد خدمة عملاء شحنات سعود
   "data": {"tracking_number": "123", "recipient_name": "أحمد"}
 }
 
-=== أمثلة للردود ===
+=== أمثلة للردود مع أسماء العملاء ===
 
 بدء إنشاء شحنة:
-{"intent": "CREATE", "confidence": 0.8, "missing_fields": ["recipient_name"], "message": "تمام 👍 لمين الشحنة؟", "data": {}}
+{"intent": "CREATE", "confidence": 0.8, "missing_fields": ["recipient_name"], "message": "تمام أحمد 👍 لمين الشحنة؟", "data": {}}
 
 تتبع شحنة:
-{"intent": "TRACK", "confidence": 0.95, "missing_fields": [], "message": "", "data": {"tracking_number": "50724610926"}}
+{"intent": "TRACK", "confidence": 0.95, "missing_fields": [], "message": "تمام سارة، خلني أجيبلك بيانات الشحنة الحين...", "data": {"tracking_number": "50724610926"}}
 
-عرض الرصيد:
-{"intent": "BALANCE", "confidence": 0.9, "missing_fields": [], "message": "", "data": {}}
+استعلام الرصيد:
+{"intent": "BALANCE", "confidence": 0.9, "missing_fields": [], "message": "تمام محمد، خلني أجيبلك بيانات رصيدك من النظام...", "data": {}}
 
 قائمة الشحنات:
-{"intent": "LIST", "confidence": 0.9, "missing_fields": [], "message": "", "data": {}}
+{"intent": "LIST", "confidence": 0.9, "missing_fields": [], "message": "تمام فاطمة، هذي شحناتك:", "data": {}}
 
 محادثة عامة:
-{"intent": "CHAT", "confidence": 0.6, "missing_fields": [], "message": "أهلاً! وش أقدر أساعدك فيه اليوم؟", "data": {}}
+{"intent": "CHAT", "confidence": 0.6, "missing_fields": [], "message": "أهلاً خالد! كيف أقدر أساعدك في شحناتك اليوم؟", "data": {}}
 
 إلغاء شحنة:
-{"intent": "CANCEL", "confidence": 0.9, "missing_fields": [], "message": "", "data": {"shipment_id": "123"}}
+{"intent": "CANCEL", "confidence": 0.9, "missing_fields": [], "message": "تمام ليلى، خلني ألغي الشحنة لك...", "data": {"shipment_id": "123"}}
 
 === تذكير ===
 - intent=CHAT للتحيات والأسئلة العامة
@@ -350,8 +352,7 @@ function quickKeywordParse(message) {
     console.log("✅ [Greetings] Detected 'كيفك' greeting!");
     return {
       action: "CHAT_RESPONSE",
-      message:
-        "الحمد لله بخير! 😊\n\nأنا **مساعد مراسيل الذكي** 🤖 جاهز لخدمتك 🇸🇦\n\n✨ أقدر أساعدك في:\n• 📦 إنشاء وتتبع الشحنات\n• 💰 معرفة رصيدك\n• 📋 عرض شحناتك\n• ❓ أي سؤال عن الشحن\n\nوش تحتاجه اليوم؟ 🚀",
+      message: `الحمد لله بخير ${userName}! 😊\n\nأنا **مساعد مراسيل الذكي** 🤖 جاهز لخدمتك 🇸🇦\n\n✨ أقدر أساعدك في:\n• 📦 إنشاء وتتبع الشحنات\n• 💰 معرفة رصيدك\n• 📋 عرض شحناتك\n• ❓ أي سؤال عن الشحن\n\nوش تحتاجه اليوم؟ 🚀`,
     };
   }
 
@@ -362,8 +363,7 @@ function quickKeywordParse(message) {
     console.log("✅ [Greetings] Detected Islamic greeting!");
     return {
       action: "CHAT_RESPONSE",
-      message:
-        "وعليكم السلام ورحمة الله وبركاته! 🤲\n\nأنا **مساعد مراسيل الذكي** 🤖 - متخصص في شحنات السعودية 🇸🇦\n\n✨ جاهز لخدمتك في كل ما يخص الشحن:\n• 📦 إنشاء شحنة جديدة\n• 🔍 تتبع شحناتك\n• 💰 رصيد محفظتك\n• 📋 شحناتك الموجودة\n\nكيف أقدر أساعدك؟ 😊",
+      message: `وعليكم السلام ورحمة الله وبركاته ${userName}! 🤲\n\nأنا **مساعد مراسيل الذكي** 🤖 - متخصص في شحنات السعودية 🇸🇦\n\n✨ جاهز لخدمتك في كل ما يخص الشحن:\n• 📦 إنشاء شحنة جديدة\n• 🔍 تتبع شحناتك\n• 💰 رصيد محفظتك\n• 📋 شحناتك الموجودة\n\nكيف أقدر أساعدك؟ 😊`,
     };
   }
 
@@ -371,8 +371,7 @@ function quickKeywordParse(message) {
     console.log("✅ [Greetings] Detected casual greeting!");
     return {
       action: "CHAT_RESPONSE",
-      message:
-        "هاي! مرحباً بك 🤝\n\nأنا **مساعد مراسيل الذكي** 🤖 - هنا عشان أساعدك في شحناتك 🇸🇦\n\n✨ أقدر أعمل لك:\n• 📦 شحنة جديدة\n• 🔍 تتبع شحنتك\n• 💰 شوف رصيدك\n• 📋 عرض شحناتك\n\nوش تبي تسوي؟ 😊",
+      message: `هاي! مرحباً بك ${userName} 🤝\n\nأنا **مساعد مراسيل الذكي** 🤖 - هنا عشان أساعدك في شحناتك 🇸🇦\n\n✨ أقدر أعمل لك:\n• 📦 شحنة جديدة\n• 🔍 تتبع شحنتك\n• 💰 شوف رصيدك\n• 📋 عرض شحناتك\n\nوش تبي تسوي؟ 😊`,
     };
   }
 
@@ -773,7 +772,12 @@ function buildContext(recentMessages) {
 /**
  * إرسال رسالة لـ Gemini والحصول على رد
  */
-async function sendToGemini(userMessage, context = "", userId = null) {
+async function sendToGemini(
+  userMessage,
+  context = "",
+  userId = null,
+  userInfo = null
+) {
   try {
     console.log("🎯 [Gemini] Processing user message:", userMessage);
 
@@ -812,7 +816,15 @@ async function sendToGemini(userMessage, context = "", userId = null) {
     const fullPrompt = `${SYSTEM_PROMPT}
 
 === معلومات العميل ===
-العميل: ${userId || "غير محدد"}
+المعرف: ${userId || "غير محدد"}
+${
+  userInfo
+    ? `الاسم: ${userInfo.firstName || ""} ${userInfo.lastName || ""}
+البريد الإلكتروني: ${userInfo.email || "غير محدد"}
+رقم الهاتف: ${userInfo.phone || "غير محدد"}
+العناوين: ${userInfo.addresses ? userInfo.addresses.length : 0} عنوان`
+    : "معلومات العميل غير متوفرة حالياً"
+}
 
 === الحالة الحالية للمحادثة ===
 ${
@@ -1038,8 +1050,19 @@ ${context}
 /**
  * معالجة الرد من Gemini وتنفيذ العمليات
  */
-async function processGeminiResponse(geminiResponse, services, userId = null) {
+async function processGeminiResponse(
+  geminiResponse,
+  services,
+  userId = null,
+  userInfo = null
+) {
   const { intent, confidence, missing_fields, message, data } = geminiResponse;
+
+  // الحصول على اسم العميل
+  const userName = userInfo
+    ? `${userInfo.firstName || ""} ${userInfo.lastName || ""}`.trim() ||
+      "عميلنا الكريم"
+    : "عميلنا الكريم";
 
   console.log(
     "🔄 [Gemini] Processing intent:",
@@ -1047,7 +1070,9 @@ async function processGeminiResponse(geminiResponse, services, userId = null) {
     "confidence:",
     confidence,
     "missing_fields:",
-    missing_fields
+    missing_fields,
+    "user:",
+    userName
   );
 
   try {
@@ -1105,13 +1130,14 @@ async function processGeminiResponse(geminiResponse, services, userId = null) {
           // اسأل عن الحقل المفقود الأول
           const field = missing_fields[0];
           const fieldMessages = {
-            recipient_name: "وش اسم المستلم؟",
-            phone: "وش رقم جوال المستلم؟",
-            weight: "كم وزن الشحنة بالكيلو؟",
-            address: "وش عنوان المستلم؟",
-            city: "وش مدينة المستلم؟",
+            recipient_name: `تمام ${userName} 👍 وش اسم المستلم؟`,
+            phone: `تمام ${userName}، وش رقم جوال المستلم؟`,
+            weight: `ممتاز ${userName}، كم وزن الشحنة بالكيلو؟`,
+            address: `تمام ${userName}، وش عنوان المستلم؟`,
+            city: `وش مدينة المستلم ${userName}؟`,
           };
-          const question = fieldMessages[field] || `أحتاج ${field}. وش قيمته؟`;
+          const question =
+            fieldMessages[field] || `أحتاج ${field}. وش قيمته ${userName}؟`;
           return {
             success: true,
             action: "CHAT_RESPONSE",

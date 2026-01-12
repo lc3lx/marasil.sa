@@ -45,10 +45,19 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
       }
     }
 
-    // إذا لم نجد العميل من التوكن، نبحث به user_id
+    // جلب بيانات المستخدم الكاملة من قاعدة البيانات
     if (!customer) {
-      // في هذا النظام، user_id هو ObjectId للعميل
-      customer = { _id: user_id };
+      try {
+        const Customer = require('../models/customerModel');
+        customer = await Customer.findById(user_id).select('firstName lastName email phone addresses');
+        if (!customer) {
+          console.warn("⚠️ [AI-Controller] Customer not found:", user_id);
+          customer = { _id: user_id, firstName: 'عميل', lastName: 'محترم' };
+        }
+      } catch (dbError) {
+        console.warn("⚠️ [AI-Controller] Database error:", dbError.message);
+        customer = { _id: user_id, firstName: 'عميل', lastName: 'محترم' };
+      }
     }
 
     // 1. إيجاد أو إنشاء محادثة
@@ -66,7 +75,7 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
 
     // 4. إرسال لـ Gemini
     console.log("🚀 [AI-Controller] Sending to Gemini...");
-    const geminiResponse = await geminiService.sendToGemini(message, context, user_id);
+    const geminiResponse = await geminiService.sendToGemini(message, context, user_id, customer);
 
     if (!geminiResponse || typeof geminiResponse !== 'object') {
       console.error("❌ [AI-Controller] Invalid Gemini response:", geminiResponse);
@@ -86,7 +95,7 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
     const executionResult = await geminiService.processGeminiResponse(geminiResponse, {
       shipmentService: aiServices,
       walletService: aiServices
-    }, user_id);
+    }, user_id, customer);
 
     console.log("✅ [AI-Controller] Execution result:", executionResult);
 
