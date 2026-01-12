@@ -253,8 +253,12 @@ function quickKeywordParse(message, userInfo = null) {
   if (lowerMessage.includes("تتبع") || lowerMessage.includes("track")) {
     const numberMatch = message.match(/(\d{6,})/);
     if (numberMatch) {
+      console.log("✅ [Quick Parse] Matched old TRACK pattern");
       return {
-        action: "TRACK_SHIPMENT",
+        intent: "TRACK",
+        confidence: 0.95,
+        missing_fields: [],
+        message: `تمام ${userName}، خلني أجيبلك بيانات الشحنة الحين...`,
         data: { tracking_number: numberMatch[1] },
       };
     }
@@ -266,8 +270,12 @@ function quickKeywordParse(message, userInfo = null) {
     lowerMessage.includes("create") ||
     lowerMessage.includes("جديدة")
   ) {
+    console.log("✅ [Quick Parse] Matched old CREATE pattern");
     return {
-      action: "CREATE_SHIPMENT",
+      intent: "CREATE",
+      confidence: 0.8,
+      missing_fields: ["recipient_name", "phone", "weight"],
+      message: `تمام ${userName} 👍 لمين الشحنة؟`,
       data: {},
     };
   }
@@ -923,6 +931,10 @@ function quickKeywordParse(message, userInfo = null) {
     "تابع شحنتي",
     "تتبع شحنتي",
     "/تتبع",
+    "اين شحنتي",
+    "وين شحنتي",
+    "فين شحنتي",
+    "قوم بتتبع",
   ];
   if (trackShipmentPatterns.some((pattern) => cleanMessage.includes(pattern))) {
     console.log("✅ [Quick Parse] Matched TRACK pattern");
@@ -1115,8 +1127,9 @@ ${context}
     // تقييد طول الـ prompt
     const maxPromptLength = 2000;
     if (fullPrompt.length > maxPromptLength) {
-      const truncatedContext = buildContext(recentMessages.slice(-3)); // آخر 3 رسائل فقط
-      fullPrompt = `${SYSTEM_PROMPT}\n\nContext (last 3 messages):\n${truncatedContext}\n\nUser: ${userMessage}\n\nRespond with valid JSON only:`;
+      // استخدم الـ context المُمرر بدلاً من recentMessages
+      const truncatedContext = context.length > 500 ? context.substring(0, 500) + "..." : context;
+      fullPrompt = `${SYSTEM_PROMPT}\n\nContext (last messages):\n${truncatedContext}\n\nUser: ${userMessage}\n\nRespond with valid JSON only:`;
     }
 
     console.log("🚀 [Gemini] Sending prompt to Gemini...");
