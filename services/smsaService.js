@@ -3,9 +3,13 @@
  * @param {Object} address عنوان العميل من قاعدة البيانات
  * @returns {Object} عنوان بصيغة SMSA
  */
-exports.formatAddress = (address) => {
-  return {
-    ShortCode: address.nationalAddress,
+exports.formatAddress = (address = {}) => {
+  const shouldOmitShortCode =
+    Boolean(address?.meta?.isOfficePickup) ||
+    Boolean(address?.meta?.isOfficeDropoff) ||
+    Boolean(address?.meta?.forceNoShortCode);
+
+  const formattedAddress = {
     ContactName: address.full_name, // بين 5 و150 حرف
     ContactPhoneNumber: address.mobile, // رقم الهاتف
     Country: address.country, // رمز الدولة
@@ -13,6 +17,12 @@ exports.formatAddress = (address) => {
     AddressLine1: `${address.address}        `,
     // District: address.address, // اسم المدينة
   };
+
+  if (!shouldOmitShortCode) {
+    formattedAddress.ShortCode = address.nationalAddress;
+  }
+
+  return formattedAddress;
 };
 
 exports.Shapmentdata = (

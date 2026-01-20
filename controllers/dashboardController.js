@@ -527,6 +527,13 @@ exports.getAllShipments = asyncHandler(async (req, res) => {
     searchQuery.shipmentstates = req.query.status;
   }
 
+  if (req.query.paymentMethod) {
+    const normalizedPayment = String(req.query.paymentMethod).toUpperCase();
+    if (["COD", "PREPAID"].includes(normalizedPayment)) {
+      searchQuery.paymentMathod = normalizedPayment === "PREPAID" ? "Prepaid" : "COD";
+    }
+  }
+
   // filter by specific user if provided
   if (req.query.userId) {
     searchQuery.customerId = req.query.userId;

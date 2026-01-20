@@ -3,6 +3,54 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 // تهيئة Gemini API مع دعم لـ function calling
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+const ENABLE_DEEP_THINKING =
+  process.env.GEMINI_ALLOW_EXPANSIVE_RESPONSES !== "false";
+
+const GENERATION_CONFIG = {
+  temperature: 0.7,
+  topK: 40,
+  topP: 0.9,
+  maxOutputTokens: 1536,
+};
+
+const ARABIC_INDIC_DIGITS_MAP = Object.freeze({
+  "٠": "0",
+  "١": "1",
+  "٢": "2",
+  "٣": "3",
+  "٤": "4",
+  "٥": "5",
+  "٦": "6",
+  "٧": "7",
+  "٨": "8",
+  "٩": "9",
+});
+
+function normalizeArabicText(text = "") {
+  if (!text) return "";
+
+  return text
+    .toLowerCase()
+    .replace(/[\u0622\u0623\u0625\u0627]/g, "ا")
+    .replace(/[\u0649\u0625\u0670\u0640]/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/ؤ/g, "و")
+    .replace(/ئ/g, "ي")
+    .replace(/؟/g, "?")
+    .replace(/[٠-٩]/g, (digit) => ARABIC_INDIC_DIGITS_MAP[digit] || digit)
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function includesNormalized(haystack = "", pattern = "", haystackNormalized = false) {
+  if (!haystack || !pattern) return false;
+  const normalizedHaystack = haystackNormalized
+    ? haystack
+    : normalizeArabicText(haystack);
+  const normalizedPattern = normalizeArabicText(pattern);
+  return normalizedHaystack.includes(normalizedPattern);
+}
+
 /**
  * System Prompt الصارم للمساعد الذكي - محسن ليشمل وصف APIs وتفكير خطوة بخطوة
  */
@@ -290,6 +338,8 @@ const TOOLS = [
   },
 ];
 
+const NO_CONTEXT_PLACEHOLDER = "لا يوجد سياق سابق.";
+
 // State Manager للمحادثات (ابقِ كما هو)
 class ConversationStateManager {
   // (الكود الأصلي)
@@ -393,38 +443,53 @@ function buildContext(recentMessages) {
  * استخراج intent من الرسالة
  */
 function extractIntent(message) {
-  const lowerMessage = message.toLowerCase();
+  const normalizedMessage = normalizeArabicText(message || "");
+  const lowerMessage = (message || "").toLowerCase();
 
   // تتبع شحنة
-  if (lowerMessage.includes("تتبع") || lowerMessage.includes("track")) {
+  if (
+    includesNormalized(normalizedMessage, "تتبع", true) ||
+    lowerMessage.includes("track") ||
+    includesNormalized(normalizedMessage, "وين طلبي", true) ||
+    includesNormalized(normalizedMessage, "وين الطلب", true) ||
+    includesNormalized(normalizedMessage, "وصلت الشحنه", true)
+  ) {
     return "TRACK";
   }
 
   // إنشاء شحنة
   if (
-    lowerMessage.includes("إنشاء") ||
+    includesNormalized(normalizedMessage, "انشاء", true) ||
     lowerMessage.includes("create") ||
-    lowerMessage.includes("جديد")
+    includesNormalized(normalizedMessage, "شحنه جديده", true) ||
+    includesNormalized(normalizedMessage, "ابغى اشحن", true)
   ) {
     return "CREATE";
   }
 
   // رصيد المحفظة
   if (
-    lowerMessage.includes("رصيد") ||
+    includesNormalized(normalizedMessage, "رصيد", true) ||
     lowerMessage.includes("balance") ||
-    lowerMessage.includes("محفظة")
+    includesNormalized(normalizedMessage, "محفظه", true)
   ) {
     return "BALANCE";
   }
 
   // قائمة الشحنات
-  if (lowerMessage.includes("شحنات") || lowerMessage.includes("shipments")) {
+  if (
+    includesNormalized(normalizedMessage, "شحنات", true) ||
+    lowerMessage.includes("shipments")
+  ) {
     return "LIST";
   }
 
   // إلغاء شحنة
-  if (lowerMessage.includes("إلغاء") || lowerMessage.includes("cancel")) {
+  if (
+    includesNormalized(normalizedMessage, "الغاء", true) ||
+    lowerMessage.includes("cancel") ||
+    includesNormalized(normalizedMessage, "الغي", true)
+  ) {
     return "CANCEL";
   }
 
@@ -436,8 +501,9 @@ function extractIntent(message) {
  */
 function quickKeywordParse(message, userInfo = null) {
   const userName = userInfo?.firstName || "عميلنا الكريم";
-  const lowerMessage = message.toLowerCase();
-  const cleanMessage = message.trim();
+  const normalizedMessage = normalizeArabicText(message || "");
+  const lowerMessage = (message || "").toLowerCase();
+  const cleanMessage = (message || "").trim();
 
   // تعريف أنماط الترحيب
   const greetingPatterns = [
@@ -463,18 +529,23 @@ function quickKeywordParse(message, userInfo = null) {
     "تمام",
     "الحمد لله",
     "تمام الحمد لله",
+    "ايش الاخبار",
+    "شلونك",
+    "عامل ايه",
+    "كيف امورك",
   ];
 
   // أنماط الترحيب - أولوية عالية (لكن ليس إذا كانت جزء من جملة أخرى)
   const isGreeting = greetingPatterns.some((pattern) => {
     // تجنب التحيات التي تكون جزء من جملة مثل "هاي الرقم"
-    if (pattern === "هاي" && cleanMessage.includes("هاي الرقم")) {
+    if (
+      normalizeArabicText(pattern) === "هاي" &&
+      (includesNormalized(normalizedMessage, "هاي الرقم", true) ||
+        includesNormalized(normalizedMessage, "هاي رقم", true))
+    ) {
       return false;
     }
-    if (pattern === "هاي" && cleanMessage.includes("هاي رقم")) {
-      return false;
-    }
-    return lowerMessage.includes(pattern);
+    return includesNormalized(normalizedMessage, pattern, true);
   });
 
   if (isGreeting) {
@@ -489,11 +560,12 @@ function quickKeywordParse(message, userInfo = null) {
   }
 
   // التحقق من رقم التتبع المستقل (مثل "50724610926")
-  const numberOnlyMatch = message.match(/^(\d{6,})$/);
+  const numberOnlyMatch = normalizedMessage.match(/^(\d{6,})$/);
   if (
     numberOnlyMatch &&
-    !lowerMessage.includes("كم") &&
-    !lowerMessage.includes("balance")
+    !includesNormalized(normalizedMessage, "كم", true) &&
+    !lowerMessage.includes("balance") &&
+    !includesNormalized(normalizedMessage, "بكم", true)
   ) {
     console.log("✅ [Quick Parse] Matched standalone tracking number");
     return {
@@ -506,8 +578,8 @@ function quickKeywordParse(message, userInfo = null) {
   }
 
   // التحقق من رقم التتبع مع كلمات توضيحية (مثل "هاي رقم التتبع 50724610926")
-  const numberWithWordsMatch = message.match(
-    /(?:رقم|هاي|هذا|التتبع|الشحنة|هاي الرقم)\s*\:?\s*(\d{6,})/i
+  const numberWithWordsMatch = normalizedMessage.match(
+    /(?:رقم|هاي|هذا|التتبع|الشحنه|الطلب|الطلبيه|الكود|المرسل|هاي الرقم)\s*:?\s*(\d{6,})/i
   );
   if (numberWithWordsMatch) {
     console.log("✅ [Quick Parse] Matched tracking number with words");
@@ -527,34 +599,47 @@ function quickKeywordParse(message, userInfo = null) {
     "تابع",
     "شو الحل",
     "بدي اتبع",
-    "أريد أتبع",
+    "اريد اتبع",
     "اتبع",
     "تبع",
     "زبط الوضع",
-    "بدي اتبع",
     "هاي رقم التتبع",
     "رقم التتبع",
     "رقم الشحنة",
     "وينها",
     "وين الشحنة",
     "فين الشحنة",
-    "شو الشحنة",
-    "وين وصلت",
-    "كيف الشحنة",
-    "حالة الشحنة",
+    "وين الطلب",
+    "وين طلبي",
+    "طلبي وين",
+    "وين صار الطلب",
+    "وين صار الطرد",
+    "وين صارت",
+    "وين وصل",
+    "فين وصلت",
+    "وصلت الشحنه",
+    "وصل طلبي",
+    "حالة الشحنه",
+    "متا توصل",
+    "امتى توصل",
+    "متى توصل",
     "وين الطرد",
     "فين الطرد",
     "اطلع الشحنة",
     "بعتلك ايه",
     "شو بعتلك",
     "وش بعتلك",
+    "اخبار الشحنه",
+    "كيف صار الطلب",
+    "شلون صار الطلب",
+    "على وين الشحنه",
   ];
 
   const hasTrackKeyword = trackPatterns.some((pattern) =>
-    cleanMessage.includes(pattern)
+    includesNormalized(normalizedMessage, pattern, true)
   );
   if (hasTrackKeyword) {
-    const numberMatch = message.match(/(\d{6,})/);
+    const numberMatch = normalizedMessage.match(/(\d{6,})/);
     if (numberMatch) {
       console.log("✅ [Quick Parse] Matched TRACK with number");
       return {
@@ -578,9 +663,13 @@ function quickKeywordParse(message, userInfo = null) {
 
   // إنشاء شحنة
   if (
-    lowerMessage.includes("إنشاء") ||
-    lowerMessage.includes("create") ||
-    lowerMessage.includes("جديدة")
+    includesNormalized(normalizedMessage, "انشاء", true) ||
+    includesNormalized(normalizedMessage, "جديد", true) ||
+    includesNormalized(normalizedMessage, "ابغى اشحن", true) ||
+    includesNormalized(normalizedMessage, "ابغا اشحن", true) ||
+    includesNormalized(normalizedMessage, "ودي اشحن", true) ||
+    includesNormalized(normalizedMessage, "ارسل طرد", true) ||
+    lowerMessage.includes("create")
   ) {
     console.log("✅ [Quick Parse] Matched old CREATE pattern");
     return {
@@ -610,8 +699,17 @@ function quickKeywordParse(message, userInfo = null) {
     "كم رصيد بالمحفظة",
     "رصيدي",
     "فلوسي كم",
+    "كم المبلغ",
+    "قد ايش رصيدي",
+    "حسابي",
+    "كم في الحساب",
+    "الباقي في المحفظه",
   ];
-  if (balancePatterns.some((pattern) => cleanMessage.includes(pattern))) {
+  if (
+    balancePatterns.some((pattern) =>
+      includesNormalized(normalizedMessage, pattern, true)
+    )
+  ) {
     console.log("✅ [Quick Parse] Matched BALANCE pattern");
     return {
       intent: "BALANCE",
@@ -635,8 +733,16 @@ function quickKeywordParse(message, userInfo = null) {
     "شوف شحناتي",
     "شحناتي كلها",
     "قائمة شحناتي",
+    "كل الشحنات",
+    "شوف الطلبات",
+    "عرض الطلبيات",
+    "اظهر الشحنات",
   ];
-  if (listPatterns.some((pattern) => cleanMessage.includes(pattern))) {
+  if (
+    listPatterns.some((pattern) =>
+      includesNormalized(normalizedMessage, pattern, true)
+    )
+  ) {
     console.log("✅ [Quick Parse] Matched LIST_SHIPMENTS pattern");
     return {
       intent: "LIST",
@@ -649,9 +755,12 @@ function quickKeywordParse(message, userInfo = null) {
 
   // إلغاء شحنة
   if (
-    lowerMessage.includes("إلغاء") ||
+    includesNormalized(normalizedMessage, "الغاء", true) ||
+    includesNormalized(normalizedMessage, "الغ الشحنه", true) ||
+    includesNormalized(normalizedMessage, "وقف الشحنه", true) ||
+    includesNormalized(normalizedMessage, "ما عاد ابي الشحنه", true) ||
     lowerMessage.includes("cancel") ||
-    lowerMessage.includes("ألغي")
+    includesNormalized(normalizedMessage, "الغي", true)
   ) {
     console.log("✅ [Quick Parse] Matched CANCEL pattern");
     return {
@@ -687,8 +796,15 @@ function quickKeywordParse(message, userInfo = null) {
     "وإيه أكثر",
     "وش أكثر",
     "وش غير كذا",
+    "عرفني على مراسيل",
+    "احكي عن مراسيل",
+    "من انتم",
   ];
-  if (companyPatterns.some((pattern) => cleanMessage.includes(pattern))) {
+  if (
+    companyPatterns.some((pattern) =>
+      includesNormalized(normalizedMessage, pattern, true)
+    )
+  ) {
     console.log("✅ [Quick Parse] Matched COMPANY_INFO pattern");
     return {
       intent: "CHAT",
@@ -708,9 +824,13 @@ function quickKeywordParse(message, userInfo = null) {
     "أي شركات",
     "شركات التوصيل",
     "شركات الشحن المتاحة",
+    "الشركات المتاحه",
+    "عطيني الشركات",
   ];
   if (
-    shippingCompaniesPatterns.some((pattern) => cleanMessage.includes(pattern))
+    shippingCompaniesPatterns.some((pattern) =>
+      includesNormalized(normalizedMessage, pattern, true)
+    )
   ) {
     console.log("✅ [Quick Parse] Matched SHIPPING_COMPANIES pattern");
     return {
@@ -729,7 +849,7 @@ function quickKeywordParse(message, userInfo = null) {
     "كم الثمن",
     "التكلفة",
     "السعر",
-    "الأسعار",
+    "الاسعار",
     "price",
     "cost",
     "كم يكلف",
@@ -737,11 +857,10 @@ function quickKeywordParse(message, userInfo = null) {
     "كم سعر الشحن",
     "شو اسعار",
     "وش اسعار",
-    "شو الأسعار",
+    "شو الاسعار",
     "كم تكلفة الشحن",
     "كم سعر الشحنات",
     "اسعار الشركات",
-    "أسعار الشركات",
     "تكلفة الشحن",
     "سعر الشحن",
     "شو اسعار الشركات",
@@ -749,20 +868,30 @@ function quickKeywordParse(message, userInfo = null) {
     "شو اسعار شركات الشحن",
     "كم تكلفة شركات الشحن",
     "بدي اعرف كم",
-    "أبي أعرف كم",
-    "أريد أعرف كم",
+    "ابي اعرف كم",
+    "اريد اعرف كم",
     "دي اعرف كم",
     "كم تكلفني",
     "كم سعر",
     "شو سعر",
     "وش سعر",
     "كم يكلفني",
-    "كم السعر لـ",
+    "كم السعر ل",
     "كم سعر الشحنة",
     "كم سعر الشحنة في",
     "سعر الشحنة",
+    "بكم",
+    "قديش",
+    "قد ايش",
+    "قد ايه",
+    "كم تطلع",
+    "كم محسوبه",
   ];
-  if (pricingPatterns.some((pattern) => cleanMessage.includes(pattern))) {
+  if (
+    pricingPatterns.some((pattern) =>
+      includesNormalized(normalizedMessage, pattern, true)
+    )
+  ) {
     console.log("✅ [Quick Parse] Matched PRICING pattern");
     return {
       intent: "CHAT",
@@ -813,7 +942,11 @@ function quickKeywordParse(message, userInfo = null) {
     "وريني إياها",
   ];
 
-  if (continuationPatterns.some((pattern) => cleanMessage.includes(pattern))) {
+  if (
+    continuationPatterns.some((pattern) =>
+      includesNormalized(normalizedMessage, pattern, true)
+    )
+  ) {
     console.log("✅ [Quick Parse] Matched CONTINUATION pattern");
 
     // تحقق من السياق بطريقة أكثر دقة
@@ -933,7 +1066,11 @@ function quickKeywordParse(message, userInfo = null) {
     "فوري",
   ];
 
-  if (shipmentTypePatterns.some((pattern) => cleanMessage.includes(pattern))) {
+  if (
+    shipmentTypePatterns.some((pattern) =>
+      includesNormalized(normalizedMessage, pattern, true)
+    )
+  ) {
     console.log("✅ [Quick Parse] Matched SHIPMENT_TYPE pattern");
 
     // إذا كان السياق يتعلق بالأسعار أو الشركات
@@ -978,21 +1115,25 @@ function quickKeywordParse(message, userInfo = null) {
 
   // تفاصيل الشحنة للحساب (وزن، دفع، أبعاد)
   const shipmentDetailsPatterns = [
-    /\d+(\.\d+)?\s*ك(?:يلو|جم|غ|ليو|يلو)/i, // وزن مثل "2 كيلو" أو "2.5 كجم" أو "10 كليو"
-    /\d+(\.\d+)?\s*kg/i, // وزن بالإنجليزية "2 kg"
-    /كاش|نقد/i, // طريقة دفع كاش
-    /دفع عند الاستلام|cod/i, // دفع عند الاستلام
-    /\d+\s*x\s*\d+\s*x\s*\d+/i, // أبعاد مثل "30x20x10"
-    /\d+\s*×\s*\d+\s*×\s*\d+/i, // أبعاد بالضرب "30×20×10"
-    /شحنة\s+\d+/i, // مثل "شحنة 10"
-    /وزن الشحنة\s+\d+/i, // مثل "وزن الشحنة 10"
-    /نوعها\s+شحن/i, // مثل "نوعها شحن عادي"
-    /سمسا\s+الاقتصادية/i, // مثل "سمسا الاقتصادية"
-    /سمسا\s+البرو/i, // مثل "سمسا البرو"
-    /أرامكس\s+البرو/i, // مثل "أرامكس البرو"
+    /\d+(?:\.\d+)?\s*ك(?:يلو|جم|غ|ليو|يلو)/i,
+    /\d+(?:\.\d+)?\s*kg/i,
+    /كاش|نقد/i,
+    /دفع عند الاستلام|cod/i,
+    /\d+\s*x\s*\d+\s*x\s*\d+/i,
+    /\d+\s*×\s*\d+\s*×\s*\d+/i,
+    /شحنه\s+\d+/i,
+    /وزن الشحنه\s+\d+/i,
+    /نوعها\s+شحن/i,
+    /سمسا\s+الاقتصاديه/i,
+    /سمسا\s+البرو/i,
+    /ارامكس\s+البرو/i,
   ];
 
-  if (shipmentDetailsPatterns.some((pattern) => pattern.test(cleanMessage))) {
+  if (
+    shipmentDetailsPatterns.some((pattern) =>
+      pattern.test(normalizedMessage) || pattern.test(lowerMessage)
+    )
+  ) {
     console.log("✅ [Quick Parse] Matched SHIPMENT_DETAILS pattern");
 
     // إذا كان السياق يتعلق بحساب الأسعار
@@ -1031,19 +1172,48 @@ async function sendToGemini(
     const quickResult = quickKeywordParse(userMessage, userInfo);
 
     if (quickResult) {
-      console.log("⚡ [Gemini] Quick parse success:", quickResult.intent);
-      return quickResult;
+      console.log("⚡ [Gemini] Quick parse produced hint:", quickResult.intent);
+      if (!ENABLE_DEEP_THINKING) {
+        console.log(
+          "⚡ [Gemini] Deep thinking disabled, returning quick response"
+        );
+        return quickResult;
+      }
     }
 
-    console.log("🚀 [Gemini] Quick parse returned null, going to Gemini API");
+    console.log(
+      "🚀 [Gemini] Proceeding with Gemini API for deep reasoning",
+      ENABLE_DEEP_THINKING ? "(expanded mode)" : ""
+    );
 
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-pro",
       tools: [{ functionDeclarations: TOOLS }],
+      generationConfig: GENERATION_CONFIG,
     });
 
     // بناء الـ prompt مع إرشادات تفكير
-    const fullPrompt = `${SYSTEM_PROMPT}\n\nفكر خطوة بخطوة ثم حدد الـ intent والـ API إذا لزم.\n\nContext: ${context}\nUser: ${userMessage}`;
+    const deepThinkingDirectives = ENABLE_DEEP_THINKING
+      ? `فكر بتسلسل واضح: 1) فهم نية المستخدم بدقة 2) تقييم البيانات المتاحة والسياق 3) تحديد ما إذا كان يلزم استدعاء API 4) صغ ردًا غنيًا ومطمئنًا يشرح المنطق والخطوات التالية.`
+      : "فكر خطوة بخطوة ثم حدد الـ intent والـ API إذا لزم.";
+
+    const quickIntentHint = quickResult
+      ? {
+          intent: quickResult.intent,
+          data: quickResult.data || {},
+          missing_fields: quickResult.missing_fields || [],
+          base_message: quickResult.message || "",
+        }
+      : null;
+
+    const hintSection = quickIntentHint
+      ? `\n\n# تلميح intent (اختياري)
+${JSON.stringify(quickIntentHint, null, 2)}`
+      : "";
+
+    const normalizedContext = context || NO_CONTEXT_PLACEHOLDER;
+
+    const fullPrompt = `${SYSTEM_PROMPT}\n\n${deepThinkingDirectives}\n\nContext: ${normalizedContext}\nUser: ${userMessage}${hintSection}`;
 
     const result = await model.generateContent(fullPrompt);
     const response = await result.response;
@@ -1075,6 +1245,20 @@ async function sendToGemini(
 
         const geminiData = JSON.parse(jsonText);
 
+        if (quickResult) {
+          geminiData.intent = geminiData.intent || quickResult.intent;
+          geminiData.data = {
+            ...(quickResult.data || {}),
+            ...(geminiData.data || {}),
+          };
+          geminiData.missing_fields =
+            geminiData.missing_fields || quickResult.missing_fields || [];
+          geminiData.confidence =
+            geminiData.confidence || quickResult.confidence || 0.6;
+          geminiData.message =
+            geminiData.message || quickResult.message || "";
+        }
+
         // التأكد من وجود الحقول المطلوبة
         if (geminiData.intent && geminiData.message) {
           return {
@@ -1090,6 +1274,10 @@ async function sendToGemini(
 
       // إذا لم نجد JSON صحيح، أعد رد دردشة عام
       console.log("⚠️ [Gemini] No valid JSON found, returning chat response");
+      if (quickResult) {
+        return quickResult;
+      }
+
       return {
         intent: "CHAT",
         confidence: 0.3,
@@ -1099,6 +1287,11 @@ async function sendToGemini(
       };
     } catch (parseError) {
       console.error("❌ [Gemini] JSON parse error:", parseError.message);
+      if (quickResult) {
+        console.log("🔄 [Gemini] Falling back to quick response after parse error");
+        return quickResult;
+      }
+
       return {
         intent: "CHAT",
         confidence: 0.2,
