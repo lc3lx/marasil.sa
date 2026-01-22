@@ -1,5 +1,9 @@
 const mongoose = require("mongoose");
 const Shapment = require("../models/shipmentModel");
+const Order = require("../models/Order");
+const ShippingCompany = require("../models/shipping_company");
+const ClientAddress = require("../models/clientAddressModel");
+const shipmentAccount = require("./shipmentAccount");
 const Wallet = require("../models/walletModel");
 const Customer = require("../models/customerModel");
 
@@ -10,6 +14,18 @@ class AIServices {
   constructor(userId, customer) {
     this.userId = userId;
     this.customer = customer;
+  }
+
+  mapCompanySlug(companyName = "") {
+    const normalized = companyName.toLowerCase();
+    if (normalized.includes("سمسا") || normalized.includes("smsa")) return "smsa";
+    if (normalized.includes("ارامكس") || normalized.includes("aramex"))
+      return "aramex";
+    if (normalized.includes("ريد بوكس") || normalized.includes("redbox"))
+      return "redbox";
+    if (normalized.includes("لاما") || normalized.includes("omni"))
+      return "omniclama";
+    return normalized;
   }
 
   /**
@@ -66,57 +82,157 @@ class AIServices {
       console.log("📦 [AI-Shipment] Creating shipment from AI:", shipmentData);
 
       // التحقق من البيانات المطلوبة
-      if (!shipmentData.company || !shipmentData.weight || !shipmentData.receiver_name) {
+      if (
+        !shipmentData.company ||
+        !shipmentData.weight ||
+        !shipmentData.receiver?.name ||
+        !shipmentData.sender?.name
+      ) {
         return {
           success: false,
           message: "البيانات غير مكتملة لإنشاء الشحنة"
         };
       }
 
-      // إنشاء payload للشحنة (مثل ما يتم في shapmentController)
-      const payload = {
-        company: shipmentData.company,
-        shapmentingType: "Dry", // افتراضي
-        orderDescription: `شحنة إلى ${shipmentData.receiver_name}`,
-        order: {
-          paymentMethod: "Prepaid", // افتراضي
-          customer: {
-            full_name: shipmentData.receiver_name,
-            mobile: shipmentData.receiver_phone || "0000000000",
-            city: shipmentData.receiver_city || "الرياض",
-            country: "sa",
-            address: shipmentData.receiver_address || "غير محدد",
-            email: this.customer.email || "test@example.com"
-          },
-          total: {
-            amount: 50, // افتراضي - يجب حسابه حسب الوزن والمسافة
-            currency: "SAR"
-          }
-        },
-        shipperAddress: {
-          full_name: this.customer.firstName + " " + (this.customer.lastName || ""),
-          mobile: this.customer.phone,
-          city: "الرياض", // افتراضي - يجب أخذه من عناوين المستخدم
-          country: "sa",
-          address: "عنوان افتراضي" // يجب أخذه من عناوين المستخدم
-        },
-        weight: parseFloat(shipmentData.weight) || 1,
-        Parcels: 1, // افتراضي
-        dimension: {
-          high: 10,
-          width: 10,
-          length: 10
-        }
+      const companyRecord = await ShippingCompany.findOne({
+        company: shipmentData.company
+      });
+
+      if (!companyRecord) {
+        return {
+          success: false,
+          message: "شركة الشحن غير موجودة في النظام"
+        };
+      }
+
+      const shippingTypes = companyRecord.shippingTypes || [];
+      const selectedType = shipmentData.shipmentType
+        ? shippingTypes.find(
+            (type) => type.type === shipmentData.shipmentType
+          )
+        : shippingTypes[0];
+
+      if (!selectedType) {
+        return {
+          success: false,
+          message: "نوع الشحن غير متوفر لهذه الشركة"
+        };
+      }
+
+      const paymentMethod = shipmentData.paymentMethod || "COD";
+      const weight = parseFloat(shipmentData.weight) || 1;
+      const boxes = parseInt(shipmentData.boxes, 10) || 1;
+      const dimension = shipmentData.dimensions || {
+        length: 0,
+        width: 0,
+        height: 0
       };
 
-      // محاكاة إنشاء الشحنة (في الواقع يجب استدعاء createShapment من shapmentController)
-      // لكن هذا يتطلب إعادة هيكلة كبيرة، لذلك سنعيد رسالة نجاح مع رقم تتبع وهمي
+      const pricing = shipmentAccount.shipmentnorm(selectedType, {
+        weight,
+        paymentMethod,
+        dimension
+      });
+
+      const receiverAddress = await ClientAddress.create({
+        customer: this.userId,
+        clientName: shipmentData.receiver.name,
+        clientAddress: shipmentData.receiver.address,
+        clientPhone: shipmentData.receiver.phone,
+        clientEmail: shipmentData.receiver.email || this.customer?.email,
+        country: shipmentData.receiver.country || "sa",
+        city: shipmentData.receiver.city,
+        district: shipmentData.receiver.district,
+        nationalAddress: shipmentData.receiver.nationalAddress
+      });
+
+      await ClientAddress.create({
+        customer: this.userId,
+        clientName: shipmentData.sender.name,
+        clientAddress: shipmentData.sender.address,
+        clientPhone: shipmentData.sender.phone,
+        clientEmail: shipmentData.sender.email || this.customer?.email,
+        country: shipmentData.sender.country || "sa",
+        city: shipmentData.sender.city,
+        district: shipmentData.sender.district,
+        nationalAddress: shipmentData.sender.nationalAddress
+      });
+
+      const order = await Order.create({
+        customer: {
+          full_name: shipmentData.receiver.name,
+          mobile: shipmentData.receiver.phone,
+          city: shipmentData.receiver.city,
+          country: shipmentData.receiver.country || "sa",
+          address: shipmentData.receiver.address,
+          email: shipmentData.receiver.email || this.customer?.email
+        },
+        total: {
+          amount: shipmentData.value || 0,
+          currency: "SAR"
+        },
+        payment_method: paymentMethod,
+        platform: "Marasil",
+        number_of_boxes: boxes,
+        weight: weight,
+        box_dimensions: {
+          length: dimension.length || 0,
+          width: dimension.width || 0,
+          height: dimension.height || 0
+        },
+        product_description: shipmentData.description,
+        product_value: shipmentData.value || 0,
+        clientAddress: receiverAddress._id,
+        Customer: this.userId
+      });
+
+      const trackingNumber = `MRSL${Date.now().toString().slice(-6)}`;
+      const shipment = await Shapment.create({
+        receiverAddress: receiverAddress._id,
+        senderAddress: {
+          clientName: shipmentData.sender.name,
+          clientAddress: shipmentData.sender.address,
+          clientPhone: shipmentData.sender.phone,
+          city: shipmentData.sender.city,
+          country: shipmentData.sender.country || "sa"
+        },
+        weight,
+        customerId: this.userId,
+        orderId: order._id,
+        boxNum: boxes,
+        dimension: {
+          length: dimension.length || 0,
+          width: dimension.width || 0,
+          height: dimension.height || 0
+        },
+        paymentMathod: paymentMethod,
+        shipmentstates: "READY_FOR_PICKUP",
+        shapmentingType: "Dry",
+        shapmentCompany: this.mapCompanySlug(companyRecord.company),
+        trackingId: trackingNumber,
+        trackingURL: companyRecord.trackingURL,
+        totalprice: pricing.total,
+        shapmentPrice: {
+          priceaddedtax: selectedType.priceaddedtax,
+          basePrice: selectedType.basePrice,
+          profitPrice: selectedType.profitPrice,
+          profitRTOprice: selectedType.profitRTOprice,
+          baseAdditionalweigth: selectedType.baseAdditionalweigth,
+          profitAdditionalweigth: selectedType.profitAdditionalweigth,
+          baseCODfees: selectedType.baseCODfees,
+          profitCODfees: selectedType.profitCODfees,
+          insurancecost: selectedType.insurancecost,
+          baseRTOprice: selectedType.baseRTOprice
+        }
+      });
 
       return {
         success: true,
         message: "تم إنشاء الشحنة بنجاح",
-        trackingNumber: "MRSL" + Date.now().toString().slice(-6),
-        shipmentData: payload
+        trackingNumber: shipment.trackingId,
+        shipmentId: shipment._id,
+        pricing: pricing,
+        shipmentData: shipment
       };
 
     } catch (error) {
@@ -276,39 +392,15 @@ class AIServices {
     try {
       console.log("🚚 [AI-General] Getting shipping companies");
 
+      const companies = await ShippingCompany.find({ status: "Enabled" });
       return {
         success: true,
-        companies: [
-          {
-            name: "سمسا",
-            types: ["اقتصادي", "برو"],
-            pricing: "حسب الوزن والمسافة",
-            deliveryTime: "1-5 أيام",
-            description: "خدمة موثوقة للشحنات المحلية"
-          },
-          {
-            name: "أرامكس",
-            types: ["برو"],
-            pricing: "أعلى من سمسا",
-            deliveryTime: "1-3 أيام",
-            description: "خدمة سريعة وموثوقة"
-          },
-          {
-            name: "ريد بوكس",
-            types: ["أساسي"],
-            pricing: "مناسب للشحنات الصغيرة",
-            deliveryTime: "2-7 أيام",
-            description: "خدمة اقتصادية"
-          },
-          {
-            name: "لاما بوكس",
-            types: ["أساسي"],
-            pricing: "مناسب للشحنات المتوسطة",
-            deliveryTime: "2-5 أيام",
-            description: "خدمة موثوقة للمتاجر"
-          }
-        ],
-        recommendation: "ننصح بسمسا لمعظم الشحنات للتوازن بين السعر والسرعة"
+        companies: companies.map((company) => ({
+          name: company.company,
+          deliveryTime: company.deliveryTime || "2-3 أيام عمل",
+          shippingTypes: company.shippingTypes || [],
+          description: company.detailsAr || company.details || ""
+        }))
       };
 
     } catch (error) {

@@ -340,9 +340,40 @@ const TOOLS = [
 
 const NO_CONTEXT_PLACEHOLDER = "لا يوجد سياق سابق.";
 
-// State Manager للمحادثات (ابقِ كما هو)
+// State Manager للمحادثات (مبسّط لتتبّع تدفق إنشاء الشحنات)
 class ConversationStateManager {
-  // (الكود الأصلي)
+  constructor() {
+    this.states = new Map();
+  }
+
+  getState(userId) {
+    if (!userId) return null;
+    return this.states.get(String(userId)) || null;
+  }
+
+  setState(userId, state) {
+    if (!userId) return null;
+    this.states.set(String(userId), state);
+    return state;
+  }
+
+  updateState(userId, patch) {
+    if (!userId) return null;
+    const current = this.getState(userId) || {};
+    const next = { ...current, ...patch };
+    this.states.set(String(userId), next);
+    return next;
+  }
+
+  clearState(userId) {
+    if (!userId) return;
+    this.states.delete(String(userId));
+  }
+
+  hasActiveFlow(userId, flowName) {
+    const state = this.getState(userId);
+    return !!state && state.flow === flowName;
+  }
 }
 
 const stateManager = new ConversationStateManager();
@@ -499,11 +530,30 @@ function extractIntent(message) {
 /**
  * تحليل سريع للرسالة بناءً على الكلمات المفتاحية - محسن لمزيد من الحالات
  */
-function quickKeywordParse(message, userInfo = null) {
+function quickKeywordParse(
+  message,
+  userInfo = null,
+  context = "",
+  userId = null
+) {
   const userName = userInfo?.firstName || "عميلنا الكريم";
   const normalizedMessage = normalizeArabicText(message || "");
   const lowerMessage = (message || "").toLowerCase();
   const cleanMessage = (message || "").trim();
+
+  // إذا كان المستخدم داخل تدفق إنشاء شحنة، نُمرّر الرسالة للمعالجة المتخصّصة
+  if (userId && stateManager.hasActiveFlow(userId, "CREATE_SHIPMENT")) {
+    return {
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: "",
+      data: {
+        action: "CREATE_SHIPMENT_FLOW",
+        rawMessage: message,
+      },
+    };
+  }
 
   // تعريف أنماط الترحيب
   const greetingPatterns = [
@@ -673,11 +723,15 @@ function quickKeywordParse(message, userInfo = null) {
   ) {
     console.log("✅ [Quick Parse] Matched old CREATE pattern");
     return {
-      intent: "CREATE",
-      confidence: 0.8,
-      missing_fields: ["recipient_name", "phone", "weight"],
-      message: `تمام ${userName} 👍 لمين الشحنة؟`,
-      data: {},
+      intent: "CHAT",
+      confidence: 0.85,
+      missing_fields: [],
+      message: "",
+      data: {
+        action: "CREATE_SHIPMENT_FLOW",
+        rawMessage: message,
+        start: true,
+      },
     };
   }
 
@@ -1169,7 +1223,12 @@ async function sendToGemini(
   try {
     // 1. أولاً جرب Quick Parse للأسئلة البسيطة
     console.log("🎯 [Gemini] Processing user message:", userMessage);
-    const quickResult = quickKeywordParse(userMessage, userInfo);
+    const quickResult = quickKeywordParse(
+      userMessage,
+      userInfo,
+      context,
+      userId
+    );
 
     if (quickResult) {
       console.log("⚡ [Gemini] Quick parse produced hint:", quickResult.intent);
@@ -1307,7 +1366,12 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
     );
 
     // في حالة الخطأ، أعد رد Quick Parse أو رد عام
-    const quickFallback = quickKeywordParse(userMessage, userInfo);
+    const quickFallback = quickKeywordParse(
+      userMessage,
+      userInfo,
+      context,
+      userId
+    );
     if (quickFallback) {
       console.log("🔄 [Gemini] Using quick parse fallback");
       return quickFallback;
@@ -1403,6 +1467,17 @@ async function processGeminiResponse(
       };
 
     case "CHAT":
+      // تدفق إنشاء شحنة جديد
+      if (data && data.action === "CREATE_SHIPMENT_FLOW") {
+        return await handleCreateShipmentFlow(
+          data.rawMessage || "",
+          userId,
+          userInfo,
+          services,
+          data.start === true
+        );
+      }
+
       // التحقق من وجود CALCULATE_PRICING action في البيانات
       if (data && data.action === "CALCULATE_PRICING" && data.shipmentDetails) {
         console.log(
@@ -1672,6 +1747,7 @@ async function processGeminiResponse(
 // استخراج تفاصيل الشحنة من الرسالة
 function extractShipmentDetails(message) {
   console.log("🔍 [AI] Extracting shipment details from:", message);
+  const normalizedMessage = normalizeArabicText(message || "");
 
   const details = {
     weight: null,
@@ -1682,7 +1758,7 @@ function extractShipmentDetails(message) {
   };
 
   // استخراج الوزن - دعم جميع الاختلافات العامية
-  const weightMatch = message.match(
+  const weightMatch = normalizedMessage.match(
     /(\d+(?:\.\d+)?)\s*(?:ك(?:يلو|جم|غ|ليو|يلو|ليوغرام)|kg)/i
   );
   if (weightMatch) {
@@ -1690,7 +1766,7 @@ function extractShipmentDetails(message) {
     console.log("⚖️ [AI] Extracted weight:", details.weight);
   } else {
     // محاولة استخراج من "شحنة X" أو "وزن الشحنة X"
-    const shipmentWeightMatch = message.match(
+    const shipmentWeightMatch = normalizedMessage.match(
       /(?:شحنة|وزن الشحنة)\s+(\d+(?:\.\d+)?)/i
     );
     if (shipmentWeightMatch) {
@@ -1701,27 +1777,33 @@ function extractShipmentDetails(message) {
 
   // استخراج نوع الشحن
   if (
-    message.includes("شحن عادي") ||
-    message.includes("عادي") ||
-    message.includes("اقتصادي")
+    includesNormalized(normalizedMessage, "شحن عادي", true) ||
+    includesNormalized(normalizedMessage, "عادي", true) ||
+    includesNormalized(normalizedMessage, "اقتصادي", true)
   ) {
     details.shipmentType = "اقتصادي";
   } else if (
-    message.includes("شحن برو") ||
-    message.includes("برو") ||
-    message.includes("سريع")
+    includesNormalized(normalizedMessage, "شحن برو", true) ||
+    includesNormalized(normalizedMessage, "برو", true) ||
+    includesNormalized(normalizedMessage, "سريع", true)
   ) {
     details.shipmentType = "برو";
   }
 
   // استخراج الشركة
-  if (message.includes("سمسا")) {
+  if (includesNormalized(normalizedMessage, "سمسا", true)) {
     details.company = "سمسا";
-  } else if (message.includes("أرامكس") || message.includes("ارامكس")) {
+  } else if (
+    includesNormalized(normalizedMessage, "أرامكس", true) ||
+    includesNormalized(normalizedMessage, "ارامكس", true)
+  ) {
     details.company = "أرامكس";
-  } else if (message.includes("ريد بوكس")) {
+  } else if (includesNormalized(normalizedMessage, "ريد بوكس", true)) {
     details.company = "ريد بوكس";
-  } else if (message.includes("لاما بوكس") || message.includes("ولما بوكس")) {
+  } else if (
+    includesNormalized(normalizedMessage, "لاما بوكس", true) ||
+    includesNormalized(normalizedMessage, "ولما بوكس", true)
+  ) {
     details.company = "لاما بوكس";
   }
 
@@ -1756,6 +1838,35 @@ function extractShipmentDetails(message) {
   return details;
 }
 
+function pickShippingTypeForCompany(company, shipmentDetails) {
+  const shippingTypes = Array.isArray(company.shippingTypes)
+    ? company.shippingTypes
+    : Array.isArray(company.shipmentType)
+    ? company.shipmentType
+    : [];
+
+  if (!shippingTypes.length) return null;
+
+  const requestedType = shipmentDetails?.shipmentType
+    ? normalizeArabicText(shipmentDetails.shipmentType)
+    : null;
+
+  if (requestedType) {
+    const matched = shippingTypes.find((type) =>
+      includesNormalized(type.type || "", requestedType)
+    );
+    if (matched) return matched;
+  }
+
+  return shippingTypes.reduce((cheapest, current) => {
+    const cheapestPrice =
+      (cheapest?.basePrice || 0) + (cheapest?.profitPrice || 0);
+    const currentPrice =
+      (current?.basePrice || 0) + (current?.profitPrice || 0);
+    return currentPrice < cheapestPrice ? current : cheapest;
+  }, shippingTypes[0]);
+}
+
 // حساب الأسعار لشركة محددة
 async function calculatePricingForSpecificCompany(company, shipmentDetails) {
   console.log(
@@ -1779,30 +1890,11 @@ async function calculatePricingForSpecificCompany(company, shipmentDetails) {
   try {
     console.log(`🏢 [AI] Calculating for ${company.name}`);
 
-    // اختيار نوع الشحن المناسب (افتراضياً اقتصادي)
-    const shippingType =
-      shipmentDetails.shipmentType === "برو"
-        ? {
-            basePrice: 35,
-            profitPrice: 10,
-            maxWeight: 10,
-            baseAdditionalweigth: 5,
-            profitAdditionalweigth: 2,
-            baseCODfees: 8,
-            profitCODfees: 2,
-            priceaddedtax: 0.15,
-          }
-        : // اقتصادي
-          {
-            basePrice: 25,
-            profitPrice: 5,
-            maxWeight: 5,
-            baseAdditionalweigth: 3,
-            profitAdditionalweigth: 1,
-            baseCODfees: 5,
-            profitCODfees: 1,
-            priceaddedtax: 0.15,
-          };
+    const shippingType = pickShippingTypeForCompany(company, shipmentDetails);
+
+    if (!shippingType) {
+      throw new Error("لا توجد أنواع شحن متاحة لهذه الشركة");
+    }
 
     // حساب السعر باستخدام shipmentAccount
     const pricing = shipmentAccount.shipmentnorm(shippingType, orderData);
@@ -1822,7 +1914,7 @@ async function calculatePricingForSpecificCompany(company, shipmentDetails) {
       name: company.name,
       total: pricing.total,
       breakdown: breakdown,
-      type: shipmentDetails.shipmentType || "اقتصادي",
+      type: shippingType.type || shipmentDetails.shipmentType || "أساسي",
     });
   } catch (error) {
     console.error(`❌ [AI] Error calculating for ${company.name}:`, error);
@@ -1859,40 +1951,14 @@ async function calculatePricingForAllCompanies(companies, shipmentDetails) {
     try {
       console.log(`🏢 [AI] Calculating for ${company.name}`);
 
-      // اختيار نوع الشحن المناسب (افتراضياً اقتصادي)
-      const shippingType = company.types?.includes("اقتصادي")
-        ? {
-            basePrice: 25,
-            profitPrice: 5,
-            maxWeight: 5,
-            baseAdditionalweigth: 3,
-            profitAdditionalweigth: 1,
-            baseCODfees: 5,
-            profitCODfees: 1,
-            priceaddedtax: 0.15,
-          }
-        : company.types?.includes("برو")
-        ? {
-            basePrice: 35,
-            profitPrice: 10,
-            maxWeight: 10,
-            baseAdditionalweigth: 5,
-            profitAdditionalweigth: 2,
-            baseCODfees: 8,
-            profitCODfees: 2,
-            priceaddedtax: 0.15,
-          }
-        : // نوع أساسي
-          {
-            basePrice: 20,
-            profitPrice: 3,
-            maxWeight: 3,
-            baseAdditionalweigth: 2,
-            profitAdditionalweigth: 0.5,
-            baseCODfees: 3,
-            profitCODfees: 0.5,
-            priceaddedtax: 0.15,
-          };
+      const shippingType = pickShippingTypeForCompany(company, shipmentDetails);
+
+      if (!shippingType) {
+        console.warn(
+          `⚠️ [AI] No shipping types available for ${company.name}`
+        );
+        continue;
+      }
 
       // حساب السعر باستخدام shipmentAccount
       const pricing = shipmentAccount.shipmentnorm(shippingType, orderData);
@@ -1912,7 +1978,7 @@ async function calculatePricingForAllCompanies(companies, shipmentDetails) {
         name: company.name,
         total: pricing.total,
         breakdown: breakdown,
-        type: company.types?.[0] || "أساسي",
+        type: shippingType.type || "أساسي",
       });
     } catch (error) {
       console.error(`❌ [AI] Error calculating for ${company.name}:`, error);
@@ -1927,6 +1993,572 @@ async function calculatePricingForAllCompanies(companies, shipmentDetails) {
 
   // ترتيب النتائج حسب السعر (الأقل سعراً أولاً)
   return pricingResults.sort((a, b) => a.total - b.total);
+}
+
+function extractPhoneNumber(message) {
+  const normalized = normalizeArabicText(message || "");
+  const match = normalized.match(/(\d{8,15})/);
+  return match ? match[1] : null;
+}
+
+function extractNumber(message) {
+  const normalized = normalizeArabicText(message || "");
+  const match = normalized.match(/(\d+(?:\.\d+)?)/);
+  return match ? parseFloat(match[1]) : null;
+}
+
+function extractBoxesCount(message) {
+  const normalized = normalizeArabicText(message || "");
+  const contextualMatch = normalized.match(
+    /(عدد|صندوق|صناديق|كرتون|كراتين)\s*(\d+)/i
+  );
+  if (contextualMatch) return parseInt(contextualMatch[2], 10);
+  const fallback = normalized.match(/(\d+)/);
+  return fallback ? parseInt(fallback[1], 10) : null;
+}
+
+function extractPaymentMethod(message) {
+  const normalized = normalizeArabicText(message || "");
+  if (
+    includesNormalized(normalized, "cod", true) ||
+    includesNormalized(normalized, "دفع عند الاستلام", true) ||
+    includesNormalized(normalized, "عند الاستلام", true)
+  ) {
+    return "COD";
+  }
+  if (
+    includesNormalized(normalized, "مسبق", true) ||
+    includesNormalized(normalized, "مدفوع", true) ||
+    includesNormalized(normalized, "prepaid", true)
+  ) {
+    return "Prepaid";
+  }
+  return null;
+}
+
+function isAffirmativeReply(message) {
+  const normalized = normalizeArabicText(message || "");
+  const patterns = ["نعم", "اي", "ايه", "تمام", "موافق", "توكل", "اوكي"];
+  return patterns.some((pattern) => includesNormalized(normalized, pattern, true));
+}
+
+function isNegativeReply(message) {
+  const normalized = normalizeArabicText(message || "");
+  const patterns = ["لا", "مو", "غير", "الغ", "إلغاء", "وقف"];
+  return patterns.some((pattern) => includesNormalized(normalized, pattern, true));
+}
+
+function findCompanyInOptions(message, options) {
+  const normalized = normalizeArabicText(message || "");
+  if (
+    includesNormalized(normalized, "ارخص", true) ||
+    includesNormalized(normalized, "اقل سعر", true)
+  ) {
+    return options.reduce((min, current) =>
+      current.total < min.total ? current : min
+    );
+  }
+
+  return options.find((option) =>
+    includesNormalized(normalized, option.name, true)
+  );
+}
+
+async function handleCreateShipmentFlow(
+  message,
+  userId,
+  userInfo,
+  services,
+  startFlow = false
+) {
+  const userName = userInfo?.firstName || "عميلنا الكريم";
+  const normalizedMessage = normalizeArabicText(message || "");
+  let state = stateManager.getState(userId);
+  const wasNewFlow = !state;
+
+  if (!state) {
+    state = stateManager.setState(userId, {
+      flow: "CREATE_SHIPMENT",
+      step: "ASK_SENDER_NAME",
+      data: {},
+    });
+  }
+
+  if (startFlow && wasNewFlow) {
+    return {
+      success: true,
+      intent: "CHAT",
+      result: {},
+      message: `تمام ${userName}، خلّينا ننشئ الشحنة خطوة خطوة. مين المرسل؟ (اسم المرسل)`,
+    };
+  }
+
+  if (isNegativeReply(normalizedMessage)) {
+    stateManager.clearState(userId);
+    return {
+      success: true,
+      intent: "CHAT",
+      result: {},
+      message: `تمام ${userName}، تم إلغاء إنشاء الشحنة. إذا حاب نرجع لها بأي وقت أنا جاهز.`,
+    };
+  }
+
+  const nextState = (patch) => stateManager.updateState(userId, patch);
+
+  const data = state.data || {};
+
+  switch (state.step) {
+    case "ASK_SENDER_NAME": {
+      const senderName = message.trim();
+      if (!senderName) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: "فضلاً اكتب اسم المرسل.",
+        };
+      }
+
+      nextState({
+        step: "ASK_SENDER_PHONE",
+        data: {
+          ...data,
+          sender: { ...(data.sender || {}), name: senderName },
+        },
+      });
+      return {
+        success: true,
+        intent: "CHAT",
+        result: {},
+        message: `تمام ${userName}، رقم جوال المرسل؟`,
+      };
+    }
+    case "ASK_SENDER_PHONE": {
+      const phone = extractPhoneNumber(message);
+      if (!phone) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: "احتاج رقم الجوال للمرسل (مثال: 05XXXXXXXX).",
+        };
+      }
+
+      nextState({
+        step: "ASK_SENDER_CITY",
+        data: {
+          ...data,
+          sender: { ...(data.sender || {}), phone },
+        },
+      });
+      return {
+        success: true,
+        intent: "CHAT",
+        result: {},
+        message: "مدينة المرسل؟",
+      };
+    }
+    case "ASK_SENDER_CITY": {
+      const city = message.trim();
+      if (!city) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: "فضلاً اكتب مدينة المرسل.",
+        };
+      }
+
+      nextState({
+        step: "ASK_SENDER_ADDRESS",
+        data: {
+          ...data,
+          sender: { ...(data.sender || {}), city },
+        },
+      });
+      return {
+        success: true,
+        intent: "CHAT",
+        result: {},
+        message: "عنوان المرسل بالتفصيل؟",
+      };
+    }
+    case "ASK_SENDER_ADDRESS": {
+      const address = message.trim();
+      if (!address) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: "فضلاً اكتب عنوان المرسل بالتفصيل.",
+        };
+      }
+
+      nextState({
+        step: "ASK_RECEIVER_NAME",
+        data: {
+          ...data,
+          sender: { ...(data.sender || {}), address },
+        },
+      });
+      return {
+        success: true,
+        intent: "CHAT",
+        result: {},
+        message: "ممتاز. الآن مين المستلم؟ (اسم المستلم)",
+      };
+    }
+    case "ASK_RECEIVER_NAME": {
+      const receiverName = message.trim();
+      if (!receiverName) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: "فضلاً اكتب اسم المستلم.",
+        };
+      }
+
+      nextState({
+        step: "ASK_RECEIVER_PHONE",
+        data: {
+          ...data,
+          receiver: { ...(data.receiver || {}), name: receiverName },
+        },
+      });
+      return {
+        success: true,
+        intent: "CHAT",
+        result: {},
+        message: "رقم جوال المستلم؟",
+      };
+    }
+    case "ASK_RECEIVER_PHONE": {
+      const phone = extractPhoneNumber(message);
+      if (!phone) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: "احتاج رقم الجوال للمستلم (مثال: 05XXXXXXXX).",
+        };
+      }
+
+      nextState({
+        step: "ASK_RECEIVER_CITY",
+        data: {
+          ...data,
+          receiver: { ...(data.receiver || {}), phone },
+        },
+      });
+      return {
+        success: true,
+        intent: "CHAT",
+        result: {},
+        message: "مدينة المستلم؟",
+      };
+    }
+    case "ASK_RECEIVER_CITY": {
+      const city = message.trim();
+      if (!city) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: "فضلاً اكتب مدينة المستلم.",
+        };
+      }
+
+      nextState({
+        step: "ASK_RECEIVER_ADDRESS",
+        data: {
+          ...data,
+          receiver: { ...(data.receiver || {}), city },
+        },
+      });
+      return {
+        success: true,
+        intent: "CHAT",
+        result: {},
+        message: "عنوان المستلم بالتفصيل؟",
+      };
+    }
+    case "ASK_RECEIVER_ADDRESS": {
+      const address = message.trim();
+      if (!address) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: "فضلاً اكتب عنوان المستلم بالتفصيل.",
+        };
+      }
+
+      nextState({
+        step: "ASK_WEIGHT",
+        data: {
+          ...data,
+          receiver: { ...(data.receiver || {}), address },
+        },
+      });
+      return {
+        success: true,
+        intent: "CHAT",
+        result: {},
+        message: "كم وزن الشحنة بالكيلو؟",
+      };
+    }
+    case "ASK_WEIGHT": {
+      const details = extractShipmentDetails(message);
+      if (!details.weight) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: "فضلاً اكتب وزن الشحنة بالكيلو (مثال: 5 كيلو).",
+        };
+      }
+
+      nextState({
+        step: "ASK_BOXES",
+        data: {
+          ...data,
+          weight: details.weight,
+          shipmentType: details.shipmentType || data.shipmentType,
+        },
+      });
+      return {
+        success: true,
+        intent: "CHAT",
+        result: {},
+        message: "كم عدد الصناديق؟",
+      };
+    }
+    case "ASK_BOXES": {
+      const boxes = extractBoxesCount(message);
+      if (!boxes || boxes <= 0) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: "فضلاً اكتب عدد الصناديق (مثال: 2).",
+        };
+      }
+
+      nextState({
+        step: "ASK_DESCRIPTION",
+        data: { ...data, boxes },
+      });
+      return {
+        success: true,
+        intent: "CHAT",
+        result: {},
+        message: "وصف مختصر لمحتوى الشحنة؟",
+      };
+    }
+    case "ASK_DESCRIPTION": {
+      const description = message.trim();
+      if (!description) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: "فضلاً اكتب وصف الشحنة.",
+        };
+      }
+
+      nextState({
+        step: "ASK_VALUE",
+        data: { ...data, description },
+      });
+      return {
+        success: true,
+        intent: "CHAT",
+        result: {},
+        message: "قيمة الشحنة بالريال؟",
+      };
+    }
+    case "ASK_VALUE": {
+      const value = extractNumber(message);
+      if (!value || value <= 0) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: "فضلاً اكتب قيمة الشحنة بالأرقام (مثال: 150).",
+        };
+      }
+
+      nextState({
+        step: "ASK_PAYMENT_METHOD",
+        data: {
+          ...data,
+          value,
+        },
+      });
+
+      return {
+        success: true,
+        intent: "CHAT",
+        result: {},
+        message:
+          "طريقة الدفع تكون مسبق أو دفع عند الاستلام (COD). وش تختار؟",
+      };
+    }
+    case "ASK_PAYMENT_METHOD": {
+      const paymentMethod = extractPaymentMethod(message);
+      if (!paymentMethod) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message:
+            "فضلاً اختر طريقة الدفع: مسبق أو دفع عند الاستلام (COD).",
+        };
+      }
+
+      const shipmentDetails = {
+        weight: data.weight,
+        paymentMethod,
+        dimensions: data.dimensions || null,
+        shipmentType: data.shipmentType || null,
+      };
+
+      const companiesResult =
+        await services.generalService.getShippingCompanies();
+      if (!companiesResult.success) {
+        return {
+          success: false,
+          intent: "CHAT",
+          result: {},
+          message: "ما قدرت أجيب شركات الشحن حالياً. جرّب بعد شوي.",
+        };
+      }
+
+      const pricingComparison = await calculatePricingForAllCompanies(
+        companiesResult.companies,
+        shipmentDetails
+      );
+
+      if (!pricingComparison.length) {
+        return {
+          success: false,
+          intent: "CHAT",
+          result: {},
+          message:
+            "ما حصلت أسعار مناسبة للشحنة. تأكد من البيانات وحاول مرة ثانية.",
+        };
+      }
+
+      nextState({
+        step: "AWAIT_COMPANY",
+        data: {
+          ...data,
+          paymentMethod,
+          pricingOptions: pricingComparison,
+        },
+      });
+
+      const pricingLines = pricingComparison
+        .map(
+          (option, index) =>
+            `${index + 1}. ${option.name} (${option.type}) - ${option.total} ريال`
+        )
+        .join("\n");
+
+      return {
+        success: true,
+        intent: "CHAT",
+        result: {},
+        message: `تمام ${userName}، هذه أسعار الشركات المتاحة:\n\n${pricingLines}\n\nاختر الشركة اللي تناسبك (أو قل "الأرخص").`,
+      };
+    }
+    case "AWAIT_COMPANY": {
+      const options = data.pricingOptions || [];
+      const selected = findCompanyInOptions(message, options);
+      if (!selected) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: "ما قدرت أحدد الشركة. قل اسم الشركة بوضوح أو قل \"الأرخص\".",
+        };
+      }
+
+      nextState({
+        step: "AWAIT_CONFIRMATION",
+        data: {
+          ...data,
+          company: selected.name,
+          shipmentType: selected.type,
+          selectedPricing: selected,
+        },
+      });
+
+      return {
+        success: true,
+        intent: "CHAT",
+        result: {},
+        message: `تلخيص الشحنة:\n- المرسل: ${data.sender?.name}\n- المستلم: ${data.receiver?.name}\n- الوزن: ${data.weight} كجم\n- الصناديق: ${data.boxes}\n- الوصف: ${data.description}\n- قيمة الشحنة: ${data.value} ريال\n- شركة الشحن: ${selected.name} (${selected.type})\n- السعر التقريبي: ${selected.total} ريال\n\nإذا كل شيء صحيح، تقدر تأكد التنفيذ.`,
+      };
+    }
+    case "AWAIT_CONFIRMATION": {
+      if (!isAffirmativeReply(message)) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: "تمام، إذا حاب تغير شركة الشحن قل اسم الشركة أو قل \"إلغاء\" لإنهاء الطلب.",
+        };
+      }
+
+      const shipmentPayload = {
+        sender: data.sender,
+        receiver: data.receiver,
+        weight: data.weight,
+        boxes: data.boxes,
+        description: data.description,
+        value: data.value,
+        paymentMethod: data.paymentMethod || "COD",
+        company: data.company,
+        shipmentType: data.shipmentType,
+        dimensions: data.dimensions || null,
+        pricing: data.selectedPricing,
+      };
+
+      const creationResult = await services.shipmentService.createShipmentFromAI(
+        shipmentPayload
+      );
+
+      if (!creationResult.success) {
+        return {
+          success: false,
+          intent: "CHAT",
+          result: creationResult,
+          message:
+            creationResult.message ||
+            "صار خطأ أثناء إنشاء الشحنة. حاول مرة ثانية.",
+        };
+      }
+
+      stateManager.clearState(userId);
+
+      return {
+        success: true,
+        intent: "CHAT",
+        result: creationResult,
+        message: `تم إنشاء الشحنة بنجاح ✅ رقم التتبع: ${creationResult.trackingNumber}`,
+      };
+    }
+    default:
+      stateManager.clearState(userId);
+      return {
+        success: true,
+        intent: "CHAT",
+        result: {},
+        message: `تمام ${userName}، خلينا نبدأ من جديد. مين المرسل؟`,
+      };
+  }
 }
 
 module.exports = {
