@@ -122,7 +122,7 @@ module.exports.acountingShipmentPrice = asyncHandler(async (req, res, next) => {
       dimension: hasValidDimension ? normalizedDimension : null,
     };
 
-    const pricing = shipmentnorm(shippingType, orderWithDimension);
+    const pricing = shipmentnorm(shippingType, orderWithDimension, company);
 
     res.status(200).json({ data: pricing });
   } catch (error) {
@@ -302,7 +302,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
       paymentMethod: order.payment_method,
       dimension: dimensionPayload, // إضافة الأبعاد لحساب الوزن البعدي
     };
-    const pricing = shipmentnorm(shippingType, orderWithWeight);
+    const pricing = shipmentnorm(shippingType, orderWithWeight, company);
     orderToUse.dimension = dimensionPayload;
 
     // البحث عن محفظة العميل

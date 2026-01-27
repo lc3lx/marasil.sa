@@ -132,7 +132,7 @@ class AIServices {
         weight,
         paymentMethod,
         dimension
-      });
+      }, companyRecord.company);
 
       const receiverAddress = await ClientAddress.create({
         customer: this.userId,

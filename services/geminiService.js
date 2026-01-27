@@ -1897,7 +1897,7 @@ async function calculatePricingForSpecificCompany(company, shipmentDetails) {
     }
 
     // حساب السعر باستخدام shipmentAccount
-    const pricing = shipmentAccount.shipmentnorm(shippingType, orderData);
+    const pricing = shipmentAccount.shipmentnorm(shippingType, orderData, company.name);
 
     // بناء تفاصيل التكلفة
     let breakdown = `الأساسي: ${

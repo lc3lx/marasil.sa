@@ -58,7 +58,7 @@ const _createReturnShipmentInternal = async (shipmentId, customerId) => {
   };
 
   // حساب التكلفة باستخدام نفس دالة حساب التكلفة للشحنات العادية
-  const pricing = shipmentnorm(shippingType, orderWithWeight);
+  const pricing = shipmentnorm(shippingType, orderWithWeight, company);
   const shippingCost = pricing.total;
 
   // البحث عن محفظة العميل أو إنشاؤها إذا لم تكن موجودة
