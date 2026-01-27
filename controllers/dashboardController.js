@@ -539,6 +539,26 @@ exports.getAllShipments = asyncHandler(async (req, res) => {
     searchQuery.customerId = req.query.userId;
   }
 
+  // filter by date range
+  if (req.query.startDate || req.query.endDate || req.query.dateFrom || req.query.dateTo) {
+    const startDate = req.query.startDate || req.query.dateFrom;
+    const endDate = req.query.endDate || req.query.dateTo;
+    
+    if (startDate || endDate) {
+      searchQuery.createdAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        searchQuery.createdAt.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        searchQuery.createdAt.$lte = end;
+      }
+    }
+  }
+
   try {
     const Shipment = require("../models/shipmentModel");
     const shipments = await Shipment.find(searchQuery)
