@@ -12,7 +12,7 @@ const AuthService = require("../controllers/authController");
 const router = express.Router();
 
 // apply protect and auth at all routes
-router.use(AuthService.Protect, AuthService.allowedTo("user"));
+router.use(AuthService.Protect, AuthService.allowedTo("user", "admin"));
 
 router.route("/").post(addAdrress).get(getaddresses);
 router.delete("/:addressId", removeaddress);
