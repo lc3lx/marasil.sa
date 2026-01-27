@@ -653,7 +653,8 @@ exports.getCarrierStats = asyncHandler(async (req, res) => {
     const company = s.shapmentCompany || "unknown";
     const st = ensure(company);
     st.total += 1;
-    if (s.shipmentstates === "Delivered") st.delivered += 1;
+    const isDelivered = s.shipmentstates === "Delivered";
+    if (isDelivered) st.delivered += 1;
     if (s.shipmentstates === "IN_TRANSIT") st.inTransit += 1;
     if (s.shipmentstates === "READY_FOR_PICKUP") st.readyForPickup += 1;
     if (s.shipmentstates === "Canceled" || s.shipmentstates === "CANCELLED") st.canceled += 1;
@@ -676,29 +677,40 @@ exports.getCarrierStats = asyncHandler(async (req, res) => {
     const profitCOD = Number(sp.profitCODfees) || 0;
     const baseRTO = Number(sp.baseRTOprice) || 0;
     const profitRTO = Number(sp.profitRTOprice) || 0;
+    const basePickup = Number(sp.basepickUpPrice) || 0;
+    const profitPickup = Number(sp.profitpickUpPrice) || 0;
+    const byocPrice = Number(sp.byocPrice) || 0; // سعر البوليصة
 
-    let payable = basePrice + overweightKg * baseAdditional;
-    let profit = profitPrice + overweightKg * profitAdditional;
+    // حساب المبالغ المستحقة للشركة (base فقط)
+    let payable = basePrice + overweightKg * baseAdditional + basePickup;
+    // حساب الربح (profit فقط) - فقط للشحنات المسلمة
+    let profit = isDelivered ? (profitPrice + overweightKg * profitAdditional + profitPickup) : 0;
 
     if (s.paymentMathod === "COD") {
       payable += baseCOD;
-      profit += profitCOD;
+      if (isDelivered) profit += profitCOD;
       st.codCount += 1;
       st.codBaseFeesTotal += baseCOD;
-      st.codProfitTotal += profitCOD;
+      if (isDelivered) st.codProfitTotal += profitCOD;
     }
 
     if (isReturn) {
       payable += baseRTO;
-      profit += profitRTO;
+      if (isDelivered) profit += profitRTO;
+    }
+
+    // إضافة سعر البوليصة للربح إذا كانت الشحنة مسلمة
+    if (isDelivered && byocPrice > 0) {
+      profit += byocPrice;
     }
 
     st.overweightChargesBase += overweightKg * baseAdditional;
-    st.overweightProfit += overweightKg * profitAdditional;
+    if (isDelivered) st.overweightProfit += overweightKg * profitAdditional;
 
     const total = Number(s.totalprice) || payable + profit;
     st.totalRevenue += total;
     st.payableToCarrier += payable;
+    // الربح يُحسب فقط للشحنات المسلمة
     st.ourProfit += profit;
   }
 
