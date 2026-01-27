@@ -624,6 +624,8 @@ exports.getCarrierStats = asyncHandler(async (req, res) => {
     .lean();
 
   const stats = {};
+  const statsByType = {}; // إحصائيات مقسمة حسب الشركة ونوع الشحن
+  
   const ensure = (k) => {
     if (!stats[k]) {
       stats[k] = {
@@ -647,26 +649,71 @@ exports.getCarrierStats = asyncHandler(async (req, res) => {
     return stats[k];
   };
 
+  const ensureByType = (company, type) => {
+    const key = `${company}::${type}`;
+    if (!statsByType[key]) {
+      statsByType[key] = {
+        company,
+        shipmentType: type,
+        total: 0,
+        delivered: 0,
+        inTransit: 0,
+        readyForPickup: 0,
+        canceled: 0,
+        returns: 0,
+        overweightKg: 0,
+        overweightChargesBase: 0,
+        overweightProfit: 0,
+        codCount: 0,
+        codBaseFeesTotal: 0,
+        codProfitTotal: 0,
+        totalRevenue: 0,
+        payableToCarrier: 0,
+        ourProfit: 0,
+      };
+    }
+    return statsByType[key];
+  };
+
   const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
   for (const s of shipments) {
     const company = s.shapmentCompany || "unknown";
+    const shipmentType = s.shapmentingType || "غير محدد";
     const st = ensure(company);
+    const stByType = ensureByType(company, shipmentType);
     st.total += 1;
+    stByType.total += 1;
     const isDelivered = s.shipmentstates === "Delivered";
-    if (isDelivered) st.delivered += 1;
-    if (s.shipmentstates === "IN_TRANSIT") st.inTransit += 1;
-    if (s.shipmentstates === "READY_FOR_PICKUP") st.readyForPickup += 1;
-    if (s.shipmentstates === "Canceled" || s.shipmentstates === "CANCELLED") st.canceled += 1;
+    if (isDelivered) {
+      st.delivered += 1;
+      stByType.delivered += 1;
+    }
+    if (s.shipmentstates === "IN_TRANSIT") {
+      st.inTransit += 1;
+      stByType.inTransit += 1;
+    }
+    if (s.shipmentstates === "READY_FOR_PICKUP") {
+      st.readyForPickup += 1;
+      stByType.readyForPickup += 1;
+    }
+    if (s.shipmentstates === "Canceled" || s.shipmentstates === "CANCELLED") {
+      st.canceled += 1;
+      stByType.canceled += 1;
+    }
 
     const isReturn = Boolean(s.isReturnShipment) || s.shapmentType === "reverse";
-    if (isReturn) st.returns += 1;
+    if (isReturn) {
+      st.returns += 1;
+      stByType.returns += 1;
+    }
 
     const typeMaxMap = companyTypeMaxMap.get(company) || {};
     const maxWeight = typeMaxMap[s.shapmentingType] || 0;
     const weight = Number(s.weight) || 0;
     const overweightKg = maxWeight > 0 ? Math.max(0, Math.ceil(weight - maxWeight)) : 0;
     st.overweightKg += overweightKg;
+    stByType.overweightKg += overweightKg;
 
     const sp = s.shapmentPrice || {};
     const baseAdditional = Number(sp.baseAdditionalweigth) || 0;
@@ -692,6 +739,9 @@ exports.getCarrierStats = asyncHandler(async (req, res) => {
       st.codCount += 1;
       st.codBaseFeesTotal += baseCOD;
       if (isDelivered) st.codProfitTotal += profitCOD;
+      stByType.codCount += 1;
+      stByType.codBaseFeesTotal += baseCOD;
+      if (isDelivered) stByType.codProfitTotal += profitCOD;
     }
 
     if (isReturn) {
@@ -706,16 +756,47 @@ exports.getCarrierStats = asyncHandler(async (req, res) => {
 
     st.overweightChargesBase += overweightKg * baseAdditional;
     if (isDelivered) st.overweightProfit += overweightKg * profitAdditional;
+    stByType.overweightChargesBase += overweightKg * baseAdditional;
+    if (isDelivered) stByType.overweightProfit += overweightKg * profitAdditional;
 
     const total = Number(s.totalprice) || payable + profit;
     st.totalRevenue += total;
     st.payableToCarrier += payable;
     // الربح يُحسب فقط للشحنات المسلمة
     st.ourProfit += profit;
+    
+    stByType.totalRevenue += total;
+    stByType.payableToCarrier += payable;
+    stByType.ourProfit += profit;
   }
 
   const byCarrier = Object.entries(stats).map(([company, v]) => ({
     company,
+    totals: {
+      total: v.total,
+      delivered: v.delivered,
+      inTransit: v.inTransit,
+      readyForPickup: v.readyForPickup,
+      canceled: v.canceled,
+      returns: v.returns,
+    },
+    financials: {
+      totalRevenue: r2(v.totalRevenue),
+      payableToCarrier: r2(v.payableToCarrier),
+      ourProfit: r2(v.ourProfit),
+      overweightKg: v.overweightKg,
+      overweightChargesBase: r2(v.overweightChargesBase),
+      overweightProfit: r2(v.overweightProfit),
+      codCount: v.codCount,
+      codBaseFeesTotal: r2(v.codBaseFeesTotal),
+      codProfitTotal: r2(v.codProfitTotal),
+    },
+  }));
+
+  // تجميع البيانات حسب الشركة ونوع الشحن
+  const byCarrierAndType = Object.values(statsByType).map((v) => ({
+    company: v.company,
+    shipmentType: v.shipmentType,
     totals: {
       total: v.total,
       delivered: v.delivered,
@@ -774,7 +855,11 @@ exports.getCarrierStats = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    data: { byCarrier, overall },
+    data: { 
+      byCarrier, 
+      byCarrierAndType, // إضافة البيانات المقسمة حسب نوع الشحن
+      overall 
+    },
     filters: { startDate: startDate || null, endDate: endDate || null },
   });
 });
