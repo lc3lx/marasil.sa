@@ -1,12 +1,19 @@
-module.exports.shipmentnorm = (shippingType, orderData) => {
+module.exports.shipmentnorm = (shippingType, orderData, company = null) => {
 
   if (!shippingType || !orderData) {
     throw new Error("البيانات غير مكتملة");
   }
 
   // حساب الوزن البعدي إذا كانت الأبعاد متوفرة
+  // إذا كانت الشركة ريد بوكس أو أومني لاما، لا نحسب الوزن البعدي (نستخدم الوزن الفعلي فقط)
   let dimensionalWeight = 0;
-  if (orderData.dimension && 
+  const companyName = (company || "").toLowerCase();
+  const isWeightOnlyCompany = companyName === "redbox" || 
+                              companyName === "omniclama" || 
+                              companyName === "omni lama" ||
+                              companyName === "omini lama";
+  
+  if (!isWeightOnlyCompany && orderData.dimension && 
       orderData.dimension.length && 
       orderData.dimension.width && 
       orderData.dimension.height) {
