@@ -12,7 +12,11 @@ const AuthService = require("../controllers/authController");
 const router = express.Router();
 
 // apply protect and auth at all routes
-router.use(AuthService.Protect, AuthService.allowedTo("user"));
+// السماح لكل من user و admin بالوصول إلى /api/addresses
+router.use(
+  AuthService.Protect,
+  AuthService.allowedTo("user", "admin")
+);
 
 router.route("/").post(addAdrress).get(getaddresses);
 router.delete("/:addressId", removeaddress);
