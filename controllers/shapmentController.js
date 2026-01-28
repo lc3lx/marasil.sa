@@ -353,10 +353,10 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
       case "redbox":
         shipmentData = redboxServers.shipmentdata(
           orderToUse,
-          orderDescription,
           shipperAddress,
           weight,
-          Parcels
+          Parcels,
+          orderDescription
         );
         trackingInfo = await redbox.createShipment(shipmentData);
 

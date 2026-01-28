@@ -23,8 +23,8 @@ exports.shipmentdata = (
     reference: String(order._id || ""),
     cod_amount:
       order.payment_method === "COD" || order.paymentMethod === "COD"
-        ? 0
-        : parseFloat(order.total?.amount || 0),
+        ? parseFloat(order.total?.amount || 0)
+        : 0,
     cod_currency: "SAR",
     customer_name: order.customer?.full_name || "",
     customer_phone: order.customer?.mobile || "",
@@ -52,7 +52,7 @@ exports.shipmentdata = (
     customer_city: order.customer?.city || "",
     customer_country: order.customer?.country || "SA",
     customer_email: order.customer?.email || "",
-    dimension_height: parseFloat(order.dimension?.height) || 0,
+    dimension_height: parseFloat(order.dimension?.height || order.dimension?.high) || 0,
     dimension_length: parseFloat(order.dimension?.length) || 0,
     dimension_unit: "CM",
     dimension_width: parseFloat(order.dimension?.width) || 0,
