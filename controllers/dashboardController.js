@@ -513,13 +513,65 @@ exports.getAllShipments = asyncHandler(async (req, res) => {
   const skip = (page - 1) * limit;
 
   let searchQuery = {};
+
+  // بحث متقدّم يدعم:
+  // - رقم التتبع / رقم الشحنة (trackingId / companyshipmentid)
+  // - اسم العميل / إيميل العميل (من Customer)
+  // - المدينة / العنوان (من ClientAddress)
   if (req.query.search) {
-    searchQuery = {
-      $or: [
-        { trackingId: { $regex: req.query.search, $options: 'i' } },
-        { companyshipmentid: { $regex: req.query.search, $options: 'i' } }
-      ]
-    };
+    const term = String(req.query.search).trim();
+    const rx = new RegExp(term, "i");
+
+    searchQuery.$or = [
+      { trackingId: { $regex: rx } },
+      { companyshipmentid: { $regex: rx } },
+      { shapmentCompany: { $regex: rx } },
+      { orderSou: { $regex: rx } },
+    ];
+
+    // البحث في العملاء بالاسم أو الإيميل
+    try {
+      const Customer = require("../models/customerModel");
+      const customers = await Customer.find({
+        $or: [
+          { firstName: { $regex: rx } },
+          { lastName: { $regex: rx } },
+          { email: { $regex: rx } },
+        ],
+      })
+        .select("_id")
+        .lean();
+
+      if (customers.length > 0) {
+        const ids = customers.map((c) => c._id);
+        searchQuery.$or.push({ customerId: { $in: ids } });
+      }
+    } catch (e) {
+      // إذا فشل البحث في العملاء، نتجاهله ونكمل بباقي الشروط
+    }
+
+    // البحث في عناوين المستلمين (المدينة / العنوان)
+    try {
+      const ClientAddress = require("../models/clientAddressModel");
+      const addresses = await ClientAddress.find({
+        $or: [
+          { city: { $regex: rx } },
+          { country: { $regex: rx } },
+          { district: { $regex: rx } },
+          { location: { $regex: rx } },
+          { street: { $regex: rx } },
+        ],
+      })
+        .select("_id")
+        .lean();
+
+      if (addresses.length > 0) {
+        const addrIds = addresses.map((a) => a._id);
+        searchQuery.$or.push({ receiverAddress: { $in: addrIds } });
+      }
+    } catch (e) {
+      // إذا فشل البحث في العناوين، نتجاهله ونكمل
+    }
   }
 
   if (req.query.status) {
