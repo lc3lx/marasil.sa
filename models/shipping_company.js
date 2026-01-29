@@ -17,6 +17,7 @@ const ShippingTypeSchema = new mongoose.Schema(
     COD: { type: Boolean, default: false },
     maxCodAmount: { type: Number, default: 0 },
     maxWeight: { type: Number, default: 0 },
+    denayWeight: { type: Number, default: 30 },
     maxBoxes: { type: Number, default: 0 },
     priceaddedtax: { type: Number, default: 0 },
     basePrice: { type: Number, default: 0 },
