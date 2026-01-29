@@ -867,21 +867,7 @@ module.exports.cancelShipment = asyncHandler(async (req, res, next) => {
     await shipment.save();
 
     // إرسال بريد إلكتروني عند إلغاء شحنة أرامكس أو سمسا
-    if (["aramex"].includes(company.toLowerCase())) {
-      sendmail({
-        to: "Saraaly@aramex.com" || "support@marasil.com", // يمكنك تعديل البريد المستلم هنا
-        subject: "إلغاء شحنة من النظام",
-        text: `
-السلام عليكم
-نأمل منكم التكرم بإلغاء الشحنة التالية من نظامكم، حيث تم إلغاؤها من طرفنا في منصة مراسيل:
-	رقم الشحنة : ${trackingNumber}
-
-شاكرين تعاونكم وتفهمكم.
-تحياتنا،
-فريق مراسيل`,
-      });
-    }
-
+   
     // 8. إرجاع نتيجة الإلغاء
     res.status(200).json({
       status: "success",
@@ -1120,6 +1106,8 @@ module.exports.printShipmentInvoice = asyncHandler(async (req, res, next) => {
 /*
 METHOD: GET
 GET ALL SHIPMENTS FOR A SPECIFIC CUSTOMER
+Query params: page, itemsPerPage|limit, search, dateFrom, dateTo, status, source, carrier
+search: يطابق رقم التتبع، رقم الشحنة، اسم العميل/الوجهة، رقم الجوال
 */
 module.exports.getCustomerShipments = asyncHandler(async (req, res, next) => {
   try {
@@ -1130,8 +1118,69 @@ module.exports.getCustomerShipments = asyncHandler(async (req, res, next) => {
       parseInt(req.query.itemsPerPage, 10) ||
       10;
     const skip = (page - 1) * limit;
+    const search = (req.query.search || "").trim();
+    const dateFrom = req.query.dateFrom;
+    const dateTo = req.query.dateTo;
+    const status = req.query.status;
+    const source = req.query.source;
+    const carrier = req.query.carrier;
 
-    const shipments = await Shapment.find({ customerId })
+    const filter = { customerId };
+
+    // البحث: رقم التتبع، رقم الشحنة، اسم العميل/الوجهة، الجوال
+    if (search) {
+      const searchConditions = [
+        { trackingId: { $regex: search, $options: "i" } },
+        { "senderAddress.full_name": { $regex: search, $options: "i" } },
+        { "senderAddress.city": { $regex: search, $options: "i" } },
+        { "senderAddress.country": { $regex: search, $options: "i" } },
+        { "senderAddress.address": { $regex: search, $options: "i" } },
+        { "senderAddress.mobile": { $regex: search, $options: "i" } },
+      ];
+      if (mongoose.Types.ObjectId.isValid(search) && String(new mongoose.Types.ObjectId(search)) === search) {
+        searchConditions.push({ _id: new mongoose.Types.ObjectId(search) });
+      }
+      filter.$and = [{ $or: searchConditions }];
+    }
+
+    // فلترة حسب التاريخ
+    if (dateFrom || dateTo) {
+      filter.createdAt = {};
+      if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) {
+        const end = new Date(dateTo);
+        end.setHours(23, 59, 59, 999);
+        filter.createdAt.$lte = end;
+      }
+    }
+
+    // فلترة حسب الحالة
+    if (status && status !== "all") {
+      const statusLower = status.toLowerCase();
+      if (statusLower === "active") {
+        filter.shipmentstates = { $in: ["IN_TRANSIT", "READY_FOR_PICKUP"] };
+      } else {
+        const statusMap = {
+          delivered: "Delivered",
+          transit: "IN_TRANSIT",
+          processing: "READY_FOR_PICKUP",
+          ready: "READY_FOR_PICKUP",
+          cancel: "Canceled",
+          canceled: "Canceled",
+        };
+        const dbStatus = statusMap[statusLower] || status;
+        filter.shipmentstates = dbStatus;
+      }
+    }
+
+    if (source && source !== "all") {
+      filter.orderSou = source;
+    }
+    if (carrier && carrier !== "all") {
+      filter.shapmentCompany = carrier;
+    }
+
+    const shipments = await Shapment.find(filter)
       .populate("customerId", "firstName lastName email phone")
       .populate("receiverAddress")
       .populate("orderId")
@@ -1139,14 +1188,14 @@ module.exports.getCustomerShipments = asyncHandler(async (req, res, next) => {
       .skip(skip)
       .limit(limit);
 
-    const total = await Shapment.countDocuments({ customerId });
+    const total = await Shapment.countDocuments(filter);
 
     res.status(200).json({
       status: "success",
       results: shipments.length,
       pagination: {
         currentPage: page,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limit) || 1,
         totalItems: total,
         itemsPerPage: limit,
       },
