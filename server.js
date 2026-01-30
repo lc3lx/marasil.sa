@@ -54,6 +54,8 @@ const server = http.createServer(app);
 const allowedOrigins = [
   "https://www.marasil.site",
   "https://marasil.site",
+  "https://www.marasil.sa",
+  "https://marasil.sa",
   "http://localhost:3000",
   "http://localhost:3001",
 ];
