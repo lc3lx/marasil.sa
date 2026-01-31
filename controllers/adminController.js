@@ -7,6 +7,22 @@ const createToken = require("../utils/createToken");
 const { UploadArrayofImages } = require("../middlewares/uploadImageMiddleware");
 const Customer = require("../models/customerModel");
 const factory = require("./handlersFactory");
+
+// Base URL للملفات الثابتة والصور
+const BASE_URL = process.env.BASE_URL || "https://www.marasil.sa";
+
+/**
+ * يحول مسار الصورة النسبي إلى رابط كامل مع base URL
+ */
+const getImageFullUrl = (path) => {
+  if (!path || typeof path !== "string") return path || "";
+  const trimmed = path.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  const base = BASE_URL.replace(/\/$/, "");
+  const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  return `${base}${normalizedPath}`;
+};
 // middleware
 exports.UploadCustomerImage = UploadArrayofImages([
   { name: "profileImage", maxCount: 1 },
@@ -117,9 +133,14 @@ exports.getCompanyInfo = asyncHandler(async (req, res, next) => {
   if (!customer) {
     return res.status(404).json({ error: "Customer not found" });
   }
+  const brandLogoPath = customer.brand_logo
+    ? (!customer.brand_logo.includes("/uploads/") && !customer.brand_logo.startsWith("http")
+        ? `/uploads/Logo/${customer.brand_logo}`
+        : customer.brand_logo)
+    : null;
   const info = {
     brand_color: customer.brand_color,
-    brand_logo: customer.brand_logo,
+    brand_logo: brandLogoPath ? getImageFullUrl(brandLogoPath) : customer.brand_logo,
     company_name_ar: customer.company_name_ar,
     company_name_en: customer.company_name_en,
     brand_email: customer.brand_email,
@@ -205,31 +226,28 @@ exports.getMe = asyncHandler(async (req, res, next) => {
   // إزالة كلمة المرور من الاستجابة
   customer.password = undefined;
 
-  // إضافة المسار الكامل للصور فقط إذا لم يكن موجوداً
+  // إضافة المسار الكامل مع base URL للصور
   const customerData = customer.toObject();
   if (customerData.profileImage) {
-    // التحقق إذا كان المسار يحتوي على /uploads/ أو http بالفعل
     if (!customerData.profileImage.includes('/uploads/') && 
         !customerData.profileImage.startsWith('http')) {
-      customerData.profileImage = `/uploads/customers/${customerData.profileImage}`;
-      console.log("✅ تم إضافة المسار الكامل - profileImage:", customerData.profileImage);
+      customerData.profileImage = getImageFullUrl(`/uploads/customers/${customerData.profileImage}`);
     } else {
-      console.log("✅ المسار موجود بالفعل - profileImage:", customerData.profileImage);
+      customerData.profileImage = getImageFullUrl(customerData.profileImage);
     }
-  } else {
-    console.log("❌ لا توجد profileImage في الـ database");
+    console.log("✅ profileImage مع base URL:", customerData.profileImage);
   }
   if (customerData.brand_logo) {
-    // التحقق إذا كان المسار يحتوي على /uploads/ أو http بالفعل
     if (!customerData.brand_logo.includes('/uploads/') && 
         !customerData.brand_logo.startsWith('http')) {
-      customerData.brand_logo = `/uploads/Logo/${customerData.brand_logo}`;
-      console.log("✅ تم إضافة المسار الكامل - brand_logo:", customerData.brand_logo);
+      customerData.brand_logo = getImageFullUrl(`/uploads/Logo/${customerData.brand_logo}`);
     } else {
-      console.log("✅ المسار موجود بالفعل - brand_logo:", customerData.brand_logo);
+      customerData.brand_logo = getImageFullUrl(customerData.brand_logo);
     }
-  } else {
-    console.log("❌ لا توجد brand_logo في الـ database");
+    console.log("✅ brand_logo مع base URL:", customerData.brand_logo);
+  }
+  if (customerData.trackingSettings?.logo) {
+    customerData.trackingSettings.logo = getImageFullUrl(customerData.trackingSettings.logo);
   }
 
   console.log("========== End getMe Controller ==========\n");
@@ -357,27 +375,28 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   // إزالة كلمة المرور من الاستجابة
   customer.password = undefined;
 
-  // إضافة المسار الكامل للصور فقط إذا لم يكن موجوداً
+  // إضافة المسار الكامل مع base URL للصور
   const customerData = customer.toObject();
   if (customerData.profileImage) {
-    // التحقق إذا كان المسار يحتوي على /uploads/ أو http بالفعل
     if (!customerData.profileImage.includes('/uploads/') && 
         !customerData.profileImage.startsWith('http')) {
-      customerData.profileImage = `/uploads/customers/${customerData.profileImage}`;
-      console.log("✅ تم إضافة المسار الكامل - profileImage:", customerData.profileImage);
+      customerData.profileImage = getImageFullUrl(`/uploads/customers/${customerData.profileImage}`);
     } else {
-      console.log("✅ المسار موجود بالفعل - profileImage:", customerData.profileImage);
+      customerData.profileImage = getImageFullUrl(customerData.profileImage);
     }
+    console.log("✅ profileImage مع base URL:", customerData.profileImage);
   }
   if (customerData.brand_logo) {
-    // التحقق إذا كان المسار يحتوي على /uploads/ أو http بالفعل
     if (!customerData.brand_logo.includes('/uploads/') && 
         !customerData.brand_logo.startsWith('http')) {
-      customerData.brand_logo = `/uploads/Logo/${customerData.brand_logo}`;
-      console.log("✅ تم إضافة المسار الكامل - brand_logo:", customerData.brand_logo);
+      customerData.brand_logo = getImageFullUrl(`/uploads/Logo/${customerData.brand_logo}`);
     } else {
-      console.log("✅ المسار موجود بالفعل - brand_logo:", customerData.brand_logo);
+      customerData.brand_logo = getImageFullUrl(customerData.brand_logo);
     }
+    console.log("✅ brand_logo مع base URL:", customerData.brand_logo);
+  }
+  if (customerData.trackingSettings?.logo) {
+    customerData.trackingSettings.logo = getImageFullUrl(customerData.trackingSettings.logo);
   }
 
   console.log("========== End updateLoggedCustomerdata Controller ==========\n");
