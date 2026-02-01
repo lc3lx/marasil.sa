@@ -630,6 +630,22 @@ module.exports.getAllreturnshipment = asyncHandler(async (req, res, next) => {
       filter.typerequesst = req.query.type; // 'return' أو 'exchange'
     }
 
+    // إضافة فلتر التاريخ إذا تم تحديده
+    const { dateFrom, dateTo } = req.query;
+    if (dateFrom || dateTo) {
+      filter.createdAt = {};
+      if (dateFrom) {
+        const from = new Date(dateFrom);
+        from.setHours(0, 0, 0, 0);
+        filter.createdAt.$gte = from;
+      }
+      if (dateTo) {
+        const to = new Date(dateTo);
+        to.setHours(23, 59, 59, 999);
+        filter.createdAt.$lte = to;
+      }
+    }
+
     // جلب طلبات الإرجاع مع البيانات المرتبطة
     const returnShipments = await ReturnShipment.find(filter)
       .populate({

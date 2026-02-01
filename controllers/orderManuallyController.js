@@ -82,7 +82,24 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
   res.json({ message: "Status updated successfully", order: updatedOrder });
 });
 exports.getOrders = asyncHandler(async (req, res, next) => {
-  const order = await Order.find({ Customer: req.customer._id }).sort({
+  const { dateFrom, dateTo } = req.query;
+  const filter = { Customer: req.customer._id };
+
+  if (dateFrom || dateTo) {
+    filter.createdAt = {};
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      from.setHours(0, 0, 0, 0);
+      filter.createdAt.$gte = from;
+    }
+    if (dateTo) {
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      filter.createdAt.$lte = to;
+    }
+  }
+
+  const order = await Order.find(filter).sort({
     createdAt: -1,
   });
   res.status(200).json({ results: order.length, data: order });
