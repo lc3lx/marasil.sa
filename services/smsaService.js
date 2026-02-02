@@ -1,24 +1,23 @@
 /**
  * تحويل عنوان العميل إلى صيغة SMSA
  * @param {Object} address عنوان العميل من قاعدة البيانات
+ * @param {Object} [options]
+ * @param {boolean} [options.isRecipient=false] إذا true يُضاف العنوان الوطني (ShortCode) للمستلم فقط
  * @returns {Object} عنوان بصيغة SMSA
  */
-exports.formatAddress = (address = {}) => {
-  const shouldOmitShortCode =
-    Boolean(address?.meta?.isOfficePickup) ||
-    Boolean(address?.meta?.isOfficeDropoff) ||
-    Boolean(address?.meta?.forceNoShortCode);
+exports.formatAddress = (address = {}, options = {}) => {
+  const isRecipient = Boolean(options.isRecipient);
 
   const formattedAddress = {
     ContactName: address.full_name, // بين 5 و150 حرف
     ContactPhoneNumber: address.mobile, // رقم الهاتف
     Country: address.country, // رمز الدولة
     City: address.city,
-    AddressLine1: `${address.address}        `,
-    // District: address.address, // اسم المدينة
+    AddressLine1: `${address.address} ${address.cite}        `,
   };
 
-  if (!shouldOmitShortCode) {
+  // العنوان الوطني (ShortCode) يُضاف في كل الحالات للمستلم فقط
+  if (isRecipient && address.nationalAddress) {
     formattedAddress.ShortCode = address.nationalAddress;
   }
 
@@ -52,7 +51,7 @@ exports.Shapmentdata = (
 
   const shipmentData = {
     CODAmount: isCOD ? order.total.amount : 0,
-    ConsigneeAddress: exports.formatAddress(order.customer),
+    ConsigneeAddress: exports.formatAddress(order.customer, { isRecipient: true }),
 
     ShipperAddress: exports.formatAddress(shipperAddress),
     ContentDescription: orderDescription,
@@ -120,7 +119,7 @@ exports.ShapmentdataC2b = (originalShipment, smsaRetailId) => {
 
   const shipmentData = {
     CODAmount: 0.0, // شحنات الإرجاع لا تحتوي على مبلغ تحصيل
-    PickupAddress: exports.formatAddress(newConsigneeAddress), // عنوان المستلم (المتجر)
+    PickupAddress: exports.formatAddress(newConsigneeAddress, { isRecipient: true }), // عنوان المستلم (المتجر)
     ReturnToAddress: exports.formatAddress(newShipperAddress), // عنوان المرسل (العميل)
     ContentDescription: originalShipment.orderDescription || "منتج مرتجع",
     DeclaredValue: originalShipment.ordervalue || 0.1,

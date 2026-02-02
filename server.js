@@ -175,7 +175,7 @@ app.post(
   "/api/wallet/webhook/moyasar",
   asyncHandler(async (req, res) => {
     try {
-      const secret = process.env.MOYASAR_SECRET_TOKEN;
+      const secret = process.env.MOYASAR_WEBHOOK_SECRET;
       const payload = req.body;
 
       console.log("📥 Webhook Payload:", JSON.stringify(payload, null, 2));
