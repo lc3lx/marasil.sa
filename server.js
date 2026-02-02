@@ -251,11 +251,20 @@ app.post(
       ) {
         console.log("✅ معالجة دفعة ناجحة");
 
-        // 🔍 التحقق من الدفع عبر API ميسر
+        // 🔍 التحقق من الدفع عبر API ميسر (استخدام المفتاح الحي للدفعات الحية)
         console.log("🔍 Verifying payment with Moyasar API...");
+        const isLive = payload.live === true;
+        const secretKey = (
+          isLive
+            ? process.env.MOYASAR_SECRET_KEY_LIVE || process.env.MOYASAR_SECRET_KEY
+            : process.env.MOYASAR_SECRET_KEY
+        )?.trim?.() || process.env.MOYASAR_SECRET_KEY?.trim?.();
+        if (!secretKey) {
+          console.error("❌ MOYASAR_SECRET_KEY غير معرّف في .env");
+          return res.status(500).json({ error: "تكوين الدفع غير مكتمل" });
+        }
         const authHeader =
-          "Basic " +
-          Buffer.from(process.env.MOYASAR_SECRET_KEY + ":").toString("base64");
+          "Basic " + Buffer.from(secretKey + ":").toString("base64");
 
         const moyasarResponse = await axios.get(
           `https://api.moyasar.com/v1/payments/${payment.id}`,
