@@ -221,8 +221,9 @@ class AramexService {
             CellPhone: pickupData.mobile || "0000000000",
             EmailAddress: pickupData.email || "test@example.com",
           },
-          PickupDateTime: `\\/Date(${pickupData.pickupDateTime})\\/`,
-          ClosingDateTime: `\\/Date(${pickupData.closingDateTime})\\/`,
+          // صيغة التاريخ المطلوبة لـ .NET: "/Date( milliseconds )/"
+          PickupDateTime: "/Date(" + Number(pickupData.pickupDateTime) + ")/",
+          ClosingDateTime: "/Date(" + Number(pickupData.closingDateTime) + ")/",
           Status: "Ready",
           // إضافة حقول إضافية مطلوبة محتملة
           Comments: pickupData.comments || "Pickup request from Marasil",
@@ -241,32 +242,45 @@ class AramexService {
         payload,
         {
           headers: { "Content-Type": "application/json" },
+          validateStatus: () => true, // عدم رمي خطأ عند 4xx/5xx لمعالجة الرد يدوياً
         }
       );
 
-      if (response.status !== 200) {
+      const respData = response.data;
+      const status = response.status;
+
+      if (status !== 200) {
+        const errBody =
+          typeof respData === "string"
+            ? respData
+            : JSON.stringify(respData, null, 2);
         console.error("❌ [Aramex] CreatePickup API Response:", {
-          status: response.status,
+          status,
           statusText: response.statusText,
-          data: response.data,
-          headers: response.headers,
+          data: errBody,
         });
-        throw new Error(
-          `خطأ في إنشاء الاستلام (${response.status}): ${JSON.stringify(
-            response.data
-          )}`
-        );
+        const errMsg =
+          status === 400
+            ? `طلب غير صالح (400). تفاصيل أرامكس: ${errBody.substring(0, 500)}`
+            : `خطأ في إنشاء الاستلام (${status}): ${errBody.substring(0, 300)}`;
+        throw new Error(errMsg);
       }
 
+      const pickupGUID =
+        respData.PickupGUID ?? respData.pickupGUID ?? respData.GUID;
       return {
         success: true,
-        pickupGUID: response.data.PickupGUID,
+        pickupGUID,
+        pickupId: pickupGUID,
       };
     } catch (error) {
-      console.error(
-        "Aramex Create Pickup Error:",
-        error.response?.data || error.message
-      );
+      const detail =
+        error.response?.data != null
+          ? typeof error.response.data === "string"
+            ? error.response.data.substring(0, 600)
+            : JSON.stringify(error.response.data).substring(0, 600)
+          : error.message;
+      console.error("Aramex Create Pickup Error:", detail);
       throw new Error(`فشل إنشاء الاستلام: ${error.message}`);
     }
   }
