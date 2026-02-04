@@ -245,11 +245,26 @@ class AramexService {
               ? pickupData.pickupItems
               : [
                   {
-                    ProductGroup: pickupData.productGroup || "EXP",
-                    ProductType: pickupData.productType || "OND",
-                    NumberOfPieces: Math.max(1, Number(pickupData.numberOfPieces) || 1),
-                    Weight: { Value: Math.max(0.1, Number(pickupData.weight) || 1), Unit: "KG" },
-                    Reference1: pickupData.reference || "",
+                    NumberOfShipments: Math.max(1, Number(pickupData.numberOfShipments) || 1),
+                    PackageType: pickupData.packageType || "Box",
+                    Payment: pickupData.payment || "P",
+                    ShipmentWeight: {
+                      Value: Math.max(0.1, Number(pickupData.weight) || 1),
+                      Unit: "KG",
+                    },
+                    ShipmentVolume: {
+                      Value: Math.max(0.001, Number(pickupData.volume) || 0.001),
+                      Unit: "CBM",
+                    },
+                    CashAmount: { Value: Number(pickupData.cashAmount) || 0, CurrencyCode: "SAR" },
+                    ExtraCharges: pickupData.extraCharges != null ? pickupData.extraCharges : 0,
+                    ShipmentDimensions: {
+                      Length: Number(pickupData.length) || 10,
+                      Width: Number(pickupData.width) || 10,
+                      Height: Number(pickupData.height) || 10,
+                      Unit: "CM",
+                    },
+                    Comments: pickupData.comments || "Pickup request from Marasil",
                   },
                 ],
             PickupDateTime: "/Date(" + Number(pickupData.pickupDateTime) + ")/",
