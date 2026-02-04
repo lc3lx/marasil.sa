@@ -8,6 +8,7 @@
 exports.formatAddress = (address = {}, options = {}) => {
   const isRecipient = Boolean(options.isRecipient);
 
+  console.log(address);
   const formattedAddress = {
     ContactName: address.full_name, // بين 5 و150 حرف
     ContactPhoneNumber: address.mobile, // رقم الهاتف
@@ -51,7 +52,9 @@ exports.Shapmentdata = (
 
   const shipmentData = {
     CODAmount: isCOD ? order.total.amount : 0,
-    ConsigneeAddress: exports.formatAddress(order.customer, { isRecipient: true }),
+    ConsigneeAddress: exports.formatAddress(order.customer, {
+      isRecipient: true,
+    }),
 
     ShipperAddress: exports.formatAddress(shipperAddress),
     ContentDescription: orderDescription,
@@ -119,7 +122,9 @@ exports.ShapmentdataC2b = (originalShipment, smsaRetailId) => {
 
   const shipmentData = {
     CODAmount: 0.0, // شحنات الإرجاع لا تحتوي على مبلغ تحصيل
-    PickupAddress: exports.formatAddress(newConsigneeAddress, { isRecipient: true }), // عنوان المستلم (المتجر)
+    PickupAddress: exports.formatAddress(newConsigneeAddress, {
+      isRecipient: true,
+    }), // عنوان المستلم (المتجر)
     ReturnToAddress: exports.formatAddress(newShipperAddress), // عنوان المرسل (العميل)
     ContentDescription: originalShipment.orderDescription || "منتج مرتجع",
     DeclaredValue: originalShipment.ordervalue || 0.1,
