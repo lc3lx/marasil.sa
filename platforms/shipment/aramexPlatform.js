@@ -202,34 +202,45 @@ class AramexService {
         JSON.stringify(pickupData, null, 2)
       );
 
-      const payload = {
-        ClientInfo: {
-          UserName: this.username,
-          Password: this.password,
-          Version: "v1.0",
-          AccountNumber: this.accountNumber,
-          AccountPin: this.accountPin,
-          AccountEntity: this.accountEntity,
-          AccountCountryCode: this.accountCountryCode,
-        },
-        Pickup: {
-          PickupLocation: pickupData.pickupAddress, // البيانات تأتي منسقة بالفعل من AramexService
-          PickupContact: {
-            PersonName: pickupData.contactName || "غير محدد",
-            CompanyName: pickupData.companyName || "غير محدد",
-            PhoneNumber1: pickupData.phone || "0000000000",
-            CellPhone: pickupData.mobile || "0000000000",
-            EmailAddress: pickupData.email || "test@example.com",
+      // أرامكس تتوقع: PickupAddress = كائن العنوان، PickupLocation = نص (مثل "Reception") وليس كائن
+        const addr = pickupData.pickupAddress || {};
+        const payload = {
+          ClientInfo: {
+            UserName: this.username,
+            Password: this.password,
+            Version: "v1.0",
+            AccountNumber: this.accountNumber,
+            AccountPin: this.accountPin,
+            AccountEntity: this.accountEntity,
+            AccountCountryCode: this.accountCountryCode,
           },
-          // صيغة التاريخ المطلوبة لـ .NET: "/Date( milliseconds )/"
-          PickupDateTime: "/Date(" + Number(pickupData.pickupDateTime) + ")/",
-          ClosingDateTime: "/Date(" + Number(pickupData.closingDateTime) + ")/",
-          Status: "Ready",
-          // إضافة حقول إضافية مطلوبة محتملة
-          Comments: pickupData.comments || "Pickup request from Marasil",
-          Reference1: pickupData.reference || "",
-        },
-      };
+          Pickup: {
+            PickupAddress: {
+              Line1: addr.Line1 ?? addr.AddressLine1 ?? "Address not specified",
+              Line2: addr.Line2 ?? addr.AddressLine2 ?? "",
+              Line3: addr.Line3 ?? "",
+              City: addr.City ?? "",
+              StateOrProvinceCode: addr.StateOrProvinceCode ?? addr.State ?? "",
+              PostCode: addr.PostCode ?? addr.PostalCode ?? "",
+              CountryCode: (addr.CountryCode ?? "SA").toString().toUpperCase(),
+            },
+            PickupLocation: typeof pickupData.pickupLocation === "string"
+              ? pickupData.pickupLocation
+              : (addr.Line1 || addr.AddressLine1 || "استلام من العنوان"),
+            PickupContact: {
+              PersonName: pickupData.contactName || "غير محدد",
+              CompanyName: pickupData.companyName || "غير محدد",
+              PhoneNumber1: pickupData.phone || "0000000000",
+              CellPhone: pickupData.mobile || "0000000000",
+              EmailAddress: pickupData.email || "test@example.com",
+            },
+            PickupDateTime: "/Date(" + Number(pickupData.pickupDateTime) + ")/",
+            ClosingDateTime: "/Date(" + Number(pickupData.closingDateTime) + ")/",
+            Status: "Ready",
+            Comments: pickupData.comments || "Pickup request from Marasil",
+            Reference1: pickupData.reference || "",
+          },
+        };
 
       // طباعة الـ payload المرسل
       console.log(
