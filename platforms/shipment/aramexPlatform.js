@@ -231,7 +231,7 @@ class AramexService {
               PersonName: pickupData.contactName || "غير محدد",
               CompanyName: pickupData.companyName || "غير محدد",
               PhoneNumber1: pickupData.phone || "0000000000",
-              PhoneNumber2: pickupData.phone2 || pickupData.phone || "",
+              PhoneNumber2: pickupData.phone2 || pickupData.phone || pickupData.mobile || "0000000000",
               CellPhone: pickupData.mobile || "0000000000",
               EmailAddress: pickupData.email || "test@example.com",
               Type: pickupData.contactType || "Business",
