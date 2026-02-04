@@ -236,6 +236,22 @@ class AramexService {
               EmailAddress: pickupData.email || "test@example.com",
               Type: pickupData.contactType || "Business",
             },
+            PickupDate: "/Date(" + Number(pickupData.pickupDateTime) + ")/",
+            ReadyTime: "/Date(" + Number(pickupData.pickupDateTime) + ")/",
+            LastPickupTime: "/Date(" + Number(pickupData.closingDateTime) + ")/",
+            ClosingTime: "/Date(" + Number(pickupData.closingDateTime) + ")/",
+            Vehicle: pickupData.vehicle || "Van",
+            PickupItems: Array.isArray(pickupData.pickupItems) && pickupData.pickupItems.length > 0
+              ? pickupData.pickupItems
+              : [
+                  {
+                    ProductGroup: pickupData.productGroup || "EXP",
+                    ProductType: pickupData.productType || "OND",
+                    NumberOfPieces: Math.max(1, Number(pickupData.numberOfPieces) || 1),
+                    Weight: { Value: Math.max(0.1, Number(pickupData.weight) || 1), Unit: "KG" },
+                    Reference1: pickupData.reference || "",
+                  },
+                ],
             PickupDateTime: "/Date(" + Number(pickupData.pickupDateTime) + ")/",
             ClosingDateTime: "/Date(" + Number(pickupData.closingDateTime) + ")/",
             Status: "Ready",
