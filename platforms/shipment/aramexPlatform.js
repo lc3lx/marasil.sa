@@ -190,6 +190,40 @@ class AramexService {
   }
 
   /**
+   * بناء مصفوفة Pickup Items حسب الدليل (Table 32 - Pickup Item Structure)
+   * الحقول الإلزامية: ProductGroup, Payment, NumberOfPieces, ShipmentWeight, NumberOfShipments, ShipmentVolume
+   */
+  buildPickupItems(pickupData) {
+    if (Array.isArray(pickupData.pickupItems) && pickupData.pickupItems.length > 0) {
+      return pickupData.pickupItems;
+    }
+    const weight = Math.max(0.1, Number(pickupData.weight) || 1);
+    const pieces = Math.max(1, Math.min(100, Number(pickupData.numberOfPieces) || 1));
+    const numShipments = Math.max(1, Math.min(100, Number(pickupData.numberOfShipments) || 1));
+    return [
+      {
+        ProductGroup: (pickupData.productGroup || "EXP").slice(0, 3),
+        ProductType: (pickupData.productType || "OND").slice(0, 3),
+        Payment: (pickupData.payment || "P").slice(0, 1),
+        NumberOfPieces: pieces,
+        NumberOfShipments: numShipments,
+        PackageType: (pickupData.packageType || "Box").slice(0, 50),
+        ShipmentWeight: { Value: weight, Unit: "KG" },
+        ShipmentVolume: { Value: Math.max(0.001, Number(pickupData.volume) || 0.001), Unit: "Cm3" },
+        CashAmount: { CurrencyCode: "SAR", Value: Number(pickupData.cashAmount) || 0 },
+        ExtraCharges: { CurrencyCode: "SAR", Value: 0 },
+        ShipmentDimensions: {
+          Length: Math.max(0, Number(pickupData.length) || 10),
+          Width: Math.max(0, Number(pickupData.width) || 10),
+          Height: Math.max(0, Number(pickupData.height) || 10),
+          Unit: "CM",
+        },
+        Comments: (pickupData.comments || "Pickup request from Marasil").slice(0, 50),
+      },
+    ];
+  }
+
+  /**
    * إنشاء استلام
    * @param {Object} pickupData - بيانات الاستلام
    * @returns {Promise<Object>} - تفاصيل الاستلام
@@ -202,8 +236,11 @@ class AramexService {
         JSON.stringify(pickupData, null, 2)
       );
 
-      // أرامكس تتوقع: PickupAddress = كائن العنوان، PickupLocation = نص (مثل "Reception") وليس كائن
+      // هيكل طلب الاستلام حسب الدليل الرسمي Aramex Shipping Services API (Table 13, 31, 32)
         const addr = pickupData.pickupAddress || {};
+        const line1 = (addr.Line1 ?? addr.AddressLine1 ?? "Address not specified").trim();
+        const readyMs = Number(pickupData.pickupDateTime);
+        const closingMs = Number(pickupData.closingDateTime);
         const payload = {
           ClientInfo: {
             UserName: this.username,
@@ -214,64 +251,40 @@ class AramexService {
             AccountEntity: this.accountEntity,
             AccountCountryCode: this.accountCountryCode,
           },
+          Transaction: {
+            Reference1: pickupData.reference || "PICKUP-" + Date.now(),
+          },
           Pickup: {
             PickupAddress: {
-              Line1: addr.Line1 ?? addr.AddressLine1 ?? "Address not specified",
-              Line2: addr.Line2 ?? addr.AddressLine2 ?? "",
-              Line3: addr.Line3 ?? "",
-              City: addr.City ?? "",
-              StateOrProvinceCode: addr.StateOrProvinceCode ?? addr.State ?? "",
-              PostCode: addr.PostCode ?? addr.PostalCode ?? "",
-              CountryCode: (addr.CountryCode ?? "SA").toString().toUpperCase(),
+              Line1: line1.length >= 3 ? line1 : line1 + "   ",
+              Line2: (addr.Line2 ?? addr.AddressLine2 ?? "").trim() || " ",
+              Line3: (addr.Line3 ?? "").trim() || " ",
+              City: (addr.City ?? "").trim() || " ",
+              StateOrProvinceCode: (addr.StateOrProvinceCode ?? addr.State ?? "").trim() || " ",
+              PostCode: (addr.PostCode ?? addr.PostalCode ?? "").trim() || " ",
+              CountryCode: (addr.CountryCode ?? "SA").toString().toUpperCase().slice(0, 2),
             },
             PickupLocation: typeof pickupData.pickupLocation === "string"
               ? pickupData.pickupLocation
               : (addr.Line1 || addr.AddressLine1 || "استلام من العنوان"),
             PickupContact: {
-              PersonName: pickupData.contactName || "غير محدد",
-              CompanyName: pickupData.companyName || "غير محدد",
-              PhoneNumber1: pickupData.phone || "0000000000",
-              PhoneNumber2: pickupData.phone2 || pickupData.phone || pickupData.mobile || "0000000000",
-              CellPhone: pickupData.mobile || "0000000000",
-              EmailAddress: pickupData.email || "test@example.com",
-              Type: pickupData.contactType || "Business",
+              PersonName: (pickupData.contactName || "غير محدد").slice(0, 50),
+              CompanyName: (pickupData.companyName || "غير محدد").slice(0, 50),
+              PhoneNumber1: (pickupData.phone || "0000000000").slice(0, 30),
+              PhoneNumber2: (pickupData.phone2 || pickupData.phone || pickupData.mobile || "0000000000").slice(0, 30),
+              CellPhone: (pickupData.mobile || "0000000000").slice(0, 30),
+              EmailAddress: (pickupData.email || "test@example.com").slice(0, 50),
+              Type: (pickupData.contactType || "Business").slice(0, 50),
             },
-            PickupDate: "/Date(" + Number(pickupData.pickupDateTime) + ")/",
-            ReadyTime: "/Date(" + Number(pickupData.pickupDateTime) + ")/",
-            LastPickupTime: "/Date(" + Number(pickupData.closingDateTime) + ")/",
-            ClosingTime: "/Date(" + Number(pickupData.closingDateTime) + ")/",
-            Vehicle: pickupData.vehicle || "Van",
-            PickupItems: Array.isArray(pickupData.pickupItems) && pickupData.pickupItems.length > 0
-              ? pickupData.pickupItems
-              : [
-                  {
-                    NumberOfShipments: Math.max(1, Number(pickupData.numberOfShipments) || 1),
-                    PackageType: pickupData.packageType || "Box",
-                    Payment: pickupData.payment || "P",
-                    ShipmentWeight: {
-                      Value: Math.max(0.1, Number(pickupData.weight) || 1),
-                      Unit: "KG",
-                    },
-                    ShipmentVolume: {
-                      Value: Math.max(0.001, Number(pickupData.volume) || 0.001),
-                      Unit: "CBM",
-                    },
-                    CashAmount: { Value: Number(pickupData.cashAmount) || 0, CurrencyCode: "SAR" },
-                    ExtraCharges: pickupData.extraCharges != null ? pickupData.extraCharges : 0,
-                    ShipmentDimensions: {
-                      Length: Number(pickupData.length) || 10,
-                      Width: Number(pickupData.width) || 10,
-                      Height: Number(pickupData.height) || 10,
-                      Unit: "CM",
-                    },
-                    Comments: pickupData.comments || "Pickup request from Marasil",
-                  },
-                ],
-            PickupDateTime: "/Date(" + Number(pickupData.pickupDateTime) + ")/",
-            ClosingDateTime: "/Date(" + Number(pickupData.closingDateTime) + ")/",
-            Status: "Ready",
-            Comments: pickupData.comments || "Pickup request from Marasil",
-            Reference1: pickupData.reference || "",
+            PickupDate: "/Date(" + readyMs + ")/",
+            ReadyTime: "/Date(" + readyMs + ")/",
+            LastPickupTime: "/Date(" + closingMs + ")/",
+            ClosingTime: "/Date(" + closingMs + ")/",
+            Vehicle: (pickupData.vehicle || "Van").slice(0, 50),
+            Status: pickupData.status === "Pending" ? "Pending" : "Ready",
+            Reference1: (pickupData.reference || "").slice(0, 50),
+            Comments: (pickupData.comments || "Pickup request from Marasil").slice(0, 1000),
+            PickupItems: this.buildPickupItems(pickupData),
           },
         };
 
