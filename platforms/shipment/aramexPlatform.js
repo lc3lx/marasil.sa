@@ -253,6 +253,10 @@ class AramexService {
           },
           Transaction: {
             Reference1: pickupData.reference || "PICKUP-" + Date.now(),
+            Reference2: "",
+            Reference3: "",
+            Reference4: "",
+            Reference5: "",
           },
           Pickup: {
             PickupAddress: {
