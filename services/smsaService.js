@@ -7,14 +7,16 @@
  */
 exports.formatAddress = (address = {}, options = {}) => {
   const isRecipient = Boolean(options.isRecipient);
+  const line1Parts = [address.address, address.cite].filter(Boolean);
+  const addressLine1 =
+    (line1Parts.length ? line1Parts.join(" ") : " ").trim() + "        ";
 
-  console.log(address);
   const formattedAddress = {
     ContactName: address.full_name, // بين 5 و150 حرف
     ContactPhoneNumber: address.mobile, // رقم الهاتف
     Country: address.country, // رمز الدولة
     City: address.city,
-    AddressLine1: `${address.address} ${address.cite}        `,
+    AddressLine1: addressLine1.slice(0, 200), // حد معقول للطول
   };
 
   // العنوان الوطني (ShortCode) يُضاف في كل الحالات للمستلم فقط
