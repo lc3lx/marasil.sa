@@ -1,27 +1,56 @@
 /**
+ * توحيد عنوان من أي صيغة (ClientAddress أو مرسل) إلى حقول موحدة
+ * ClientAddress: clientName, clientPhone, clientAddress, addressDetails, nationalAddress, country, city
+ * مرسل: full_name, mobile, address, cite, country, city, nationalAddress
+ */
+function normalizeAddressForSmsa(address = {}) {
+  const name =
+    address.full_name ||
+    address.clientName ||
+    address.name ||
+    " ";
+  const phone =
+    address.mobile ||
+    address.clientPhone ||
+    address.phone ||
+    "0000000000";
+  const country = address.country || "SA";
+  const city = address.city || " ";
+  const line1 =
+    [address.address, address.cite, address.clientAddress, address.addressDetails]
+      .filter(Boolean)
+      .join(" ")
+      .trim() || " ";
+  const nationalAddress = address.nationalAddress || "";
+  return { name, phone, country, city, line1, nationalAddress };
+}
+
+/**
  * تحويل عنوان العميل إلى صيغة SMSA
+ * يدعم صيغة ClientAddress (clientName, clientPhone, clientAddress) وصيغة المرسل (full_name, mobile, address)
  * @param {Object} address عنوان العميل من قاعدة البيانات
  * @param {Object} [options]
- * @param {boolean} [options.isRecipient=false] إذا true يُضاف العنوان الوطني (ShortCode) للمستلم فقط
+ * @param {boolean} [options.isRecipient=false] إذا true يُضاف العنوان الوطني (ShortCode) للمستلم فقط - ويجب أن يكون 8 أحرف بالضبط
  * @returns {Object} عنوان بصيغة SMSA
  */
 exports.formatAddress = (address = {}, options = {}) => {
   const isRecipient = Boolean(options.isRecipient);
-  const line1Parts = [address.address, address.cite].filter(Boolean);
-  const addressLine1 =
-    (line1Parts.length ? line1Parts.join(" ") : " ").trim() + "        ";
+  const a = normalizeAddressForSmsa(address);
 
+  const addressLine1 = (a.line1.trim() || " ").slice(0, 200);
   const formattedAddress = {
-    ContactName: address.full_name, // بين 5 و150 حرف
-    ContactPhoneNumber: address.mobile, // رقم الهاتف
-    Country: address.country, // رمز الدولة
-    City: address.city,
-    AddressLine1: addressLine1.slice(0, 200), // حد معقول للطول
+    ContactName: (a.name || " ").slice(0, 150),
+    ContactPhoneNumber: String(a.phone || "0000000000").slice(0, 20),
+    Country: (a.country || "SA").slice(0, 2),
+    City: (a.city || " ").slice(0, 50),
+    AddressLine1: addressLine1.length > 0 ? addressLine1 : " ",
   };
 
-  // العنوان الوطني (ShortCode) يُضاف في كل الحالات للمستلم فقط
-  if (isRecipient && address.nationalAddress) {
-    formattedAddress.ShortCode = address.nationalAddress;
+  // ShortCode مطلوب للمستلم ويجب أن يكون بالضبط 8 أحرف
+  if (isRecipient) {
+    const raw = (a.nationalAddress || "").replace(/\s/g, "").slice(0, 8);
+    formattedAddress.ShortCode =
+      raw.length === 8 ? raw : raw.padEnd(8, "0").slice(0, 8);
   }
 
   return formattedAddress;
@@ -98,19 +127,24 @@ exports.Shapmentdata = (
 
 /**
  * تحويل بيانات شحنة الإرجاع إلى صيغة SMSA (من العميل إلى المتجر)
+ * المرسل في الإرجاع = المستلم الأصلي (العميل)، المستلم في الإرجاع = المرسل الأصلي (المتجر)
  * @param {Object} originalShipment بيانات الشحنة الأصلية الكاملة من قاعدة البيانات
  * @returns {Object} بيانات الشحنة بصيغة SMSA للإرجاع
  */
 exports.ShapmentdataC2b = (originalShipment, smsaRetailId) => {
-  // ملاحظة: نفترض أن `originalShipment` هو مستند Mongoose كامل
+  // المستلم الأصلي (العميل) = عنوان الإرجاع منه (ReturnToAddress)
+  const newShipperAddress =
+    originalShipment.receiverAddress &&
+    (typeof originalShipment.receiverAddress.toObject === "function"
+      ? originalShipment.receiverAddress.toObject()
+      : originalShipment.receiverAddress);
+  // المرسل الأصلي (المتجر) = عنوان الاستلام (PickupAddress)
+  const newConsigneeAddress =
+    originalShipment.senderAddress &&
+    (typeof originalShipment.senderAddress.toObject === "function"
+      ? originalShipment.senderAddress.toObject()
+      : originalShipment.senderAddress);
 
-  // المستلم الأصلي (العميل) هو المرسل الجديد
-  const newShipperAddress = originalShipment.receiverAddress;
-
-  // المرسل الأصلي (المتجر) هو المستلم الجديد
-  const newConsigneeAddress = originalShipment.senderAddress;
-
-  // التحقق من وجود العناوين قبل استخدامها لمنع الأخطاء
   if (!newShipperAddress || !newConsigneeAddress) {
     throw new Error("عناوين المرسل والمستلم الأصليين مطلوبة في بيانات الشحنة.");
   }
