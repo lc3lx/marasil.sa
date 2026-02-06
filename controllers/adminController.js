@@ -1,3 +1,5 @@
+const crypto = require("crypto");
+const fs = require("fs");
 const asyncHandler = require("express-async-handler");
 const bcrypt = require("bcryptjs");
 const { v4: uuidv4 } = require("uuid");
@@ -27,6 +29,7 @@ const getImageFullUrl = (path) => {
 exports.UploadCustomerImage = UploadArrayofImages([
   { name: "profileImage", maxCount: 1 },
   { name: "brand_logo", maxCount: 1 },
+  { name: "returnPageLogo", maxCount: 1 },
 ]);
 
 exports.ResizeImage = asyncHandler(async (req, res, next) => {
@@ -88,6 +91,20 @@ exports.ResizeImage = asyncHandler(async (req, res, next) => {
 
       req.body.brand_logo = filename;
       console.log("✅ تم حفظ شعار الشركة:", filename);
+    }
+
+    if (req.files && req.files.returnPageLogo) {
+      console.log("✅ returnPageLogo found in req.files");
+      const dir = "uploads/returnPageLogo";
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const filename = `returnPageLogo-${uuidv4()}-${Date.now()}.jpeg`;
+      await sharp(req.files.returnPageLogo[0].buffer)
+        .resize(400, 120)
+        .toFormat("jpeg")
+        .jpeg({ quality: 90 })
+        .toFile(`${dir}/${filename}`);
+      req.body.returnPageLogo = filename;
+      console.log("✅ تم حفظ شعار صفحة الإرجاع:", filename);
     }
 
     console.log("========== End ResizeImage Middleware ==========\n");
@@ -346,6 +363,36 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
     console.log("✅ سيتم تحديث trackingSettings:", req.body.trackingSettings);
   }
 
+  // تحديث شعار صفحة الإرجاع (إذا تم رفعه) و/أو إعدادات صفحة الاسترجاع
+  if (req.body.returnPageLogo) {
+    const customer = await Customer.findById(req.customer._id).select("returnPageSettings").lean();
+    const current = customer?.returnPageSettings && typeof customer.returnPageSettings === "object"
+      ? { ...customer.returnPageSettings }
+      : {};
+    const logoPath = req.body.returnPageLogo.includes("/") || req.body.returnPageLogo.startsWith("http")
+      ? req.body.returnPageLogo
+      : `uploads/returnPageLogo/${req.body.returnPageLogo}`;
+    const logoUrl = getImageFullUrl(logoPath.startsWith("/") ? logoPath : `/${logoPath}`);
+    const fromBody = req.body.returnPageSettings !== undefined
+      ? (typeof req.body.returnPageSettings === "string"
+          ? JSON.parse(req.body.returnPageSettings)
+          : req.body.returnPageSettings)
+      : {};
+    updateData.returnPageSettings = { ...current, ...fromBody, logoUrl };
+    console.log("✅ سيتم تحديث returnPageSettings (مع logoUrl من رفع الشعار)");
+  } else if (req.body.returnPageSettings !== undefined) {
+    updateData.returnPageSettings = typeof req.body.returnPageSettings === "string"
+      ? JSON.parse(req.body.returnPageSettings)
+      : req.body.returnPageSettings;
+    const existing = await Customer.findById(req.customer._id).select("returnPageSlug").lean();
+    if (!existing?.returnPageSlug) {
+      const slug = crypto.randomBytes(8).toString("base64url");
+      updateData.returnPageSlug = slug;
+      console.log("✅ تم إنشاء returnPageSlug للعميل:", slug);
+    }
+    console.log("✅ سيتم تحديث returnPageSettings");
+  }
+
   console.log("📝 بيانات التحديث النهائية (updateData):", updateData);
 
   console.log("🔄 جاري تحديث العميل في الـ database...");
@@ -464,5 +511,25 @@ exports.updateTrackingSettings = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     status: "success",
     data: customer.trackingSettings,
+  });
+});
+
+// @desc جلب تخصيص صفحة الاسترجاع بالرابط الفريد (للعرض العام للعملاء غير المسجلين)
+// @route GET /api/customer/return-page/:slug
+// @access public
+exports.getReturnPageBySlug = asyncHandler(async (req, res, next) => {
+  const { slug } = req.params;
+  if (!slug) {
+    return next(new ApiError("رابط صفحة الاسترجاع مطلوب", 400));
+  }
+  const customer = await Customer.findOne({ returnPageSlug: slug })
+    .select("returnPageSettings returnPageSlug")
+    .lean();
+  if (!customer) {
+    return next(new ApiError("صفحة الاسترجاع غير موجودة أو الرابط غير صحيح", 404));
+  }
+  res.status(200).json({
+    status: "success",
+    data: customer.returnPageSettings || null,
   });
 });

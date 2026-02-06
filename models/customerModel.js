@@ -119,6 +119,17 @@ const customerSchema = new mongoose.Schema(
           "<div id='shipexpress-tracking' data-tracking-id='YOUR_TRACKING_ID'></div><script src='https://tracking.shipexpress.com/embed.js'></script>",
       },
     },
+    // تخصيص صفحة الاسترجاع + رابط فريد للعميل غير المسجل
+    returnPageSettings: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    returnPageSlug: {
+      type: String,
+      sparse: true,
+      unique: true,
+      default: null,
+    },
   },
   { timestamps: true }
 );
