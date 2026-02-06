@@ -180,11 +180,31 @@ const _createReturnShipmentInternal = async (shipmentId, customerId) => {
     throw new ApiEror("لم يتم إرجاع رقم تتبع من شركة الشحن.", 500);
   }
 
+  // إنشاء سجل الشحنة المرتجعة أولاً (قبل المعاملة لاستخدام _id فيها)
+  const returnShipmentData = {
+    ...originalShipment.toObject(),
+    isReturnShipment: true,
+    originalShipmentId: originalShipment._id,
+    shapmentPrice: shippingCost,
+    shipmentstates: "READY_FOR_PICKUP",
+    shapmentingType: originalShipment.shapmentingType || "Dry",
+    paymentMathod: "Prepaid",
+    trackingId: returnShipmentResult.trackingNumber,
+    trackingURL: returnShipmentResult.trackingURL,
+    status: "pending_return",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    __v: undefined,
+  };
+  delete returnShipmentData._id;
+
+  const newReturnShipment = await Shapment.create(returnShipmentData);
+
   // خصم تكلفة الشحن من رصيد العميل
   wallet.balance -= shippingCost;
   await wallet.save();
 
-  // تسجيل المعاملة
+  // تسجيل المعاملة (بعد إنشاء الشحنة لاستخدام newReturnShipment._id)
   const transaction = new Transaction({
     walletId: wallet._id,
     customerId: customerId,
@@ -201,30 +221,6 @@ const _createReturnShipmentInternal = async (shipmentId, customerId) => {
   // إضافة المعاملة إلى سجل المعاملات في المحفظة
   wallet.transactions.push(transaction._id);
   await wallet.save();
-
-  // Create a new return shipment with all required fields
-  const returnShipmentData = {
-    ...originalShipment.toObject(),
-    _id: new mongoose.Types.ObjectId(),
-    isReturnShipment: true,
-    originalShipmentId: originalShipment._id,
-    shapmentPrice: shippingCost,
-    shipmentstates: "READY_FOR_PICKUP",
-    shapmentingType: originalShipment.shapmentingType || "Dry",
-    paymentMathod: "Prepaid",
-    trackingId: returnShipmentResult.trackingNumber,
-    trackingURL: returnShipmentResult.trackingURL,
-    status: "pending_return",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    // Clear these fields as they will be regenerated
-    __v: undefined,
-  };
-
-  // Remove the original _id to ensure a new document is created
-  delete returnShipmentData._id;
-
-  const newReturnShipment = await Shapment.create(returnShipmentData);
 
   // Create a response object with the new return shipment details
   const response = {
