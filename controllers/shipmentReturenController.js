@@ -662,6 +662,7 @@ module.exports.getAllreturnshipment = asyncHandler(async (req, res, next) => {
     const formattedReturns = returnShipments.map((item) => ({
       _id: item._id,
       status: item.status,
+      reqstatus: item.reqstatus, // pending | yes | no (لإظهار الحالة وإخفاء الإجراءات عند الرفض/الموافقة)
       type: item.typerequesst,
       requestNote: item.requestNote,
       createdAt: item.createdAt,
