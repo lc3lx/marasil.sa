@@ -713,14 +713,78 @@ module.exports.getoneship = asyncHandler(async (req, res, next) => {
 // get a all shipmnet for customer
 
 module.exports.getShipmentsByReceiver = asyncHandler(async (req, res) => {
-  const { email, phone } = req.query;
+  const { email, phone, awb } = req.query;
+  const trackingOrAwb = (awb || req.query.trackingId || req.query.tracking || "").toString().trim();
 
-  console.log("Searching shipments for:", { email, phone });
+  console.log("Searching shipments for:", { email, phone, awb: trackingOrAwb });
+
+  if (trackingOrAwb) {
+    try {
+      const shipment = await Shapment.findOne({
+        $or: [
+          { trackingId: trackingOrAwb },
+          { orderId: trackingOrAwb },
+        ],
+      })
+        .populate("receiverAddress")
+        .sort({ createdAt: -1 })
+        .lean();
+
+      if (!shipment) {
+        return res.status(200).json({
+          status: "success",
+          results: 0,
+          message: "لم يتم العثور على شحنة بهذا الرقم.",
+        });
+      }
+      if (!shipment.receiverAddress) {
+        return res.status(200).json({
+          status: "success",
+          results: 0,
+          message: "الشحنة لا تحتوي على عنوان مستلم صالح.",
+        });
+      }
+      const formatted = {
+        _id: shipment._id,
+        trackingId: shipment.trackingId,
+        awb: shipment.trackingId,
+        status: shipment.shipmentstates,
+        orderId: shipment.orderId,
+        createdAt: shipment.createdAt,
+        receiver: {
+          name: shipment.receiverAddress?.name,
+          phone: shipment.receiverAddress?.phone,
+          email: shipment.receiverAddress?.email,
+        },
+        receiverAddress: {
+          _id: shipment.receiverAddress?._id,
+          name: shipment.receiverAddress?.name,
+          phone: shipment.receiverAddress?.phone,
+          email: shipment.receiverAddress?.email,
+          address: shipment.receiverAddress?.address,
+        },
+        isReturnable: shipment.isReturnable,
+        returnDeadline: shipment.returnDeadline,
+        shipmentCompany: shipment.shapmentCompany,
+      };
+      return res.status(200).json({
+        status: "success",
+        results: 1,
+        data: [formatted],
+      });
+    } catch (err) {
+      console.error("Error in getShipmentsByReceiver (awb):", err);
+      return res.status(500).json({
+        status: "error",
+        message: err.message || "حدث خطأ أثناء البحث عن الشحنة",
+      });
+    }
+  }
 
   if (!email && !phone) {
     return res.status(400).json({
       status: "error",
-      message: "يرجى إرسال الإيميل أو رقم الجوال للبحث.",
+      message: "يرجى إدخال رقم البوليصة أو رقم الجوال أو البريد الإلكتروني للبحث.",
     });
   }
 

@@ -17,6 +17,7 @@ const {
   updateSecuritySettings,
   updateTrackingSettings,
   getReturnPageBySlug,
+  getReplacementPageBySlug,
 } = require("../controllers/adminController");
 const {
   createCustomerValidator,
@@ -32,8 +33,9 @@ const auth = require("../controllers/authController");
 
 const router = express.Router();
 
-// مسار عام: جلب تخصيص صفحة الاسترجاع بالرابط الفريد (بدون تسجيل دخول)
+// مسار عام: جلب تخصيص صفحة الاسترجاع/الاستبدال بالرابط الفريد (بدون تسجيل دخول)
 router.get("/return-page/:slug", getReturnPageBySlug);
+router.get("/replacement-page/:slug", getReplacementPageBySlug);
 
 router.use(auth.Protect); // apply protect  for all routes (admin and users)
 

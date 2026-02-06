@@ -130,6 +130,17 @@ const customerSchema = new mongoose.Schema(
       unique: true,
       default: null,
     },
+    // تخصيص صفحة الاستبدال + رابط فريد للعميل غير المسجل
+    replacementPageSettings: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    replacementPageSlug: {
+      type: String,
+      sparse: true,
+      unique: true,
+      default: null,
+    },
   },
   { timestamps: true }
 );

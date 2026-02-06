@@ -30,6 +30,7 @@ exports.UploadCustomerImage = UploadArrayofImages([
   { name: "profileImage", maxCount: 1 },
   { name: "brand_logo", maxCount: 1 },
   { name: "returnPageLogo", maxCount: 1 },
+  { name: "replacementPageLogo", maxCount: 1 },
 ]);
 
 exports.ResizeImage = asyncHandler(async (req, res, next) => {
@@ -105,6 +106,20 @@ exports.ResizeImage = asyncHandler(async (req, res, next) => {
         .toFile(`${dir}/${filename}`);
       req.body.returnPageLogo = filename;
       console.log("✅ تم حفظ شعار صفحة الإرجاع:", filename);
+    }
+
+    if (req.files && req.files.replacementPageLogo) {
+      console.log("✅ replacementPageLogo found in req.files");
+      const dir = "uploads/replacementPageLogo";
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const filename = `replacementPageLogo-${uuidv4()}-${Date.now()}.jpeg`;
+      await sharp(req.files.replacementPageLogo[0].buffer)
+        .resize(400, 120)
+        .toFormat("jpeg")
+        .jpeg({ quality: 90 })
+        .toFile(`${dir}/${filename}`);
+      req.body.replacementPageLogo = filename;
+      console.log("✅ تم حفظ شعار صفحة الاستبدال:", filename);
     }
 
     console.log("========== End ResizeImage Middleware ==========\n");
@@ -266,6 +281,22 @@ exports.getMe = asyncHandler(async (req, res, next) => {
   if (customerData.trackingSettings?.logo) {
     customerData.trackingSettings.logo = getImageFullUrl(customerData.trackingSettings.logo);
   }
+  if (customerData.returnPageSettings?.logoUrl) {
+    const logo = customerData.returnPageSettings.logoUrl;
+    if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
+      customerData.returnPageSettings.logoUrl = getImageFullUrl(`/uploads/returnPageLogo/${logo}`);
+    } else {
+      customerData.returnPageSettings.logoUrl = getImageFullUrl(logo.startsWith("/") ? logo : `/${logo}`);
+    }
+  }
+  if (customerData.replacementPageSettings?.logoUrl) {
+    const logo = customerData.replacementPageSettings.logoUrl;
+    if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
+      customerData.replacementPageSettings.logoUrl = getImageFullUrl(`/uploads/replacementPageLogo/${logo}`);
+    } else {
+      customerData.replacementPageSettings.logoUrl = getImageFullUrl(logo.startsWith("/") ? logo : `/${logo}`);
+    }
+  }
 
   console.log("========== End getMe Controller ==========\n");
 
@@ -391,6 +422,36 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
       console.log("✅ تم إنشاء returnPageSlug للعميل:", slug);
     }
     console.log("✅ سيتم تحديث returnPageSettings");
+  }
+
+  // تحديث شعار صفحة الاستبدال و/أو إعدادات صفحة الاستبدال
+  if (req.body.replacementPageLogo) {
+    const cust = await Customer.findById(req.customer._id).select("replacementPageSettings").lean();
+    const current = cust?.replacementPageSettings && typeof cust.replacementPageSettings === "object"
+      ? { ...cust.replacementPageSettings }
+      : {};
+    const logoPath = req.body.replacementPageLogo.includes("/") || req.body.replacementPageLogo.startsWith("http")
+      ? req.body.replacementPageLogo
+      : `uploads/replacementPageLogo/${req.body.replacementPageLogo}`;
+    const logoUrl = getImageFullUrl(logoPath.startsWith("/") ? logoPath : `/${logoPath}`);
+    const fromBody = req.body.replacementPageSettings !== undefined
+      ? (typeof req.body.replacementPageSettings === "string"
+          ? JSON.parse(req.body.replacementPageSettings)
+          : req.body.replacementPageSettings)
+      : {};
+    updateData.replacementPageSettings = { ...current, ...fromBody, logoUrl };
+    console.log("✅ سيتم تحديث replacementPageSettings (مع logoUrl من رفع الشعار)");
+  } else if (req.body.replacementPageSettings !== undefined) {
+    updateData.replacementPageSettings = typeof req.body.replacementPageSettings === "string"
+      ? JSON.parse(req.body.replacementPageSettings)
+      : req.body.replacementPageSettings;
+    const existingRep = await Customer.findById(req.customer._id).select("replacementPageSlug").lean();
+    if (!existingRep?.replacementPageSlug) {
+      const slug = crypto.randomBytes(8).toString("base64url");
+      updateData.replacementPageSlug = slug;
+      console.log("✅ تم إنشاء replacementPageSlug للعميل:", slug);
+    }
+    console.log("✅ سيتم تحديث replacementPageSettings");
   }
 
   console.log("📝 بيانات التحديث النهائية (updateData):", updateData);
@@ -528,8 +589,48 @@ exports.getReturnPageBySlug = asyncHandler(async (req, res, next) => {
   if (!customer) {
     return next(new ApiError("صفحة الاسترجاع غير موجودة أو الرابط غير صحيح", 404));
   }
+  const raw = customer.returnPageSettings || {};
+  const settings = { ...raw };
+  if (settings.logoUrl) {
+    const logo = settings.logoUrl;
+    if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
+      settings.logoUrl = getImageFullUrl(`/uploads/returnPageLogo/${logo}`);
+    } else {
+      settings.logoUrl = getImageFullUrl(logo.startsWith("/") ? logo : `/${logo}`);
+    }
+  }
   res.status(200).json({
     status: "success",
-    data: customer.returnPageSettings || null,
+    data: settings,
+  });
+});
+
+// @desc جلب تخصيص صفحة الاستبدال بالرابط الفريد (للعرض العام للعملاء غير المسجلين)
+// @route GET /api/customer/replacement-page/:slug
+// @access public
+exports.getReplacementPageBySlug = asyncHandler(async (req, res, next) => {
+  const { slug } = req.params;
+  if (!slug) {
+    return next(new ApiError("رابط صفحة الاستبدال مطلوب", 400));
+  }
+  const customer = await Customer.findOne({ replacementPageSlug: slug })
+    .select("replacementPageSettings replacementPageSlug")
+    .lean();
+  if (!customer) {
+    return next(new ApiError("صفحة الاستبدال غير موجودة أو الرابط غير صحيح", 404));
+  }
+  const raw = customer.replacementPageSettings || {};
+  const settings = { ...raw };
+  if (settings.logoUrl) {
+    const logo = settings.logoUrl;
+    if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
+      settings.logoUrl = getImageFullUrl(`/uploads/replacementPageLogo/${logo}`);
+    } else {
+      settings.logoUrl = getImageFullUrl(logo.startsWith("/") ? logo : `/${logo}`);
+    }
+  }
+  res.status(200).json({
+    status: "success",
+    data: settings,
   });
 });
