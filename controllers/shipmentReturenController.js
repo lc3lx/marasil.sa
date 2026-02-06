@@ -180,10 +180,11 @@ const _createReturnShipmentInternal = async (shipmentId, customerId) => {
     throw new ApiEror("لم يتم إرجاع رقم تتبع من شركة الشحن.", 500);
   }
 
-  // إنشاء سجل الشحنة المرتجعة أولاً (قبل المعاملة لاستخدام _id فيها)
+  // إنشاء سجل الشحنة المرتجعة أولاً (قبل المعاملة لاستخدام _id فيها) — نوعها عكسية
   const returnShipmentData = {
     ...originalShipment.toObject(),
     isReturnShipment: true,
+    shapmentType: "reverse", // شحنة عكسية (إرجاع/استبدال)
     originalShipmentId: originalShipment._id,
     shapmentPrice: shippingCost,
     shipmentstates: "READY_FOR_PICKUP",

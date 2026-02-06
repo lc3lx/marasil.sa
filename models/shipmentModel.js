@@ -60,10 +60,11 @@ const shapmentSchema = new mongoose.Schema(
     },
     shapmentType: {
       type: String,
-
       enum: ["straight", "reverse"],
       default: "straight",
     },
+    isReturnShipment: { type: Boolean, default: false },
+    originalShipmentId: { type: mongoose.Schema.Types.ObjectId, ref: "Shapment" },
 
     // Tracking Information
     trackingId: String,
