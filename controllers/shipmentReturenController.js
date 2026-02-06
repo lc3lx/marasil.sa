@@ -720,11 +720,12 @@ module.exports.getShipmentsByReceiver = asyncHandler(async (req, res) => {
 
   if (trackingOrAwb) {
     try {
+      const searchConditions = [{ trackingId: trackingOrAwb }];
+      if (mongoose.Types.ObjectId.isValid(trackingOrAwb) && String(new mongoose.Types.ObjectId(trackingOrAwb)) === trackingOrAwb) {
+        searchConditions.push({ orderId: trackingOrAwb });
+      }
       const shipment = await Shapment.findOne({
-        $or: [
-          { trackingId: trackingOrAwb },
-          { orderId: trackingOrAwb },
-        ],
+        $or: searchConditions,
       })
         .populate("receiverAddress")
         .sort({ createdAt: -1 })
