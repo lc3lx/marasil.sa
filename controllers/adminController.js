@@ -506,6 +506,22 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   if (customerData.trackingSettings?.logo) {
     customerData.trackingSettings.logo = getImageFullUrl(customerData.trackingSettings.logo);
   }
+  if (customerData.returnPageSettings?.logoUrl) {
+    const logo = customerData.returnPageSettings.logoUrl;
+    if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
+      customerData.returnPageSettings.logoUrl = getImageFullUrl(`/uploads/returnPageLogo/${logo}`);
+    } else {
+      customerData.returnPageSettings.logoUrl = getImageFullUrl(logo.startsWith("/") ? logo : `/${logo}`);
+    }
+  }
+  if (customerData.replacementPageSettings?.logoUrl) {
+    const logo = customerData.replacementPageSettings.logoUrl;
+    if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
+      customerData.replacementPageSettings.logoUrl = getImageFullUrl(`/uploads/replacementPageLogo/${logo}`);
+    } else {
+      customerData.replacementPageSettings.logoUrl = getImageFullUrl(logo.startsWith("/") ? logo : `/${logo}`);
+    }
+  }
 
   console.log("========== End updateLoggedCustomerdata Controller ==========\n");
 

@@ -577,9 +577,8 @@ module.exports.createReturnRequest = asyncHandler(async (req, res, next) => {
 // موافقة أو رفض صاحب الحساب على طلب الاسترجاع
 module.exports.handleReturnApproval = asyncHandler(async (req, res, next) => {
   const { returnRequestId, approve, smsaRetailId } = req.body; // smsaRetailId might be needed
-  // if (!returnRequestId || typeof approve === "undefined") {
-  //   return next(new ApiEror("يجب إدخال رقم الطلب وحالة الموافقة", 400));
-  // }
+  // تحويل approve إلى boolean (الفرونت قد يرسل "true"/"false" كنص)
+  const approved = approve === true || approve === "true";
 
   const returnReq = await ReturnShipment.findById(returnRequestId);
   if (!returnReq) {
@@ -590,7 +589,7 @@ module.exports.handleReturnApproval = asyncHandler(async (req, res, next) => {
     return next(new ApiEror("تم التعامل مع هذا الطلب مسبقاً", 400));
   }
 
-  if (approve) {
+  if (approved) {
     // On approval, create the return shipment
     if (!returnReq.shipment) {
       return next(new ApiEror("لا يمكن الموافقة على طلب غير مرتبط بشحنة", 400));

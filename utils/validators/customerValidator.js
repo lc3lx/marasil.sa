@@ -234,6 +234,8 @@ exports.updateLoggedCustomerdataValidator = [
   check("commercial_registration_number").optional(),
   check("tax_number").optional(),
   check("additional_info").optional(),
+  check("returnPageLogo").optional(),
+  check("replacementPageLogo").optional(),
 
   validatorMiddleware,
 ];
