@@ -1,4 +1,30 @@
 /**
+ * تحويل اسم/رمز الدولة إلى رمز ISO Alpha-2 (سمسا وأرامكس تقبل رموز فقط مثل SA)
+ */
+function toCountryCode(value) {
+  const v = (value || "").toString().trim();
+  if (!v) return "SA";
+  const upper = v.toUpperCase();
+  if (upper.length === 2 && /^[A-Z]{2}$/.test(upper)) return upper;
+  const normalized = v.replace(/\s+/g, " ").toLowerCase();
+  if (
+    normalized.includes("سعود") ||
+    normalized.includes("السعودية") ||
+    normalized.includes("saudi") ||
+    normalized === "sa"
+  )
+    return "SA";
+  if (normalized.includes("البحرين") || normalized.includes("bahrain")) return "BH";
+  if (normalized.includes("مصر") || normalized.includes("egypt")) return "EG";
+  if (normalized.includes("الكويت") || normalized.includes("kuwait")) return "KW";
+  if (normalized.includes("امارات") || normalized.includes("uae") || normalized.includes("emirates")) return "AE";
+  if (normalized.includes("الاردن") || normalized.includes("jordan")) return "JO";
+  if (normalized.includes("عمان") && !normalized.includes("عمان ")) return "OM";
+  if (normalized.includes("قطر") || normalized.includes("qatar")) return "QA";
+  return "SA";
+}
+
+/**
  * توحيد عنوان من أي صيغة (ClientAddress أو مرسل) إلى حقول موحدة
  * ClientAddress: clientName, clientPhone, clientAddress, addressDetails, nationalAddress, country, city
  * مرسل: full_name, mobile, address, cite, country, city, nationalAddress
@@ -14,7 +40,7 @@ function normalizeAddressForSmsa(address = {}) {
     address.clientPhone ||
     address.phone ||
     "0000000000";
-  const country = address.country || "SA";
+  const country = toCountryCode(address.country);
   const city = address.city || " ";
   const line1 =
     [address.address, address.cite, address.clientAddress, address.addressDetails]
@@ -41,7 +67,7 @@ exports.formatAddress = (address = {}, options = {}) => {
   const formattedAddress = {
     ContactName: (a.name || " ").slice(0, 150),
     ContactPhoneNumber: String(a.phone || "0000000000").slice(0, 20),
-    Country: (a.country || "SA").slice(0, 2),
+    Country: a.country,
     City: (a.city || " ").slice(0, 50),
     AddressLine1: addressLine1,
   };
