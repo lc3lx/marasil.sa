@@ -2484,7 +2484,8 @@ async function handleCreateShipmentFlow(
     };
   }
 
-  if (isNegativeReply(normalizedMessage)) {
+  const skipNegativeCheck = state.step === "AWAIT_SENDER_RECIPIENT_CHOICE" || state.step === "AWAIT_SENDER_RECIPIENT_SELECT";
+  if (!skipNegativeCheck && isNegativeReply(normalizedMessage)) {
     stateManager.clearState(userId);
     return {
       success: true,
