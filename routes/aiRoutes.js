@@ -4,6 +4,7 @@ const {
   getConversationHistory,
   deleteConversation,
   getConversationStats,
+  exportConversations,
 } = require("../controllers/aiController");
 
 const AuthService = require("../controllers/authController");
@@ -42,5 +43,12 @@ router.delete("/conversation/:conversationId", deleteConversation);
  * @access  Private (Authenticated Users)
  */
 router.get("/stats/:userId", getConversationStats);
+
+/**
+ * @desc    تصدير المحادثات (صيغة تدريب/تحليل)
+ * @route   GET /ai/export/:userId?format=training|full&limit=100
+ * @access  Private (Authenticated Users)
+ */
+router.get("/export/:userId", exportConversations);
 
 module.exports = router;

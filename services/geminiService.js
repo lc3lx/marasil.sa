@@ -158,6 +158,14 @@ const SYSTEM_PROMPT = `أنت مساعد ذكاء اصطناعي رسمي لمن
    - **ما يرد به:** معلومات عن الرؤية والخدمات والتواصل
    - **أمثلة أسئلة:** "ما هي مراسيل"، "معلومات عن الشركة"، "عن مراسيل"
 
+=== عند السؤال عن خدماتنا (خدمات مراسيل) ===
+عندما يسأل التاجر عن الخدمات أو "شو تقدمون" أو "خدماتكم" أو "ما خدمات مراسيل":
+ردّ بإبداع وتسويق ودي، واذكر:
+1) إدارة الشحنات والطلبات بأسهل طريقة — اللي تحبها قلبك
+2) التكامل مع منصات المتاجر: سلة، زيد، شوبيفي
+3) طباعة البواليص من شركات الشحن اللي في قاعدة البيانات — بأقل الأسعار
+اجعل الرد قصيراً، جذاباً، وبدون قوائم جامدة. استخدم لغة ترحيبية وتشويقية.
+
 7. **generalService.getShippingCompanies()**
    - **متى تستخدمه:** عندما يسأل التاجر عن شركات الشحن المتاحة أو يريد مقارنة
    - **المعطيات:** لا يحتاج معطيات
@@ -453,6 +461,17 @@ function buildContext(recentMessages) {
   ) {
     contextHint = "الحالة الحالية: المستخدم طلب الرصيد وينتظر النتيجة";
   }
+  // إذا كان آخر رد من الـ AI يطلب رقم الشحنة للإلغاء
+  else if (
+    lastMessage.includes("لإلغاء الشحنة أحتاج") ||
+    lastMessage.includes("رقم الشحنة أو معرفها") ||
+    secondLastMessage.includes("لإلغاء الشحنة أحتاج") ||
+    secondLastMessage.includes("رقم الشحنة أو معرفها") ||
+    recentContext.includes("لإلغاء الشحنة")
+  ) {
+    contextHint =
+      "الحالة الحالية: المستخدم طلب إلغاء شحنة وينتظر إدخال رقم الشحنة أو المعرف - إذا أرسل رقماً فقط فالمقصود إلغاء تلك الشحنة";
+  }
   // فحوصات عامة
   else if (
     recentContext.includes("تتبع") ||
@@ -481,6 +500,14 @@ function buildContext(recentMessages) {
     recentContext.includes("create")
   ) {
     contextHint = "الموضوع الحالي: إنشاء شحنة";
+  } else if (
+    recentContext.includes("إلغاء") ||
+    recentContext.includes("الغاء") ||
+    recentContext.includes("الغي") ||
+    recentContext.includes("cancel")
+  ) {
+    contextHint =
+      "الموضوع الحالي: إلغاء شحنة - إذا المستخدم يرسل رقماً فقط فهو رقم الشحنة المراد إلغاؤها";
   }
 
   const finalContext = contextHint
@@ -629,7 +656,39 @@ function quickKeywordParse(
     };
   }
 
-  // التحقق من رقم التتبع المستقل (مثل "50724610926")
+  // إلغاء شحنة + رقم في نفس الرسالة (قبل فحص "رقم فقط" حتى لا يُفسَّر كتتبع)
+  const cancelPatternsWithNumber = [
+    "الغاء شحنة",
+    "الغي شحنة",
+    "الغاء الشحنة",
+    "الغي الشحنة",
+    "قوم بالغاء",
+    "قوم بي الغاء",
+    "الغيها",
+    "الغها",
+    "رقم الشحنة",
+    "هاي رقم الشحنة",
+    "هذا رقم الشحنة",
+    "cancel shipment",
+    "الغاء",
+    "الغي",
+  ];
+  const hasCancelIntent = cancelPatternsWithNumber.some((p) =>
+    includesNormalized(normalizedMessage, p, true)
+  );
+  const cancelNumberMatch = normalizedMessage.match(/(\d{6,})/);
+  if (hasCancelIntent && cancelNumberMatch) {
+    console.log("✅ [Quick Parse] Matched CANCEL with number in same message:", cancelNumberMatch[1]);
+    return {
+      intent: "CANCEL",
+      confidence: 0.95,
+      missing_fields: [],
+      message: `تمام ${userName}، جاري إلغاء الشحنة رقم ${cancelNumberMatch[1]}...`,
+      data: { shipment_id: cancelNumberMatch[1], tracking_number: cancelNumberMatch[1] },
+    };
+  }
+
+  // رقم فقط: تحقق من السياق أولاً (طلب إلغاء سابق → الرقم للإلغاء وليس للتتبع)
   const numberOnlyMatch = normalizedMessage.match(/^(\d{6,})$/);
   if (
     numberOnlyMatch &&
@@ -637,6 +696,16 @@ function quickKeywordParse(
     !lowerMessage.includes("balance") &&
     !includesNormalized(normalizedMessage, "بكم", true)
   ) {
+    if (context && (context.includes("إلغاء") || context.includes("لإلغاء الشحنة أحتاج") || context.includes("الغاء") || context.includes("رقم الشحنة المراد إلغاؤها"))) {
+      console.log("✅ [Quick Parse] Number only in CANCEL context → CANCEL:", numberOnlyMatch[1]);
+      return {
+        intent: "CANCEL",
+        confidence: 0.95,
+        missing_fields: [],
+        message: `تمام ${userName}، جاري إلغاء الشحنة رقم ${numberOnlyMatch[1]}...`,
+        data: { shipment_id: numberOnlyMatch[1], tracking_number: numberOnlyMatch[1] },
+      };
+    }
     console.log("✅ [Quick Parse] Matched standalone tracking number");
     return {
       intent: "TRACK",
@@ -846,6 +915,41 @@ function quickKeywordParse(
     };
   }
 
+  // الخدمات (خدماتنا / خدمات مراسيل) → رد تسويقي إبداعي
+  const servicesPatterns = [
+    "خدماتكم",
+    "خدماتنا",
+    "خدمات مراسيل",
+    "شو خدماتكم",
+    "وش خدماتكم",
+    "ما خدماتكم",
+    "ما هي خدماتكم",
+    "شو تقدمون",
+    "وش تقدمون",
+    "انواع الخدمات",
+    "شو عندكم خدمات",
+    "قلي عن الخدمات",
+    "وريني الخدمات",
+    "اعرض الخدمات",
+    "ما الخدمات",
+    "ايش خدماتكم",
+    "ايش تقدمون",
+  ];
+  if (
+    servicesPatterns.some((pattern) =>
+      includesNormalized(normalizedMessage, pattern, true)
+    )
+  ) {
+    console.log("✅ [Quick Parse] Matched SERVICES question → GET_SERVICES_INFO");
+    return {
+      intent: "CHAT",
+      confidence: 0.9,
+      missing_fields: [],
+      message: "",
+      data: { action: "GET_SERVICES_INFO" },
+    };
+  }
+
   // معلومات الشركة
   const companyPatterns = [
     "معلومات الشركة",
@@ -854,8 +958,6 @@ function quickKeywordParse(
     "عن مراسيل",
     "من هي مراسيل",
     "مراسيل هي",
-    "ما هي خدماتكم",
-    "خدماتكم",
     "زبط هدول كمان",
     "زبط هذول كمان",
     "زبط هاللي قبل كمان",
@@ -889,7 +991,7 @@ function quickKeywordParse(
     };
   }
 
-  // شركات الشحن
+  // شركات الشحن / أنواع الشحن → جلب القائمة من قاعدة البيانات
   const shippingCompaniesPatterns = [
     "شركات الشحن",
     "shipping companies",
@@ -900,19 +1002,33 @@ function quickKeywordParse(
     "شركات الشحن المتاحة",
     "الشركات المتاحه",
     "عطيني الشركات",
+    "شو عنا شركات",
+    "شو في شركات",
+    "شو الشركات",
+    "وش الشركات",
+    "عندكم شركات",
+    "عندكم شركات شحن",
+    "انواع الشحن",
+    "أنواع الشحن",
+    "انواع الشحنات",
+    "شو انواع الشحن",
+    "وش انواع الشحن",
+    "ما هي الشركات",
+    "قلي الشركات",
+    "وريني الشركات",
   ];
   if (
     shippingCompaniesPatterns.some((pattern) =>
       includesNormalized(normalizedMessage, pattern, true)
     )
   ) {
-    console.log("✅ [Quick Parse] Matched SHIPPING_COMPANIES pattern");
+    console.log("✅ [Quick Parse] Matched SHIPPING_COMPANIES → fetch from DB");
     return {
       intent: "CHAT",
       confidence: 0.9,
       missing_fields: [],
-      message: `عندنا عدة شركات شحن موثوقة: سمسا (اقتصادي وبرو)، أرامكس برو، ريد بوكس، ولما بوكس. كل شركة لها مميزاتها حسب نوع الشحنة. أي نوع شحنة عندك؟`,
-      data: {},
+      message: "",
+      data: { action: "GET_SHIPPING_COMPANIES" },
     };
   }
 
@@ -961,12 +1077,29 @@ function quickKeywordParse(
     "كم تطلع",
     "كم محسوبه",
   ];
-  if (
-    pricingPatterns.some((pattern) =>
-      includesNormalized(normalizedMessage, pattern, true)
-    )
-  ) {
-    console.log("✅ [Quick Parse] Matched PRICING pattern");
+  const hasPricingIntent = pricingPatterns.some((pattern) =>
+    includesNormalized(normalizedMessage, pattern, true)
+  );
+  if (hasPricingIntent) {
+    // إذا كانت الرسالة تحتوي وزن و/أو شركة (ارمكس، سمسا، إلخ) → حساب فوري عبر shipmentAccount
+    const hasWeightInMessage = /\d+(?:\.\d+)?\s*(?:ك(?:يلو|جم|غ|ليو|يلو|ليوغرام|ليو)|kg)/i.test(normalizedMessage) ||
+      /(?:وزنها|وزن الشحنة|وزن)\s*(\d+(?:\.\d+)?)/i.test(normalizedMessage) ||
+      /شحنة\s+عادي[^\d]*(\d+)/i.test(normalizedMessage);
+    const hasCompanyInMessage = /ارمكس|ارامكس|أرامكس|سمسا|ريد بوكس|لاما|ومني|omni/i.test(normalizedMessage);
+    if (hasWeightInMessage || hasCompanyInMessage) {
+      console.log("✅ [Quick Parse] PRICING with details in message → CALCULATE_PRICING via shipmentAccount");
+      return {
+        intent: "CHAT",
+        confidence: 0.9,
+        missing_fields: [],
+        message: "",
+        data: {
+          action: "CALCULATE_PRICING",
+          shipmentDetails: message,
+        },
+      };
+    }
+    console.log("✅ [Quick Parse] Matched PRICING pattern (no details)");
     return {
       intent: "CHAT",
       confidence: 0.8,
@@ -1090,6 +1223,25 @@ function quickKeywordParse(
           message: `تمام ${userName}، خلني أجيبلك بيانات رصيدك من النظام...`,
           data: {},
         };
+      }
+
+      // إذا كان السياق يتعلق بإلغاء شحنة والمستخدم أرسل رقماً أو جملة فيها رقم
+      if (
+        context.includes("إلغاء") ||
+        context.includes("لإلغاء الشحنة أحتاج") ||
+        context.includes("رقم الشحنة المراد إلغاؤها")
+      ) {
+        const cancelNumInMessage = normalizedMessage.match(/(\d{6,})/);
+        if (cancelNumInMessage) {
+          console.log("✅ [Quick Parse] Continuation in CANCEL context with number:", cancelNumInMessage[1]);
+          return {
+            intent: "CANCEL",
+            confidence: 0.9,
+            missing_fields: [],
+            message: `تمام ${userName}، جاري إلغاء الشحنة رقم ${cancelNumInMessage[1]}...`,
+            data: { shipment_id: cancelNumInMessage[1], tracking_number: cancelNumInMessage[1] },
+          };
+        }
       }
 
       // إذا كان السياق يتعلق بالأسعار أو الشركات
@@ -1499,6 +1651,72 @@ async function processGeminiResponse(
       };
 
     case "CHAT":
+      // طلب معلومات الخدمات → رد تسويقي إبداعي
+      if (data && data.action === "GET_SERVICES_INFO") {
+        const userName = userInfo?.firstName || "عميلنا";
+        const servicesMessage =
+          `أهلاً فيك ${userName} 🌟\n\n` +
+          `عندنا اللي يريحك ويوفر عليك:\n\n` +
+          `📦 **إدارة الشحنات والطلبات** — بأسهل طريقة، اللي تحبها قلبك. تنشئ، تتابع، وتتحكم بكل شحنة من مكان واحد.\n\n` +
+          `🔗 **تكامل مع متجرك:** ربط مباشر مع **سلة** و **زيد** و **شوبيفي** — الطلبات تنزل عندنا والشحن ينساب معك.\n\n` +
+          `🏷️ **طباعة البواليص** من كل شركات الشحن اللي عندنا في المنصة، **بأقل الأسعار** — بدون ما تروح لشركة وشركة.\n\n` +
+          `تبغى نبدأ من وين؟ شحناتك، الرصيد، أو أسعار شركة معينة؟ 😊`;
+        return {
+          success: true,
+          intent: "CHAT",
+          result: null,
+          message: servicesMessage,
+        };
+      }
+
+      // طلب قائمة شركات الشحن من قاعدة البيانات
+      if (data && data.action === "GET_SHIPPING_COMPANIES") {
+        try {
+          const companiesResult =
+            await services.generalService.getShippingCompanies();
+          if (!companiesResult.success || !companiesResult.companies?.length) {
+            return {
+              success: true,
+              intent: "CHAT",
+              result: companiesResult,
+              message: `عذراً ${userInfo?.firstName || "عميلنا"}، ما فيه شركات شحن متاحة حالياً. جرّب بعد شوي أو تواصل مع الدعم.`,
+            };
+          }
+          const companies = companiesResult.companies;
+          const userName = userInfo?.firstName || "عميلنا";
+          let companiesMessage = `🚚 **شركات الشحن المتاحة عندنا:**\n\n`;
+          companies.forEach((c, i) => {
+            const emoji = ["📦", "🚛", "✈️", "🚚"][i] || "•";
+            const types =
+              Array.isArray(c.shippingTypes) && c.shippingTypes.length > 0
+                ? c.shippingTypes.map((t) => t.type || t).join("، ")
+                : "—";
+            companiesMessage += `${emoji} **${c.name}**\n`;
+            companiesMessage += `   📋 أنواع الشحن: ${types}\n`;
+            companiesMessage += `   ⏱️ مدة التوصيل: ${c.deliveryTime || "2-3 أيام عمل"}\n`;
+            if (c.description) {
+              companiesMessage += `   ${c.description}\n`;
+            }
+            companiesMessage += "\n";
+          });
+          companiesMessage += `أي شركة تناسبك؟ أو قلي وزن شحنتك وأحسب لك الأسعار. 💰`;
+          return {
+            success: true,
+            intent: "CHAT",
+            result: companiesResult,
+            message: companiesMessage,
+          };
+        } catch (err) {
+          console.error("❌ [AI] GET_SHIPPING_COMPANIES failed:", err);
+          return {
+            success: false,
+            intent: "CHAT",
+            result: null,
+            message: "حدث خطأ في جلب شركات الشحن. يرجى المحاولة لاحقاً.",
+          };
+        }
+      }
+
       // تدفق إنشاء شحنة جديد
       if (data && data.action === "CREATE_SHIPMENT_FLOW") {
         return await handleCreateShipmentFlow(
@@ -1556,11 +1774,19 @@ async function processGeminiResponse(
 
           let pricingComparison;
 
-          // إذا كان هناك شركة محددة، احسب لها فقط
+          // إذا كان هناك شركة محددة، احسب لها فقط (مطابقة مرنة: أرامكس = aramex)
           if (shipmentDetails.company) {
-            const specificCompany = companiesResult.companies.find(
-              (c) => c.name === shipmentDetails.company
+            const requested = (shipmentDetails.company || "").trim();
+            let specificCompany = companiesResult.companies.find(
+              (c) => (c.name || "").trim() === requested
             );
+            if (!specificCompany && requested) {
+              const requestedNorm = normalizeArabicText(requested);
+              specificCompany = companiesResult.companies.find((c) => {
+                const nameNorm = normalizeArabicText((c.name || "").trim());
+                return nameNorm === requestedNorm || nameNorm.includes(requestedNorm) || requestedNorm.includes(nameNorm) || (requestedNorm.includes("ارمكس") && nameNorm.includes("aramex"));
+              });
+            }
 
             if (specificCompany) {
               console.log(
@@ -1758,11 +1984,32 @@ async function processGeminiResponse(
         console.log("❌ [AI] Unknown API call:", api_call.name);
         apiResult = { success: false, message: "API غير مدعوم" };
     }
+
+    // تنسيق رسالة شركات الشحن من قاعدة البيانات عند استدعاء getShippingCompanies
+    let apiMessage = apiResult.success ? "تم التنفيذ بنجاح" : apiResult.message;
+    if (api_call.name === "getShippingCompanies" && apiResult.success && apiResult.companies?.length) {
+      const companies = apiResult.companies;
+      apiMessage = `🚚 **شركات الشحن المتاحة عندنا:**\n\n`;
+      companies.forEach((c, i) => {
+        const emoji = ["📦", "🚛", "✈️", "🚚"][i] || "•";
+        const types =
+          Array.isArray(c.shippingTypes) && c.shippingTypes.length > 0
+            ? c.shippingTypes.map((t) => t.type || t).join("، ")
+            : "—";
+        apiMessage += `${emoji} **${c.name}**\n`;
+        apiMessage += `   📋 أنواع الشحن: ${types}\n`;
+        apiMessage += `   ⏱️ مدة التوصيل: ${c.deliveryTime || "2-3 أيام عمل"}\n`;
+        if (c.description) apiMessage += `   ${c.description}\n`;
+        apiMessage += "\n";
+      });
+      apiMessage += `أي شركة تناسبك؟ أو قلي وزن شحنتك وأحسب لك الأسعار. 💰`;
+    }
+
     return {
       success: apiResult.success,
       intent,
       result: apiResult,
-      message: apiResult.success ? "تم التنفيذ بنجاح" : apiResult.message,
+      message: apiMessage,
     };
   }
 
@@ -1789,21 +2036,26 @@ function extractShipmentDetails(message) {
     company: null,
   };
 
-  // استخراج الوزن - دعم جميع الاختلافات العامية
+  // استخراج الوزن - دعم كيلو، كليو، وزنها، وزن الشحنة، إلخ
   const weightMatch = normalizedMessage.match(
-    /(\d+(?:\.\d+)?)\s*(?:ك(?:يلو|جم|غ|ليو|يلو|ليوغرام)|kg)/i
+    /(\d+(?:\.\d+)?)\s*(?:ك(?:يلو|ليو|جم|غ|يلو|ليوغرام)|kg)/i
   );
   if (weightMatch) {
     details.weight = parseFloat(weightMatch[1]);
     console.log("⚖️ [AI] Extracted weight:", details.weight);
   } else {
-    // محاولة استخراج من "شحنة X" أو "وزن الشحنة X"
-    const shipmentWeightMatch = normalizedMessage.match(
-      /(?:شحنة|وزن الشحنة)\s+(\d+(?:\.\d+)?)/i
-    );
-    if (shipmentWeightMatch) {
-      details.weight = parseFloat(shipmentWeightMatch[1]);
-      console.log("⚖️ [AI] Extracted weight from shipment:", details.weight);
+    const weightPatterns = [
+      /(?:وزنها|وزن الشحنة|وزن)\s*(\d+(?:\.\d+)?)(?:\s*ك(?:يلو|ليو|جم))?/i,
+      /(?:شحنة|شحنه)\s+(?:عادي|برو)?[^\d]*(\d+(?:\.\d+)?)(?:\s*ك(?:يلو|ليو))?/i,
+      /(\d+(?:\.\d+)?)\s*ك(?:يلو|ليو)/i,
+    ];
+    for (const re of weightPatterns) {
+      const m = normalizedMessage.match(re);
+      if (m && m[1]) {
+        details.weight = parseFloat(m[1]);
+        console.log("⚖️ [AI] Extracted weight:", details.weight);
+        break;
+      }
     }
   }
 
@@ -1822,12 +2074,13 @@ function extractShipmentDetails(message) {
     details.shipmentType = "برو";
   }
 
-  // استخراج الشركة
+  // استخراج الشركة (ارمكس بدون الألف الثانية شائعة في العامية)
   if (includesNormalized(normalizedMessage, "سمسا", true)) {
     details.company = "سمسا";
   } else if (
     includesNormalized(normalizedMessage, "أرامكس", true) ||
-    includesNormalized(normalizedMessage, "ارامكس", true)
+    includesNormalized(normalizedMessage, "ارامكس", true) ||
+    includesNormalized(normalizedMessage, "ارمكس", true)
   ) {
     details.company = "أرامكس";
   } else if (includesNormalized(normalizedMessage, "ريد بوكس", true)) {

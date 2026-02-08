@@ -14,6 +14,16 @@ const messageSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  // للرسائل من الـ AI: الـ intent (TRACK, CANCEL, CHAT, PRICING, إلخ) للتحليل والاستفادة لاحقاً
+  intent: {
+    type: String,
+    default: null
+  },
+  // للرسائل من الـ AI: بيانات إضافية (data من Gemini) للتحليل
+  intentData: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
+  },
   // للرسائل من الـ AI
   geminiResponse: {
     type: mongoose.Schema.Types.Mixed, // JSON response من Gemini
@@ -22,10 +32,10 @@ const messageSchema = new mongoose.Schema({
   executionResult: {
     type: mongoose.Schema.Types.Mixed, // نتيجة العملية المنفذة
   },
-  // نوع العملية إن وجدت
+  // نوع العملية/الإجراء (مرن للتخزين والتحليل لاحقاً)
   action: {
     type: String,
-    enum: ["TRACK_SHIPMENT", "CREATE_SHIPMENT", "CANCEL_SHIPMENT", "GET_WALLET_BALANCE", "LIST_SHIPMENTS", "CHAT_RESPONSE"],
+    default: null
   }
 });
 
@@ -88,8 +98,11 @@ conversationSchema.methods.addMessage = function(type, content, additionalData =
   this.lastActivity = new Date();
   this.metadata.totalMessages = this.messages.length;
 
-  if (additionalData.action && additionalData.action !== "CHAT_RESPONSE") {
-    this.metadata.totalActions += 1;
+  if (additionalData.action || additionalData.intent) {
+    const a = additionalData.action || additionalData.intent;
+    if (a && a !== "CHAT" && String(a).toUpperCase() !== "CHAT_RESPONSE") {
+      this.metadata.totalActions += 1;
+    }
   }
 
   return this.save();
@@ -131,7 +144,10 @@ conversationSchema.statics.findOrCreateConversation = async function(userId, ses
 // Pre-save middleware لتحديث الإحصائيات
 conversationSchema.pre('save', function(next) {
   this.metadata.totalMessages = this.messages.length;
-  this.metadata.totalActions = this.messages.filter(msg => msg.action && msg.action !== "CHAT_RESPONSE").length;
+  this.metadata.totalActions = this.messages.filter(msg => {
+    const a = msg.action || msg.intent;
+    return a && a !== "CHAT" && String(a).toUpperCase() !== "CHAT_RESPONSE";
+  }).length;
   next();
 });
 

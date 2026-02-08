@@ -245,17 +245,17 @@ class AIServices {
   }
 
   /**
-   * خدمة إلغاء الشحنة
+   * خدمة إلغاء الشحنة (تقبل _id أو رقم التتبع trackingId)
    */
   async cancelShipment(shipmentId) {
     try {
       console.log("🚫 [AI-Shipment] Cancelling shipment:", shipmentId);
 
-      // البحث عن الشحنة
-      const shipment = await Shapment.findOne({
-        _id: shipmentId,
-        customerId: this.userId
-      });
+      const isObjectId = mongoose.Types.ObjectId.isValid(shipmentId) && String(new mongoose.Types.ObjectId(shipmentId)) === shipmentId;
+
+      const shipment = isObjectId
+        ? await Shapment.findOne({ _id: shipmentId, customerId: this.userId })
+        : await Shapment.findOne({ trackingId: String(shipmentId).trim(), customerId: this.userId });
 
       if (!shipment) {
         return {

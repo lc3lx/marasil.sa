@@ -1,4 +1,5 @@
 const asyncHandler = require("express-async-handler");
+const mongoose = require("mongoose");
 const Conversation = require("../models/conversationModel");
 const AIServices = require("../services/aiServices");
 const geminiService = require("../services/geminiService");
@@ -76,8 +77,12 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
       conversation._id
     );
 
-    // 2. الحصول على آخر 10 رسائل للسياق
-    const recentMessages = conversation.getRecentMessages(10);
+    // 2. الحصول على آخر 10 رسائل للسياق (تنسيق موحّد لـ buildContext: sender + message)
+    const rawMessages = conversation.getRecentMessages(10);
+    const recentMessages = rawMessages.map((msg) => ({
+      sender: msg.type === "user" ? "user" : "assistant",
+      message: msg.content || "",
+    }));
     console.log(
       "📚 [AI-Controller] Recent messages count:",
       recentMessages.length
@@ -131,20 +136,22 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
     console.log("💾 [AI-Controller] Saving conversation...");
 
     // حفظ رسالة المستخدم
-    await conversation.addMessage("user", message, {
+    await conversation.addMessage("user", message.trim(), {
       timestamp: new Date(),
     });
 
-    // حفظ رد AI مع النتائج
-    await conversation.addMessage("ai", executionResult.message, {
+    // حفظ رد AI مع النتائج (intent + intentData للتحليل والاستفادة لاحقاً)
+    const intent = geminiResponse.intent || geminiResponse.action;
+    await conversation.addMessage("ai", (executionResult.message || "").trim(), {
       geminiResponse,
       executionResult,
-      action: geminiResponse.action,
+      intent: intent || null,
+      intentData: geminiResponse.data || null,
+      action: intent || geminiResponse.action || null,
       timestamp: new Date(),
     });
 
-    // تحديث آخر intent إذا كان متوفراً
-    const intent = geminiService.extractIntent(message);
+    // تحديث آخر intent في metadata المحادثة
     if (intent) {
       await conversation.updateLastIntent(intent);
     }
@@ -234,7 +241,7 @@ exports.getConversationHistory = asyncHandler(async (req, res, next) => {
       });
     }
 
-    // الحصول على آخر الرسائل
+    // الحصول على آخر الرسائل (مع intent و intentData للاستفادة لاحقاً)
     const messages = conversation.messages
       .slice(-parseInt(limit))
       .map((msg) => ({
@@ -242,7 +249,9 @@ exports.getConversationHistory = asyncHandler(async (req, res, next) => {
         type: msg.type,
         content: msg.content,
         timestamp: msg.timestamp,
-        action: msg.action,
+        intent: msg.intent || undefined,
+        intentData: msg.intentData || undefined,
+        action: msg.action || undefined,
       }));
 
     res.status(200).json({
@@ -292,6 +301,68 @@ exports.deleteConversation = asyncHandler(async (req, res, next) => {
     res.status(500).json({
       success: false,
       message: "حدث خطأ في حذف المحادثة",
+    });
+  }
+});
+
+/**
+ * تصدير المحادثات بصيغة قابلة للاستفادة (تحليل، تدريب، تقارير)
+ * GET /ai/export/:userId?format=training&limit=100
+ * format=training: مصفوفة turns فيها { role, content, intent?, timestamp? }
+ * format=full: محادثات كاملة مع كل التفاصيل
+ */
+exports.exportConversations = asyncHandler(async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { format = "training", limit = 500 } = req.query;
+
+    const conversations = await Conversation.find({ userId })
+      .sort({ lastActivity: -1 })
+      .limit(Math.min(parseInt(limit, 10) || 500, 1000))
+      .lean();
+
+    if (format === "training") {
+      const turns = [];
+      for (const conv of conversations) {
+        for (const msg of conv.messages || []) {
+          turns.push({
+            role: msg.type === "user" ? "user" : "assistant",
+            content: msg.content || "",
+            ...(msg.intent && { intent: msg.intent }),
+            ...(msg.timestamp && { timestamp: msg.timestamp }),
+          });
+        }
+      }
+      return res.status(200).json({
+        success: true,
+        data: { turns, totalTurns: turns.length },
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        conversations: conversations.map((c) => ({
+          _id: c._id,
+          sessionId: c.sessionId,
+          lastActivity: c.lastActivity,
+          metadata: c.metadata,
+          messageCount: (c.messages || []).length,
+          messages: (c.messages || []).map((m) => ({
+            type: m.type,
+            content: m.content,
+            intent: m.intent,
+            intentData: m.intentData,
+            timestamp: m.timestamp,
+          })),
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("❌ [AI-Controller] Export error:", error);
+    res.status(500).json({
+      success: false,
+      message: "حدث خطأ في تصدير المحادثات",
     });
   }
 });
