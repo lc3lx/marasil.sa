@@ -1841,24 +1841,21 @@ async function processGeminiResponse(
           }\n\n`;
 
           // إذا كانت شركة واحدة، غير الرسالة
+          const formatPrice = (n) => (Number(n) != null && !Number.isNaN(Number(n)) ? Number(Number(n).toFixed(2)) : n);
           if (
             Array.isArray(pricingComparison) &&
             pricingComparison.length === 1
           ) {
             const company = pricingComparison[0];
             const emoji = "🚚";
-            pricingMessage += `${emoji} **${company.name}**\n`;
-            pricingMessage += `💰 السعر: ${company.total} ريال\n`;
-            pricingMessage += `📋 التفاصيل: ${company.breakdown}\n\n`;
+            pricingMessage += `${emoji} **${company.name}** — 💰 ${formatPrice(company.total)} ريال\n\n`;
             pricingMessage += `🛒 موافق على إنشاء الشحنة مع ${company.name}؟`;
           } else {
             pricingComparison.forEach((company, index) => {
               const emoji = ["🚚", "📦", "🚛", "✈️"][index] || "📮";
-              pricingMessage += `${emoji} **${company.name}**\n`;
-              pricingMessage += `💰 السعر: ${company.total} ريال\n`;
-              pricingMessage += `📋 التفاصيل: ${company.breakdown}\n\n`;
+              pricingMessage += `${emoji} **${company.name}** — 💰 ${formatPrice(company.total)} ريال\n`;
             });
-            pricingMessage += `🛒 أي شركة تفضلها لإنشاء الشحنة؟`;
+            pricingMessage += `\n🛒 أي شركة تفضلها لإنشاء الشحنة؟`;
           }
 
           return {
