@@ -22,6 +22,7 @@ const aramxServers = require("../services/AramexService");
 // helpers import
 const ApiEror = require("../utils/apiError");
 const asyncHandler = require("express-async-handler");
+const shipmentCreationService = require("../services/shipmentCreationService");
 
 const normalizeDimensionInput = (dimension = {}) => {
   const toNumber = (value) => {
@@ -131,76 +132,28 @@ module.exports.acountingShipmentPrice = asyncHandler(async (req, res, next) => {
 });
 
 /*
-
-
-MATHOD : POST
-THIS MOTHOD FOR CREATE SHIPMENT 
-
+  POST - إنشاء شحنة (نفس منطق صفحة create-shipment - يستخدم shipmentCreationService)
 */
 module.exports.createShapment = asyncHandler(async (req, res, next) => {
   try {
-    const {
-      company,
-      order,
-      orderDescription,
-      shipperAddress,
-      weight,
-      Parcels,
-      shapmentingType,
-      dimension,
-    } = req.body;
+    const result = await shipmentCreationService.createShipment(req.customer._id, req.body);
+    res.status(201).json({
+      status: "success",
+      data: {
+        shipment: result.shipment,
+        tracking: result.tracking,
+        ...(result.pickupRequest && { pickupRequest: result.pickupRequest }),
+      },
+    });
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    return next(
+      new ApiEror(error.message || "حدث خطأ أثناء إنشاء الشحنة", statusCode)
+    );
+  }
+});
 
-    // 1. التحقق من البيانات المطلوبة
-    if (
-      !company ||
-      !order ||
-      !shipperAddress ||
-      !shapmentingType ||
-      !weight ||
-      !Parcels
-    ) {
-      return next(
-        new ApiEror(
-          "جميع البيانات مطلوبة: company, order, shipperAddress, shapmentingType, weight, Parcels",
-          400
-        )
-      );
-    }
-
-    let orderToUse = order;
-    let newOrder = null;
-
-    // If order doesn't have an ID, create a new order
-    if (!order._id) {
-      newOrder = new Order({
-        customer: {
-          full_name: order.customer?.full_name,
-          email: order.customer?.email,
-          mobile: order.customer?.mobile,
-          address: order.customer?.address,
-          country: order.customer?.country,
-          city: order.customer?.city,
-          nationalAddress: order.customer?.nationalAddress || "",
-        },
-        total: {
-          amount: order.total?.amount || 0,
-          currency: order.total?.currency || "SAR",
-        },
-        payment_method: order.paymentMethod || "COD",
-        platform: order.platform || "manual",
-        store_id: order.store_id || null,
-        status: "pending",
-        items: order.items || [],
-        created_at: new Date(),
-      });
-
-      await newOrder.save();
-      orderToUse = newOrder.toObject();
-      orderToUse._id = newOrder._id;
-    }
-
-    // 2. جلب بيانات شركة الشحن والتحقق من صلاحيتها
-    const shippingCompany = await shappingCompany.findOne({ company });
+/*
     if (!shippingCompany) {
       return next(new ApiEror(`شركة الشحن ${company} غير موجودة`, 404));
     }

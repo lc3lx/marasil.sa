@@ -6,6 +6,7 @@ const ClientAddress = require("../models/clientAddressModel");
 const shipmentAccount = require("./shipmentAccount");
 const Wallet = require("../models/walletModel");
 const Customer = require("../models/customerModel");
+const shipmentCreationService = require("./shipmentCreationService");
 
 /**
  * Wrapper لجميع الخدمات المطلوبة للـ AI Assistant
@@ -75,15 +76,13 @@ class AIServices {
   }
 
   /**
-   * خدمة إنشاء شحنة من خلال AI
+   * إنشاء شحنة من خلال AI - بنفس طريقة صفحة create-shipment (نفس الـ API والمنطق)
    */
   async createShipmentFromAI(shipmentData) {
     try {
-      console.log("📦 [AI-Shipment] Creating shipment from AI:", shipmentData);
+      console.log("📦 [AI-Shipment] Creating shipment (same flow as create-shipment page):", shipmentData);
 
       const hasReceiverId = shipmentData.receiverId && mongoose.Types.ObjectId.isValid(shipmentData.receiverId);
-      const hasReceiverObj = shipmentData.receiver?.name && shipmentData.sender?.name;
-
       if (!shipmentData.company || !shipmentData.weight || !shipmentData.sender?.name) {
         return { success: false, message: "البيانات غير مكتملة لإنشاء الشحنة" };
       }
@@ -91,178 +90,82 @@ class AIServices {
         return { success: false, message: "البيانات غير مكتملة: المستلم مطلوب" };
       }
 
-      let companyRecord = await ShippingCompany.findOne({
-        company: shipmentData.company
-      });
-      if (!companyRecord && shipmentData.company) {
-        const slug = this.mapCompanySlug(shipmentData.company);
-        if (slug !== (shipmentData.company || "").toLowerCase()) {
-          companyRecord = await ShippingCompany.findOne({ company: slug });
-        }
-      }
+      const companySlug = this.mapCompanySlug(shipmentData.company);
+      const paymentMethod = (shipmentData.paymentMethod || "COD") === "CASH" || (shipmentData.paymentMethod || "").toString().toLowerCase() === "prepaid" ? "Prepaid" : "COD";
+      const shapmentingType = paymentMethod === "Prepaid" ? "Dry" : "COD";
 
-      if (!companyRecord) {
-        return {
-          success: false,
-          message: "شركة الشحن غير موجودة في النظام"
+      let orderCustomer;
+      if (hasReceiverId) {
+        const rec = await ClientAddress.findOne({ _id: shipmentData.receiverId, customer: this.userId });
+        if (!rec) return { success: false, message: "عنوان المستلم غير موجود أو لا يخص حسابك" };
+        orderCustomer = {
+          full_name: rec.clientName,
+          mobile: rec.clientPhone,
+          city: rec.city,
+          country: rec.country || "sa",
+          address: rec.clientAddress,
+          email: rec.clientEmail || this.customer?.email,
+          district: rec.district || "",
+          nationalAddress: rec.nationalAddress || "",
+        };
+      } else {
+        orderCustomer = {
+          full_name: shipmentData.receiver.name,
+          mobile: shipmentData.receiver.phone,
+          city: shipmentData.receiver.city,
+          country: shipmentData.receiver.country || "sa",
+          address: shipmentData.receiver.address,
+          email: shipmentData.receiver.email || this.customer?.email,
+          district: shipmentData.receiver.district || "",
+          nationalAddress: shipmentData.receiver.nationalAddress || "",
         };
       }
 
-      const shippingTypes = companyRecord.shippingTypes || [];
-      const requestedType = (shipmentData.shipmentType || "").toString().trim();
-      const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, " ");
-      const typeAliases = ["عادي", "اقتصادي", "جاف", "برو", "سريع"];
-      const requestedNorm = norm(requestedType);
-      const isStandardType = typeAliases.slice(0, 3).some((a) => requestedNorm.includes(norm(a))); // عادي/اقتصادي/جاف
-      const isProType = typeAliases.slice(3).some((a) => requestedNorm.includes(norm(a))); // برو/سريع
-
-      let selectedType = null;
-      if (requestedType) {
-        selectedType = shippingTypes.find((t) => norm(t.type) === requestedNorm || norm(t.type).includes(requestedNorm) || requestedNorm.includes(norm(t.type)));
-        if (!selectedType && isStandardType) {
-          selectedType = shippingTypes.find((t) => ["عادي", "اقتصادي", "جاف"].some((a) => norm(t.type).includes(norm(a))));
-        }
-        if (!selectedType && isProType) {
-          selectedType = shippingTypes.find((t) => ["برو", "سريع"].some((a) => norm(t.type).includes(norm(a))));
-        }
-      }
-      if (!selectedType) selectedType = shippingTypes[0];
-
-      if (!selectedType) {
-        return {
-          success: false,
-          message: "نوع الشحن غير متوفر لهذه الشركة"
-        };
-      }
-
-      const paymentMethodRaw = shipmentData.paymentMethod || "COD";
-      const paymentMethod = paymentMethodRaw === "CASH" ? "Prepaid" : (paymentMethodRaw === "COD" ? "COD" : paymentMethodRaw);
-      const weight = parseFloat(shipmentData.weight) || 1;
-      const boxes = parseInt(shipmentData.boxes, 10) || 1;
-      const dimension = shipmentData.dimensions || {
-        length: 0,
-        width: 0,
-        height: 0
+      const dim = shipmentData.dimensions || {};
+      const body = {
+        company: companySlug,
+        shapmentingType,
+        orderDescription: shipmentData.description || "شحنة",
+        order: {
+          paymentMethod,
+          customer: orderCustomer,
+          total: { amount: shipmentData.value || 0, currency: "SAR" },
+          description: shipmentData.description || "شحنة",
+          customerAddress: orderCustomer.address,
+        },
+        shipperAddress: {
+          full_name: shipmentData.sender.name,
+          mobile: shipmentData.sender.phone,
+          city: shipmentData.sender.city,
+          city_en: shipmentData.sender.city_en || "",
+          country: shipmentData.sender.country || "sa",
+          address: shipmentData.sender.address,
+          nationalAddress: shipmentData.sender.nationalAddress || "",
+        },
+        weight: parseFloat(shipmentData.weight) || 1,
+        Parcels: parseInt(shipmentData.boxes, 10) || 1,
+        dimension: {
+          high: dim.height || 0,
+          width: dim.width || 0,
+          length: dim.length || 0,
+        },
+        senderOfficeCode: shipmentData.senderOfficeCode,
+        recipientOfficeCode: shipmentData.recipientOfficeCode,
       };
 
-      const pricing = shipmentAccount.shipmentnorm(selectedType, {
-        weight,
-        paymentMethod,
-        dimension
-      });
-
-      let receiverAddress;
-      if (hasReceiverId) {
-        receiverAddress = await ClientAddress.findOne({
-          _id: shipmentData.receiverId,
-          customer: this.userId
-        });
-        if (!receiverAddress) {
-          return { success: false, message: "عنوان المستلم غير موجود أو لا يخص حسابك" };
-        }
-      } else {
-        receiverAddress = await ClientAddress.create({
-          customer: this.userId,
-          clientName: shipmentData.receiver.name,
-          clientAddress: shipmentData.receiver.address,
-          clientPhone: shipmentData.receiver.phone,
-          clientEmail: shipmentData.receiver.email || this.customer?.email,
-          country: shipmentData.receiver.country || "sa",
-          city: shipmentData.receiver.city,
-          district: shipmentData.receiver.district,
-          nationalAddress: shipmentData.receiver.nationalAddress
-        });
-      }
-
-      const receiverName = receiverAddress.clientName || shipmentData.receiver?.name;
-      const receiverPhone = receiverAddress.clientPhone || shipmentData.receiver?.phone;
-      const receiverCity = receiverAddress.city || shipmentData.receiver?.city;
-      const receiverCountry = receiverAddress.country || shipmentData.receiver?.country || "sa";
-      const receiverAddressStr = receiverAddress.clientAddress || shipmentData.receiver?.address;
-      const receiverEmail = receiverAddress.clientEmail || shipmentData.receiver?.email || this.customer?.email;
-
-      const order = await Order.create({
-        customer: {
-          full_name: receiverName,
-          mobile: receiverPhone,
-          city: receiverCity,
-          country: receiverCountry,
-          address: receiverAddressStr,
-          email: receiverEmail
-        },
-        total: {
-          amount: shipmentData.value || 0,
-          currency: "SAR"
-        },
-        payment_method: paymentMethod,
-        platform: "Marasil",
-        number_of_boxes: boxes,
-        weight: weight,
-        box_dimensions: {
-          length: dimension.length || 0,
-          width: dimension.width || 0,
-          height: dimension.height || 0
-        },
-        product_description: shipmentData.description,
-        product_value: shipmentData.value || 0,
-        clientAddress: receiverAddress._id,
-        Customer: this.userId
-      });
-
-      const trackingNumber = `MRSL${Date.now().toString().slice(-6)}`;
-      const shipment = await Shapment.create({
-        receiverAddress: receiverAddress._id,
-        senderAddress: {
-          clientName: shipmentData.sender.name,
-          clientAddress: shipmentData.sender.address,
-          clientPhone: shipmentData.sender.phone,
-          city: shipmentData.sender.city,
-          country: shipmentData.sender.country || "sa"
-        },
-        weight,
-        customerId: this.userId,
-        orderId: order._id,
-        boxNum: boxes,
-        dimension: {
-          length: dimension.length || 0,
-          width: dimension.width || 0,
-          height: dimension.height || 0
-        },
-        paymentMathod: paymentMethod,
-        shipmentstates: "READY_FOR_PICKUP",
-        shapmentingType: "Dry",
-        shapmentCompany: this.mapCompanySlug(companyRecord.company),
-        trackingId: trackingNumber,
-        trackingURL: companyRecord.trackingURL,
-        totalprice: pricing.total,
-        shapmentPrice: {
-          priceaddedtax: selectedType.priceaddedtax,
-          basePrice: selectedType.basePrice,
-          profitPrice: selectedType.profitPrice,
-          profitRTOprice: selectedType.profitRTOprice,
-          baseAdditionalweigth: selectedType.baseAdditionalweigth,
-          profitAdditionalweigth: selectedType.profitAdditionalweigth,
-          baseCODfees: selectedType.baseCODfees,
-          profitCODfees: selectedType.profitCODfees,
-          insurancecost: selectedType.insurancecost,
-          baseRTOprice: selectedType.baseRTOprice
-        }
-      });
-
+      const result = await shipmentCreationService.createShipment(this.userId, body);
       return {
         success: true,
         message: "تم إنشاء الشحنة بنجاح",
-        trackingNumber: shipment.trackingId,
-        shipmentId: shipment._id,
-        pricing: pricing,
-        shipmentData: shipment
+        trackingNumber: result.tracking?.number || result.shipment?.trackingId,
+        shipmentId: result.shipment?._id,
+        shipmentData: result.shipment,
       };
-
     } catch (error) {
       console.error("❌ [AI-Shipment] Create error:", error);
       return {
         success: false,
-        message: "حدث خطأ في إنشاء الشحنة"
+        message: error.message || "حدث خطأ في إنشاء الشحنة",
       };
     }
   }
