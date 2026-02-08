@@ -109,11 +109,24 @@ class AIServices {
       }
 
       const shippingTypes = companyRecord.shippingTypes || [];
-      const selectedType = shipmentData.shipmentType
-        ? shippingTypes.find(
-            (type) => type.type === shipmentData.shipmentType
-          )
-        : shippingTypes[0];
+      const requestedType = (shipmentData.shipmentType || "").toString().trim();
+      const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, " ");
+      const typeAliases = ["عادي", "اقتصادي", "جاف", "برو", "سريع"];
+      const requestedNorm = norm(requestedType);
+      const isStandardType = typeAliases.slice(0, 3).some((a) => requestedNorm.includes(norm(a))); // عادي/اقتصادي/جاف
+      const isProType = typeAliases.slice(3).some((a) => requestedNorm.includes(norm(a))); // برو/سريع
+
+      let selectedType = null;
+      if (requestedType) {
+        selectedType = shippingTypes.find((t) => norm(t.type) === requestedNorm || norm(t.type).includes(requestedNorm) || requestedNorm.includes(norm(t.type)));
+        if (!selectedType && isStandardType) {
+          selectedType = shippingTypes.find((t) => ["عادي", "اقتصادي", "جاف"].some((a) => norm(t.type).includes(norm(a))));
+        }
+        if (!selectedType && isProType) {
+          selectedType = shippingTypes.find((t) => ["برو", "سريع"].some((a) => norm(t.type).includes(norm(a))));
+        }
+      }
+      if (!selectedType) selectedType = shippingTypes[0];
 
       if (!selectedType) {
         return {

@@ -2120,19 +2120,20 @@ function extractShipmentDetails(message) {
     }
   }
 
-  // استخراج نوع الشحن
+  // استخراج نوع الشحن (عادي / اقتصادي / جاف = نفس الفئة، برو = سريع)
   if (
-    includesNormalized(normalizedMessage, "شحن عادي", true) ||
-    includesNormalized(normalizedMessage, "عادي", true) ||
-    includesNormalized(normalizedMessage, "اقتصادي", true)
-  ) {
-    details.shipmentType = "اقتصادي";
-  } else if (
     includesNormalized(normalizedMessage, "شحن برو", true) ||
     includesNormalized(normalizedMessage, "برو", true) ||
     includesNormalized(normalizedMessage, "سريع", true)
   ) {
     details.shipmentType = "برو";
+  } else if (
+    includesNormalized(normalizedMessage, "شحن عادي", true) ||
+    includesNormalized(normalizedMessage, "عادي", true) ||
+    includesNormalized(normalizedMessage, "اقتصادي", true) ||
+    includesNormalized(normalizedMessage, "جاف", true)
+  ) {
+    details.shipmentType = "عادي";
   }
 
   // استخراج الشركة (ارمكس بدون الألف الثانية شائعة في العامية)
