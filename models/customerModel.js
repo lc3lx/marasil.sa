@@ -141,9 +141,15 @@ const customerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// فهارس sparse حتى يُسمح بعدة عملاء بدون slug (null) بدون خطأ duplicate key
-customerSchema.index({ returnPageSlug: 1 }, { unique: true, sparse: true });
-customerSchema.index({ replacementPageSlug: 1 }, { unique: true, sparse: true });
+// فهارس جزئية: unique فقط عندما القيمة موجودة وغير null (عدة عملاء يمكن أن يكون slug لهم null)
+customerSchema.index(
+  { returnPageSlug: 1 },
+  { unique: true, partialFilterExpression: { returnPageSlug: { $exists: true, $ne: null, $type: "string" } } }
+);
+customerSchema.index(
+  { replacementPageSlug: 1 },
+  { unique: true, partialFilterExpression: { replacementPageSlug: { $exists: true, $ne: null, $type: "string" } } }
+);
 
 customerSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();

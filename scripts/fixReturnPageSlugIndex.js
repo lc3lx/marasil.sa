@@ -43,21 +43,19 @@ require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
       }
     }
 
-    // إنشاء فهارس sparse يدوياً (تسمح بعدة null)
-    await collection.createIndex(
-      { returnPageSlug: 1 },
-      { unique: true, sparse: true, name: "returnPageSlug_1" }
-    );
-    console.log("✅ Created sparse unique index: returnPageSlug_1");
-
-    await collection.createIndex(
-      { replacementPageSlug: 1 },
-      { unique: true, sparse: true, name: "replacementPageSlug_1" }
-    );
-    console.log("✅ Created sparse unique index: replacementPageSlug_1");
+    // partial index: نُفهرس فقط القيم غير null → عدة عملاء يمكن أن يكونوا null بدون تعارض
+    const partialOpt = (field) => ({
+      unique: true,
+      name: field + "_1",
+      partialFilterExpression: { [field]: { $exists: true, $ne: null, $type: "string" } },
+    });
+    await collection.createIndex({ returnPageSlug: 1 }, partialOpt("returnPageSlug"));
+    console.log("✅ Created partial unique index: returnPageSlug_1");
+    await collection.createIndex({ replacementPageSlug: 1 }, partialOpt("replacementPageSlug"));
+    console.log("✅ Created partial unique index: replacementPageSlug_1");
 
     const after = await collection.indexes();
-    console.log("Indexes after fix:", after.map((i) => ({ name: i.name, key: i.key, unique: i.unique, sparse: i.sparse })));
+    console.log("Indexes after fix:", after.map((i) => ({ name: i.name, key: i.key, unique: i.unique, partialFilterExpression: i.partialFilterExpression })));
     console.log("\n✅ Done. Try registering again.");
     process.exit(0);
   } catch (err) {
