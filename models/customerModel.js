@@ -126,8 +126,6 @@ const customerSchema = new mongoose.Schema(
     },
     returnPageSlug: {
       type: String,
-      sparse: true,
-      unique: true,
       default: null,
     },
     // تخصيص صفحة الاستبدال + رابط فريد للعميل غير المسجل
@@ -137,13 +135,16 @@ const customerSchema = new mongoose.Schema(
     },
     replacementPageSlug: {
       type: String,
-      sparse: true,
-      unique: true,
       default: null,
     },
   },
   { timestamps: true }
 );
+
+// فهارس sparse حتى يُسمح بعدة عملاء بدون slug (null) بدون خطأ duplicate key
+customerSchema.index({ returnPageSlug: 1 }, { unique: true, sparse: true });
+customerSchema.index({ replacementPageSlug: 1 }, { unique: true, sparse: true });
+
 customerSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   this.password = await bcrypt.hash(this.password, 12);
