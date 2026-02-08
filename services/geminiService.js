@@ -1032,6 +1032,21 @@ function quickKeywordParse(
     };
   }
 
+  // متابعة حساب السعر: السياق يذكر أننا ننتظر وزن/دفع والرسالة تحتوي وزناً (واختيارياً طريقة دفع)
+  if (context && (context.includes("لحساب سعر") || context.includes("أحتاج أعرف وزن") || context.includes("وزن الشحنة بالكيلو") || context.includes("طريقة الدفع"))) {
+    const hasWeight = /\d+(?:\.\d+)?\s*(?:ك(?:يلو|ليو|جم|غ|يلو|ليوغرام|ليو)|كيلوغرام|kg)/i.test(normalizedMessage) || /(?:وزنها|وزن)\s*(\d+)/i.test(normalizedMessage);
+    if (hasWeight) {
+      console.log("✅ [Quick Parse] Pricing continuation (weight in message) → CALCULATE_PRICING");
+      return {
+        intent: "CHAT",
+        confidence: 0.9,
+        missing_fields: [],
+        message: "",
+        data: { action: "CALCULATE_PRICING", shipmentDetails: message },
+      };
+    }
+  }
+
   // الأسعار والتكلفة - أنماط شاملة
   const pricingPatterns = [
     "كم التكلفة",
@@ -1044,6 +1059,12 @@ function quickKeywordParse(
     "cost",
     "كم يكلف",
     "كم تكلفة",
+    "احسب سعر",
+    "بدي احسب",
+    "حساب سعر",
+    "سعر شحنة",
+    "اعمل شحنة",
+    "بدي اعمل شحنة",
     "كم سعر الشحن",
     "شو اسعار",
     "وش اسعار",
@@ -1082,9 +1103,10 @@ function quickKeywordParse(
   );
   if (hasPricingIntent) {
     // إذا كانت الرسالة تحتوي وزن و/أو شركة (ارمكس، سمسا، إلخ) → حساب فوري عبر shipmentAccount
-    const hasWeightInMessage = /\d+(?:\.\d+)?\s*(?:ك(?:يلو|جم|غ|ليو|يلو|ليوغرام|ليو)|kg)/i.test(normalizedMessage) ||
+    const hasWeightInMessage = /\d+(?:\.\d+)?\s*(?:ك(?:يلو|ليو|جم|غ|يلو|ليوغرام|ليو)|كيلوغرام|kg)/i.test(normalizedMessage) ||
       /(?:وزنها|وزن الشحنة|وزن)\s*(\d+(?:\.\d+)?)/i.test(normalizedMessage) ||
-      /شحنة\s+عادي[^\d]*(\d+)/i.test(normalizedMessage);
+      /شحنة\s+عادي[^\d]*(\d+)/i.test(normalizedMessage) ||
+      /\d+(?:\.\d+)?\s*كيلوغرام/i.test(normalizedMessage);
     const hasCompanyInMessage = /ارمكس|ارامكس|أرامكس|سمسا|ريد بوكس|لاما|ومني|omni/i.test(normalizedMessage);
     if (hasWeightInMessage || hasCompanyInMessage) {
       console.log("✅ [Quick Parse] PRICING with details in message → CALCULATE_PRICING via shipmentAccount");
@@ -1846,12 +1868,16 @@ async function processGeminiResponse(
             message: pricingMessage,
           };
         } catch (error) {
-          console.error("❌ [AI] CALCULATE_PRICING failed:", error);
+          console.error("❌ [AI] CALCULATE_PRICING failed:", error?.message || error);
+          const friendlyMessage =
+            error?.message && error.message.includes("البيانات")
+              ? `عذراً، ${error.message} تأكد من وجود شركات شحن مفعّلة في النظام.`
+              : "حدث خطأ في حساب الأسعار. تأكد من وجود شركات شحن مفعّلة في النظام وحاول مرة أخرى.";
           return {
             success: false,
             intent: "CHAT",
             result: geminiResponse,
-            message: "حدث خطأ في حساب الأسعار. يرجى المحاولة مرة أخرى.",
+            message: friendlyMessage,
           };
         }
       }
@@ -2038,16 +2064,17 @@ function extractShipmentDetails(message) {
 
   // استخراج الوزن - دعم كيلو، كليو، وزنها، وزن الشحنة، إلخ
   const weightMatch = normalizedMessage.match(
-    /(\d+(?:\.\d+)?)\s*(?:ك(?:يلو|ليو|جم|غ|يلو|ليوغرام)|kg)/i
+    /(\d+(?:\.\d+)?)\s*(?:ك(?:يلو|ليو|جم|غ|يلو|ليوغرام)|كيلوغرام|kg)/i
   );
   if (weightMatch) {
     details.weight = parseFloat(weightMatch[1]);
     console.log("⚖️ [AI] Extracted weight:", details.weight);
   } else {
     const weightPatterns = [
-      /(?:وزنها|وزن الشحنة|وزن)\s*(\d+(?:\.\d+)?)(?:\s*ك(?:يلو|ليو|جم))?/i,
-      /(?:شحنة|شحنه)\s+(?:عادي|برو)?[^\d]*(\d+(?:\.\d+)?)(?:\s*ك(?:يلو|ليو))?/i,
-      /(\d+(?:\.\d+)?)\s*ك(?:يلو|ليو)/i,
+      /(?:وزنها|وزن الشحنة|وزن)\s*(\d+(?:\.\d+)?)(?:\s*ك(?:يلو|ليو|يلوغرام|جم))?/i,
+      /(?:شحنة|شحنه)\s+(?:عادي|برو)?[^\d]*(\d+(?:\.\d+)?)(?:\s*ك(?:يلو|ليو|يلوغرام))?/i,
+      /(\d+(?:\.\d+)?)\s*ك(?:يلو|ليو|يلوغرام)/i,
+      /(\d+(?:\.\d+)?)\s*كيلوغرام/i,
     ];
     for (const re of weightPatterns) {
       const m = normalizedMessage.match(re);
@@ -2092,17 +2119,22 @@ function extractShipmentDetails(message) {
     details.company = "لاما بوكس";
   }
 
-  // استخراج طريقة الدفع
+  // استخراج طريقة الدفع (كاش، مسبق، دفع عند الاستلام)
+  const msgLower = (message || "").toLowerCase();
   if (
     message.includes("دفع عند الاستلام") ||
-    message.includes("cod") ||
-    message.includes("COD")
+    msgLower.includes("cod") ||
+    includesNormalized(normalizedMessage, "عند الاستلام", true)
   ) {
     details.paymentMethod = "COD";
   } else if (
     message.includes("كاش") ||
     message.includes("نقد") ||
-    message.includes("cash")
+    msgLower.includes("cash") ||
+    includesNormalized(normalizedMessage, "مسبق", true) ||
+    includesNormalized(normalizedMessage, "مدفوع", true) ||
+    includesNormalized(normalizedMessage, "prepaid", true) ||
+    includesNormalized(normalizedMessage, "الدفع مسبق", true)
   ) {
     details.paymentMethod = "CASH";
   }
