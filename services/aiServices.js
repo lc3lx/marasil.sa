@@ -98,23 +98,25 @@ class AIServices {
       if (hasReceiverId) {
         const rec = await ClientAddress.findOne({ _id: shipmentData.receiverId, customer: this.userId });
         if (!rec) return { success: false, message: "عنوان المستلم غير موجود أو لا يخص حسابك" };
+        const recAddr = (rec.clientAddress || rec.city || "العنوان غير محدد").trim();
         orderCustomer = {
           full_name: rec.clientName,
           mobile: rec.clientPhone,
           city: rec.city,
           country: rec.country || "sa",
-          address: rec.clientAddress,
+          address: recAddr,
           email: rec.clientEmail || this.customer?.email,
           district: rec.district || "",
           nationalAddress: rec.nationalAddress || "",
         };
       } else {
+        const recAddr = (shipmentData.receiver.address || shipmentData.receiver.city || "العنوان غير محدد").trim();
         orderCustomer = {
           full_name: shipmentData.receiver.name,
           mobile: shipmentData.receiver.phone,
           city: shipmentData.receiver.city,
           country: shipmentData.receiver.country || "sa",
-          address: shipmentData.receiver.address,
+          address: recAddr,
           email: shipmentData.receiver.email || this.customer?.email,
           district: shipmentData.receiver.district || "",
           nationalAddress: shipmentData.receiver.nationalAddress || "",
@@ -139,7 +141,7 @@ class AIServices {
           city: shipmentData.sender.city,
           city_en: shipmentData.sender.city_en || "",
           country: shipmentData.sender.country || "sa",
-          address: shipmentData.sender.address,
+          address: (shipmentData.sender.address || shipmentData.sender.city || "العنوان غير محدد").trim(),
           nationalAddress: shipmentData.sender.nationalAddress || "",
         },
         weight: parseFloat(shipmentData.weight) || 1,

@@ -20,7 +20,7 @@ function normalizeAddressForSmsa(address = {}) {
     [address.address, address.cite, address.clientAddress, address.addressDetails]
       .filter(Boolean)
       .join(" ")
-      .trim() || " ";
+      .trim() || (address.city || "العنوان غير محدد");
   const nationalAddress = address.nationalAddress || "";
   return { name, phone, country, city, line1, nationalAddress };
 }
@@ -37,13 +37,13 @@ exports.formatAddress = (address = {}, options = {}) => {
   const isRecipient = Boolean(options.isRecipient);
   const a = normalizeAddressForSmsa(address);
 
-  const addressLine1 = (a.line1.trim() || " ").slice(0, 200);
+  const addressLine1 = (String(a.line1 || "").trim() || a.city || "غير محدد").slice(0, 200);
   const formattedAddress = {
     ContactName: (a.name || " ").slice(0, 150),
     ContactPhoneNumber: String(a.phone || "0000000000").slice(0, 20),
     Country: (a.country || "SA").slice(0, 2),
     City: (a.city || " ").slice(0, 50),
-    AddressLine1: addressLine1.length > 0 ? addressLine1 : " ",
+    AddressLine1: addressLine1,
   };
 
   // ShortCode مطلوب للمستلم ويجب أن يكون بالضبط 8 أحرف

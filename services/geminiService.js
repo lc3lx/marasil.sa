@@ -2581,12 +2581,18 @@ async function handleCreateShipmentFlow(
           message: `الرقم غير صحيح. المرسلين من 1 إلى ${sendersList.length} والمستلمين من 1 إلى ${recipientsList.length}. (مثال: 1 و 2)`,
         };
       }
+      const senderAddressLine =
+        [senderAddr.location, senderAddr.detalis, senderAddr.street, senderAddr.district, senderAddr.city]
+          .filter(Boolean)
+          .join(" ")
+          .trim() || (senderAddr.city || "العنوان غير محدد");
       const senderPayload = {
         name: senderAddr.alias || senderAddr.location || "المرسل",
-        address: senderAddr.location || senderAddr.detalis || "",
+        address: senderAddressLine,
         phone: senderAddr.phone || "",
         city: senderAddr.city || "",
         country: senderAddr.country || "sa",
+        nationalAddress: senderAddr.nationalAddress || "",
       };
       const receiverPayload = {
         _id: recipientAddr._id,
