@@ -800,7 +800,40 @@ function quickKeywordParse(
     }
   }
 
-  // إنشاء شحنة
+  // إنشاء شحنة مع تفاصيل كاملة (شركة + وزن [+ دفع]) → نسأل مرسل/مستلم جديد أو موجود
+  const createWithDetailsPatterns = [
+    "اعمل شحنة", "اعمل شحن", "ابدى اعمل شحنة", "بدي اعمل شحنة", "ابي اعمل شحنة",
+    "اشحن", "اشحن بشركة", "شحنة بشركة", "انشاء شحنة", "شحنة جديد"
+  ];
+  const hasCreateWithDetails = createWithDetailsPatterns.some((p) =>
+    includesNormalized(normalizedMessage, p, true)
+  );
+  if (hasCreateWithDetails) {
+    const details = extractShipmentDetails(message);
+    if (details.weight && details.company) {
+      console.log("✅ [Quick Parse] Create shipment with full details → ask sender/recipient choice");
+      return {
+        intent: "CHAT",
+        confidence: 0.9,
+        missing_fields: [],
+        message: "",
+        data: {
+          action: "CREATE_SHIPMENT_FLOW",
+          rawMessage: message,
+          startWithDetails: true,
+          shipmentDetails: {
+            company: details.company,
+            weight: details.weight,
+            paymentMethod: details.paymentMethod || "COD",
+            shipmentType: details.shipmentType || null,
+            dimensions: details.dimensions || null,
+          },
+        },
+      };
+    }
+  }
+
+  // إنشاء شحنة (بدون تفاصيل كاملة)
   if (
     includesNormalized(normalizedMessage, "انشاء", true) ||
     includesNormalized(normalizedMessage, "جديد", true) ||
@@ -1746,7 +1779,11 @@ async function processGeminiResponse(
           userId,
           userInfo,
           services,
-          data.start === true
+          {
+            start: data.start === true,
+            startWithDetails: data.startWithDetails === true,
+            shipmentDetails: data.shipmentDetails || null,
+          }
         );
       }
 
@@ -2362,6 +2399,33 @@ function isNegativeReply(message) {
   return patterns.some((pattern) => includesNormalized(normalized, pattern, true));
 }
 
+function isExistingSenderRecipientChoice(message) {
+  const normalized = normalizeArabicText(message || "");
+  const patterns = ["موجودين", "موجود", "مسبقا", "مسبقاً", "اللي عندي", "عندي", "موجودة", "استخدم اللي عندي"];
+  return patterns.some((pattern) => includesNormalized(normalized, pattern, true));
+}
+
+function isNewSenderRecipientChoice(message) {
+  const normalized = normalizeArabicText(message || "");
+  const patterns = ["جديد", "جديدين", "انشاء", "اعمل جديد", "مرسل جديد"];
+  return patterns.some((pattern) => includesNormalized(normalized, pattern, true));
+}
+
+/** يفسر اختيار المستخدم: رقم المرسل ورقم المستلم (مثال: "1 و 2" أو "المرسل 1 المستلم 2") */
+function parseSenderRecipientSelection(message) {
+  const normalized = (message || "").trim();
+  const twoNumbers = normalized.match(/(\d+)\s*(?:و|وال)\s*(\d+)/);
+  if (twoNumbers) return { senderIndex: parseInt(twoNumbers[1], 10), recipientIndex: parseInt(twoNumbers[2], 10) };
+  const anyTwo = normalized.match(/(\d+)\s+(\d+)/);
+  if (anyTwo) return { senderIndex: parseInt(anyTwo[1], 10), recipientIndex: parseInt(anyTwo[2], 10) };
+  const senderMatch = normalized.match(/المرسل\s*(\d+)/i);
+  const recipientMatch = normalized.match(/المستلم\s*(\d+)/i);
+  if (senderMatch && recipientMatch) return { senderIndex: parseInt(senderMatch[1], 10), recipientIndex: parseInt(recipientMatch[1], 10) };
+  const singleDigit = normalized.match(/^(\d+)$/);
+  if (singleDigit) return { senderIndex: parseInt(singleDigit[1], 10), recipientIndex: parseInt(singleDigit[1], 10) };
+  return null;
+}
+
 function findCompanyInOptions(message, options) {
   const normalized = normalizeArabicText(message || "");
   if (
@@ -2383,8 +2447,12 @@ async function handleCreateShipmentFlow(
   userId,
   userInfo,
   services,
-  startFlow = false
+  options = {}
 ) {
+  const startFlow = options.start === true;
+  const startWithDetails = options.startWithDetails === true;
+  const shipmentDetails = options.shipmentDetails || null;
+
   const userName = userInfo?.firstName || "عميلنا الكريم";
   const normalizedMessage = normalizeArabicText(message || "");
   let state = stateManager.getState(userId);
@@ -2393,17 +2461,26 @@ async function handleCreateShipmentFlow(
   if (!state) {
     state = stateManager.setState(userId, {
       flow: "CREATE_SHIPMENT",
-      step: "ASK_SENDER_NAME",
-      data: {},
+      step: startWithDetails && shipmentDetails ? "AWAIT_SENDER_RECIPIENT_CHOICE" : "ASK_SENDER_NAME",
+      data: startWithDetails && shipmentDetails ? { ...shipmentDetails } : {},
     });
   }
 
-  if (startFlow && wasNewFlow) {
+  if (startFlow && wasNewFlow && !startWithDetails) {
     return {
       success: true,
       intent: "CHAT",
       result: {},
       message: `تمام ${userName}، خلّينا ننشئ الشحنة خطوة خطوة. مين المرسل؟ (اسم المرسل)`,
+    };
+  }
+
+  if (startWithDetails && wasNewFlow && shipmentDetails) {
+    return {
+      success: true,
+      intent: "CHAT",
+      result: {},
+      message: `تمام ${userName} 👍 عندك تفاصيل الشحنة (${shipmentDetails.company || "شركة"}، ${shipmentDetails.weight} كجم، ${shipmentDetails.paymentMethod === "CASH" ? "دفع مسبق" : "دفع عند الاستلام"}).\n\nبدك تعمل **مرسل جديد ومستلم جديد** أو **موجودين مسبقاً**؟ (قل "جديد" أو "موجودين")`,
     };
   }
 
@@ -2422,6 +2499,135 @@ async function handleCreateShipmentFlow(
   const data = state.data || {};
 
   switch (state.step) {
+    case "AWAIT_SENDER_RECIPIENT_CHOICE": {
+      if (isExistingSenderRecipientChoice(normalizedMessage)) {
+        const [sendersRes, recipientsRes] = await Promise.all([
+          services.shipmentService.getSenderAddresses(),
+          services.shipmentService.getClientAddresses(),
+        ]);
+        const senders = sendersRes.success ? (sendersRes.data || []) : [];
+        const recipients = recipientsRes.success ? (recipientsRes.data || []) : [];
+        if (senders.length === 0 && recipients.length === 0) {
+          return {
+            success: true,
+            intent: "CHAT",
+            result: {},
+            message: `ما في عندك مرسلين ولا مستلمين محفوظين. خلينا ننشئ مرسل ومستلم جديد. مين المرسل؟ (اسم المرسل)`,
+          };
+        }
+        if (senders.length === 0) {
+          nextState({ step: "ASK_SENDER_NAME", data: { ...data } });
+          return { success: true, intent: "CHAT", result: {}, message: `ما في مرسلين محفوظين. مين المرسل؟ (اسم المرسل)` };
+        }
+        if (recipients.length === 0) {
+          nextState({ step: "ASK_SENDER_NAME", data: { ...data } });
+          return { success: true, intent: "CHAT", result: {}, message: `ما في مستلمين محفوظين. خلينا ننشئ مرسل أولاً. مين المرسل؟` };
+        }
+        nextState({
+          step: "AWAIT_SENDER_RECIPIENT_SELECT",
+          data: {
+            ...data,
+            sendersList: senders,
+            recipientsList: recipients,
+          },
+        });
+        const senderLines = senders.map((s, i) => `${i + 1}. ${s.alias || s.location || "عنوان " + (i + 1)} - ${s.city || ""}`).join("\n");
+        const recipientLines = recipients.map((r, i) => `${i + 1}. ${r.clientName || "مستلم"} - ${r.city || ""}`).join("\n");
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: `المرسلين:\n${senderLines}\n\nالمستلمين:\n${recipientLines}\n\nاختر رقم المرسل ورقم المستلم (مثال: 1 و 2)`,
+        };
+      }
+      if (isNewSenderRecipientChoice(normalizedMessage)) {
+        nextState({ step: "ASK_SENDER_NAME", data: { ...data } });
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: `تمام ${userName}، خلينا ننشئ مرسل ومستلم جديد. مين المرسل؟ (اسم المرسل)`,
+        };
+      }
+      return {
+        success: true,
+        intent: "CHAT",
+        result: {},
+        message: `قل "موجودين" إذا تحب تختار من المرسلين والمستلمين اللي عندك، أو "جديد" لإنشاء مرسل ومستلم جديد.`,
+      };
+    }
+
+    case "AWAIT_SENDER_RECIPIENT_SELECT": {
+      const selection = parseSenderRecipientSelection(message);
+      const sendersList = data.sendersList || [];
+      const recipientsList = data.recipientsList || [];
+      if (!selection || selection.senderIndex < 1 || selection.recipientIndex < 1) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: "اختر رقم المرسل ورقم المستلم (مثال: 1 و 2).",
+        };
+      }
+      const senderAddr = sendersList[selection.senderIndex - 1];
+      const recipientAddr = recipientsList[selection.recipientIndex - 1];
+      if (!senderAddr || !recipientAddr) {
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: `الرقم غير صحيح. المرسلين من 1 إلى ${sendersList.length} والمستلمين من 1 إلى ${recipientsList.length}. (مثال: 1 و 2)`,
+        };
+      }
+      const senderPayload = {
+        name: senderAddr.alias || senderAddr.location || "المرسل",
+        address: senderAddr.location || senderAddr.detalis || "",
+        phone: senderAddr.phone || "",
+        city: senderAddr.city || "",
+        country: senderAddr.country || "sa",
+      };
+      const receiverPayload = {
+        _id: recipientAddr._id,
+        name: recipientAddr.clientName,
+        address: recipientAddr.clientAddress,
+        phone: recipientAddr.clientPhone,
+        city: recipientAddr.city,
+        country: recipientAddr.country || "sa",
+        email: recipientAddr.clientEmail,
+        district: recipientAddr.district,
+        nationalAddress: recipientAddr.nationalAddress,
+      };
+      const shipmentPayload = {
+        sender: senderPayload,
+        receiverId: receiverPayload._id,
+        receiver: receiverPayload,
+        weight: data.weight,
+        boxes: data.boxes || 1,
+        description: data.description || "شحنة",
+        value: data.value || 0,
+        paymentMethod: data.paymentMethod || "COD",
+        company: data.company,
+        shipmentType: data.shipmentType,
+        dimensions: data.dimensions || null,
+      };
+      const creationResult = await services.shipmentService.createShipmentFromAI(shipmentPayload);
+      if (!creationResult.success) {
+        return {
+          success: false,
+          intent: "CHAT",
+          result: creationResult,
+          message: creationResult.message || "صار خطأ أثناء إنشاء الشحنة. حاول مرة ثانية.",
+        };
+      }
+      stateManager.clearState(userId);
+      return {
+        success: true,
+        intent: "CHAT",
+        result: creationResult,
+        message: `تم إنشاء الشحنة بنجاح ✅ رقم التتبع: ${creationResult.trackingNumber}`,
+      };
+    }
+
     case "ASK_SENDER_NAME": {
       const senderName = message.trim();
       if (!senderName) {
@@ -2623,6 +2829,16 @@ async function handleCreateShipmentFlow(
       };
     }
     case "ASK_WEIGHT": {
+      const weightFromData = data.weight;
+      if (weightFromData != null && weightFromData > 0) {
+        const boxesFromMsg = extractBoxesCount(message);
+        if (boxesFromMsg && boxesFromMsg > 0) {
+          nextState({ step: "ASK_DESCRIPTION", data: { ...data, boxes: boxesFromMsg } });
+          return { success: true, intent: "CHAT", result: {}, message: "وصف مختصر لمحتوى الشحنة؟" };
+        }
+        nextState({ step: "ASK_BOXES", data: { ...data } });
+        return { success: true, intent: "CHAT", result: {}, message: "كم عدد الصناديق؟" };
+      }
       const details = extractShipmentDetails(message);
       if (!details.weight) {
         return {
@@ -2720,7 +2936,9 @@ async function handleCreateShipmentFlow(
       };
     }
     case "ASK_PAYMENT_METHOD": {
-      const paymentMethod = extractPaymentMethod(message);
+      const paymentFromData = data.paymentMethod;
+      let paymentMethod = paymentFromData ? extractPaymentMethod(paymentFromData) || paymentFromData : extractPaymentMethod(message);
+      if (!paymentMethod && paymentFromData) paymentMethod = paymentFromData;
       if (!paymentMethod) {
         return {
           success: true,

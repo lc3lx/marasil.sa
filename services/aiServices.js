@@ -81,22 +81,25 @@ class AIServices {
     try {
       console.log("📦 [AI-Shipment] Creating shipment from AI:", shipmentData);
 
-      // التحقق من البيانات المطلوبة
-      if (
-        !shipmentData.company ||
-        !shipmentData.weight ||
-        !shipmentData.receiver?.name ||
-        !shipmentData.sender?.name
-      ) {
-        return {
-          success: false,
-          message: "البيانات غير مكتملة لإنشاء الشحنة"
-        };
+      const hasReceiverId = shipmentData.receiverId && mongoose.Types.ObjectId.isValid(shipmentData.receiverId);
+      const hasReceiverObj = shipmentData.receiver?.name && shipmentData.sender?.name;
+
+      if (!shipmentData.company || !shipmentData.weight || !shipmentData.sender?.name) {
+        return { success: false, message: "البيانات غير مكتملة لإنشاء الشحنة" };
+      }
+      if (!hasReceiverId && !shipmentData.receiver?.name) {
+        return { success: false, message: "البيانات غير مكتملة: المستلم مطلوب" };
       }
 
-      const companyRecord = await ShippingCompany.findOne({
+      let companyRecord = await ShippingCompany.findOne({
         company: shipmentData.company
       });
+      if (!companyRecord && shipmentData.company) {
+        const slug = this.mapCompanySlug(shipmentData.company);
+        if (slug !== (shipmentData.company || "").toLowerCase()) {
+          companyRecord = await ShippingCompany.findOne({ company: slug });
+        }
+      }
 
       if (!companyRecord) {
         return {
@@ -119,7 +122,8 @@ class AIServices {
         };
       }
 
-      const paymentMethod = shipmentData.paymentMethod || "COD";
+      const paymentMethodRaw = shipmentData.paymentMethod || "COD";
+      const paymentMethod = paymentMethodRaw === "CASH" ? "Prepaid" : (paymentMethodRaw === "COD" ? "COD" : paymentMethodRaw);
       const weight = parseFloat(shipmentData.weight) || 1;
       const boxes = parseInt(shipmentData.boxes, 10) || 1;
       const dimension = shipmentData.dimensions || {
@@ -134,38 +138,44 @@ class AIServices {
         dimension
       });
 
-      const receiverAddress = await ClientAddress.create({
-        customer: this.userId,
-        clientName: shipmentData.receiver.name,
-        clientAddress: shipmentData.receiver.address,
-        clientPhone: shipmentData.receiver.phone,
-        clientEmail: shipmentData.receiver.email || this.customer?.email,
-        country: shipmentData.receiver.country || "sa",
-        city: shipmentData.receiver.city,
-        district: shipmentData.receiver.district,
-        nationalAddress: shipmentData.receiver.nationalAddress
-      });
+      let receiverAddress;
+      if (hasReceiverId) {
+        receiverAddress = await ClientAddress.findOne({
+          _id: shipmentData.receiverId,
+          customer: this.userId
+        });
+        if (!receiverAddress) {
+          return { success: false, message: "عنوان المستلم غير موجود أو لا يخص حسابك" };
+        }
+      } else {
+        receiverAddress = await ClientAddress.create({
+          customer: this.userId,
+          clientName: shipmentData.receiver.name,
+          clientAddress: shipmentData.receiver.address,
+          clientPhone: shipmentData.receiver.phone,
+          clientEmail: shipmentData.receiver.email || this.customer?.email,
+          country: shipmentData.receiver.country || "sa",
+          city: shipmentData.receiver.city,
+          district: shipmentData.receiver.district,
+          nationalAddress: shipmentData.receiver.nationalAddress
+        });
+      }
 
-      await ClientAddress.create({
-        customer: this.userId,
-        clientName: shipmentData.sender.name,
-        clientAddress: shipmentData.sender.address,
-        clientPhone: shipmentData.sender.phone,
-        clientEmail: shipmentData.sender.email || this.customer?.email,
-        country: shipmentData.sender.country || "sa",
-        city: shipmentData.sender.city,
-        district: shipmentData.sender.district,
-        nationalAddress: shipmentData.sender.nationalAddress
-      });
+      const receiverName = receiverAddress.clientName || shipmentData.receiver?.name;
+      const receiverPhone = receiverAddress.clientPhone || shipmentData.receiver?.phone;
+      const receiverCity = receiverAddress.city || shipmentData.receiver?.city;
+      const receiverCountry = receiverAddress.country || shipmentData.receiver?.country || "sa";
+      const receiverAddressStr = receiverAddress.clientAddress || shipmentData.receiver?.address;
+      const receiverEmail = receiverAddress.clientEmail || shipmentData.receiver?.email || this.customer?.email;
 
       const order = await Order.create({
         customer: {
-          full_name: shipmentData.receiver.name,
-          mobile: shipmentData.receiver.phone,
-          city: shipmentData.receiver.city,
-          country: shipmentData.receiver.country || "sa",
-          address: shipmentData.receiver.address,
-          email: shipmentData.receiver.email || this.customer?.email
+          full_name: receiverName,
+          mobile: receiverPhone,
+          city: receiverCity,
+          country: receiverCountry,
+          address: receiverAddressStr,
+          email: receiverEmail
         },
         total: {
           amount: shipmentData.value || 0,
@@ -241,6 +251,33 @@ class AIServices {
         success: false,
         message: "حدث خطأ في إنشاء الشحنة"
       };
+    }
+  }
+
+  /**
+   * عناوين المرسلين (من حساب العميل - customer.addresses)
+   */
+  async getSenderAddresses() {
+    try {
+      const customer = await Customer.findById(this.userId).select("addresses").lean();
+      const list = (customer && customer.addresses) ? customer.addresses : [];
+      return { success: true, data: list };
+    } catch (e) {
+      console.error("❌ [AI] getSenderAddresses error:", e);
+      return { success: false, data: [], message: e.message };
+    }
+  }
+
+  /**
+   * عناوين المستلمين (ClientAddress للمستخدم)
+   */
+  async getClientAddresses() {
+    try {
+      const list = await ClientAddress.find({ customer: this.userId }).lean();
+      return { success: true, data: list };
+    } catch (e) {
+      console.error("❌ [AI] getClientAddresses error:", e);
+      return { success: false, data: [], message: e.message };
     }
   }
 
