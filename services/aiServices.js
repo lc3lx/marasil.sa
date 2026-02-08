@@ -18,15 +18,19 @@ class AIServices {
   }
 
   mapCompanySlug(companyName = "") {
-    const normalized = companyName.toLowerCase();
+    const raw = (companyName || "").toString().trim();
+    const normalized = raw
+      .toLowerCase()
+      .replace(/[\u0622\u0623\u0625\u0627]/g, "\u0627")
+      .replace(/\s+/g, " ");
     if (normalized.includes("سمسا") || normalized.includes("smsa")) return "smsa";
-    if (normalized.includes("ارامكس") || normalized.includes("aramex"))
+    if (normalized.includes("ارامكس") || normalized.includes("ارمكس") || normalized.includes("aramex"))
       return "aramex";
     if (normalized.includes("ريد بوكس") || normalized.includes("redbox"))
       return "redbox";
     if (normalized.includes("لاما") || normalized.includes("omni"))
       return "omniclama";
-    return normalized;
+    return raw.toLowerCase();
   }
 
   /**
