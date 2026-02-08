@@ -20,7 +20,8 @@ const getImageFullUrl = (path) => {
   if (!path || typeof path !== "string") return path || "";
   const trimmed = path.trim();
   if (!trimmed) return "";
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://"))
+    return trimmed;
   const base = BASE_URL.replace(/\/$/, "");
   const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
   return `${base}${normalizedPath}`;
@@ -38,12 +39,18 @@ exports.ResizeImage = asyncHandler(async (req, res, next) => {
   console.log("📁 req.files:", req.files);
   console.log("📝 req.body:", req.body);
   console.log("🔧 req.files type:", typeof req.files);
-  console.log("🔧 req.files keys:", req.files ? Object.keys(req.files) : "no files");
+  console.log(
+    "🔧 req.files keys:",
+    req.files ? Object.keys(req.files) : "no files"
+  );
   console.log("🔧 Content-Type:", req.headers["content-type"]);
-  
+
   // طباعة تفاصيل req.files بالكامل
   if (req.files) {
-    console.log("🔧 Full req.files object:", JSON.stringify(req.files, null, 2));
+    console.log(
+      "🔧 Full req.files object:",
+      JSON.stringify(req.files, null, 2)
+    );
   }
 
   try {
@@ -51,7 +58,7 @@ exports.ResizeImage = asyncHandler(async (req, res, next) => {
       console.log("✅ profileImage found in req.files");
       console.log("🔧 profileImage array:", req.files.profileImage);
       console.log("🔧 profileImage length:", req.files.profileImage.length);
-      
+
       if (req.files.profileImage[0]) {
         console.log("🔧 profileImage[0] details:", {
           fieldname: req.files.profileImage[0].fieldname,
@@ -59,7 +66,9 @@ exports.ResizeImage = asyncHandler(async (req, res, next) => {
           encoding: req.files.profileImage[0].encoding,
           mimetype: req.files.profileImage[0].mimetype,
           size: req.files.profileImage[0].size,
-          buffer: req.files.profileImage[0].buffer ? `Buffer(${req.files.profileImage[0].buffer.length} bytes)` : "missing",
+          buffer: req.files.profileImage[0].buffer
+            ? `Buffer(${req.files.profileImage[0].buffer.length} bytes)`
+            : "missing",
         });
 
         const filename = `profileImage-${uuidv4()}-${Date.now()}.jpeg`;
@@ -69,7 +78,7 @@ exports.ResizeImage = asyncHandler(async (req, res, next) => {
           .toFormat("jpeg")
           .jpeg({ quality: 95 })
           .toFile(`uploads/customers/${filename}`);
-        
+
         req.body.profileImage = filename;
         console.log("✅ تم حفظ صورة البروفيل:", filename);
         console.log("✅ req.body.profileImage:", req.body.profileImage);
@@ -166,13 +175,16 @@ exports.getCompanyInfo = asyncHandler(async (req, res, next) => {
     return res.status(404).json({ error: "Customer not found" });
   }
   const brandLogoPath = customer.brand_logo
-    ? (!customer.brand_logo.includes("/uploads/") && !customer.brand_logo.startsWith("http")
-        ? `/uploads/Logo/${customer.brand_logo}`
-        : customer.brand_logo)
+    ? !customer.brand_logo.includes("/uploads/") &&
+      !customer.brand_logo.startsWith("http")
+      ? `/uploads/Logo/${customer.brand_logo}`
+      : customer.brand_logo
     : null;
   const info = {
     brand_color: customer.brand_color,
-    brand_logo: brandLogoPath ? getImageFullUrl(brandLogoPath) : customer.brand_logo,
+    brand_logo: brandLogoPath
+      ? getImageFullUrl(brandLogoPath)
+      : customer.brand_logo,
     company_name_ar: customer.company_name_ar,
     company_name_en: customer.company_name_en,
     brand_email: customer.brand_email,
@@ -261,40 +273,58 @@ exports.getMe = asyncHandler(async (req, res, next) => {
   // إضافة المسار الكامل مع base URL للصور
   const customerData = customer.toObject();
   if (customerData.profileImage) {
-    if (!customerData.profileImage.includes('/uploads/') && 
-        !customerData.profileImage.startsWith('http')) {
-      customerData.profileImage = getImageFullUrl(`/uploads/customers/${customerData.profileImage}`);
+    if (
+      !customerData.profileImage.includes("/uploads/") &&
+      !customerData.profileImage.startsWith("http")
+    ) {
+      customerData.profileImage = getImageFullUrl(
+        `/uploads/customers/${customerData.profileImage}`
+      );
     } else {
       customerData.profileImage = getImageFullUrl(customerData.profileImage);
     }
     console.log("✅ profileImage مع base URL:", customerData.profileImage);
   }
   if (customerData.brand_logo) {
-    if (!customerData.brand_logo.includes('/uploads/') && 
-        !customerData.brand_logo.startsWith('http')) {
-      customerData.brand_logo = getImageFullUrl(`/uploads/Logo/${customerData.brand_logo}`);
+    if (
+      !customerData.brand_logo.includes("/uploads/") &&
+      !customerData.brand_logo.startsWith("http")
+    ) {
+      customerData.brand_logo = getImageFullUrl(
+        `/uploads/Logo/${customerData.brand_logo}`
+      );
     } else {
       customerData.brand_logo = getImageFullUrl(customerData.brand_logo);
     }
     console.log("✅ brand_logo مع base URL:", customerData.brand_logo);
   }
   if (customerData.trackingSettings?.logo) {
-    customerData.trackingSettings.logo = getImageFullUrl(customerData.trackingSettings.logo);
+    customerData.trackingSettings.logo = getImageFullUrl(
+      customerData.trackingSettings.logo
+    );
   }
   if (customerData.returnPageSettings?.logoUrl) {
     const logo = customerData.returnPageSettings.logoUrl;
     if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
-      customerData.returnPageSettings.logoUrl = getImageFullUrl(`/uploads/returnPageLogo/${logo}`);
+      customerData.returnPageSettings.logoUrl = getImageFullUrl(
+        `/uploads/returnPageLogo/${logo}`
+      );
     } else {
-      customerData.returnPageSettings.logoUrl = getImageFullUrl(logo.startsWith("/") ? logo : `/${logo}`);
+      customerData.returnPageSettings.logoUrl = getImageFullUrl(
+        logo.startsWith("/") ? logo : `/${logo}`
+      );
     }
   }
   if (customerData.replacementPageSettings?.logoUrl) {
     const logo = customerData.replacementPageSettings.logoUrl;
     if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
-      customerData.replacementPageSettings.logoUrl = getImageFullUrl(`/uploads/replacementPageLogo/${logo}`);
+      customerData.replacementPageSettings.logoUrl = getImageFullUrl(
+        `/uploads/replacementPageLogo/${logo}`
+      );
     } else {
-      customerData.replacementPageSettings.logoUrl = getImageFullUrl(logo.startsWith("/") ? logo : `/${logo}`);
+      customerData.replacementPageSettings.logoUrl = getImageFullUrl(
+        logo.startsWith("/") ? logo : `/${logo}`
+      );
     }
   }
 
@@ -348,7 +378,10 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   // تحديث صورة البروفيل (إذا تم رفعها)
   if (req.body.profileImage) {
     updateData.profileImage = req.body.profileImage;
-    console.log("✅ سيتم تحديث profileImage في الـ database:", req.body.profileImage);
+    console.log(
+      "✅ سيتم تحديث profileImage في الـ database:",
+      req.body.profileImage
+    );
   } else {
     console.log("❌ لا يوجد profileImage في req.body");
   }
@@ -356,7 +389,10 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   // تحديث شعار الشركة (إذا تم رفعه)
   if (req.body.brand_logo) {
     updateData.brand_logo = req.body.brand_logo;
-    console.log("✅ سيتم تحديث brand_logo في الـ database:", req.body.brand_logo);
+    console.log(
+      "✅ سيتم تحديث brand_logo في الـ database:",
+      req.body.brand_logo
+    );
   } else {
     console.log("❌ لا يوجد brand_logo في req.body");
   }
@@ -379,7 +415,10 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   // تحديث إعدادات الإشعارات
   if (req.body.notificationPreferences) {
     updateData.notificationPreferences = req.body.notificationPreferences;
-    console.log("✅ سيتم تحديث notificationPreferences:", req.body.notificationPreferences);
+    console.log(
+      "✅ سيتم تحديث notificationPreferences:",
+      req.body.notificationPreferences
+    );
   }
 
   // تحديث إعدادات الأمان
@@ -396,26 +435,38 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
 
   // تحديث شعار صفحة الإرجاع (إذا تم رفعه) و/أو إعدادات صفحة الاسترجاع
   if (req.body.returnPageLogo) {
-    const customer = await Customer.findById(req.customer._id).select("returnPageSettings").lean();
-    const current = customer?.returnPageSettings && typeof customer.returnPageSettings === "object"
-      ? { ...customer.returnPageSettings }
-      : {};
-    const logoPath = req.body.returnPageLogo.includes("/") || req.body.returnPageLogo.startsWith("http")
-      ? req.body.returnPageLogo
-      : `uploads/returnPageLogo/${req.body.returnPageLogo}`;
-    const logoUrl = getImageFullUrl(logoPath.startsWith("/") ? logoPath : `/${logoPath}`);
-    const fromBody = req.body.returnPageSettings !== undefined
-      ? (typeof req.body.returnPageSettings === "string"
+    const customer = await Customer.findById(req.customer._id)
+      .select("returnPageSettings")
+      .lean();
+    const current =
+      customer?.returnPageSettings &&
+      typeof customer.returnPageSettings === "object"
+        ? { ...customer.returnPageSettings }
+        : {};
+    const logoPath =
+      req.body.returnPageLogo.includes("/") ||
+      req.body.returnPageLogo.startsWith("http")
+        ? req.body.returnPageLogo
+        : `uploads/returnPageLogo/${req.body.returnPageLogo}`;
+    const logoUrl = getImageFullUrl(
+      logoPath.startsWith("/") ? logoPath : `/${logoPath}`
+    );
+    const fromBody =
+      req.body.returnPageSettings !== undefined
+        ? typeof req.body.returnPageSettings === "string"
           ? JSON.parse(req.body.returnPageSettings)
-          : req.body.returnPageSettings)
-      : {};
+          : req.body.returnPageSettings
+        : {};
     updateData.returnPageSettings = { ...current, ...fromBody, logoUrl };
     console.log("✅ سيتم تحديث returnPageSettings (مع logoUrl من رفع الشعار)");
   } else if (req.body.returnPageSettings !== undefined) {
-    updateData.returnPageSettings = typeof req.body.returnPageSettings === "string"
-      ? JSON.parse(req.body.returnPageSettings)
-      : req.body.returnPageSettings;
-    const existing = await Customer.findById(req.customer._id).select("returnPageSlug").lean();
+    updateData.returnPageSettings =
+      typeof req.body.returnPageSettings === "string"
+        ? JSON.parse(req.body.returnPageSettings)
+        : req.body.returnPageSettings;
+    const existing = await Customer.findById(req.customer._id)
+      .select("returnPageSlug")
+      .lean();
     if (!existing?.returnPageSlug) {
       const slug = crypto.randomBytes(8).toString("base64url");
       updateData.returnPageSlug = slug;
@@ -426,26 +477,40 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
 
   // تحديث شعار صفحة الاستبدال و/أو إعدادات صفحة الاستبدال
   if (req.body.replacementPageLogo) {
-    const cust = await Customer.findById(req.customer._id).select("replacementPageSettings").lean();
-    const current = cust?.replacementPageSettings && typeof cust.replacementPageSettings === "object"
-      ? { ...cust.replacementPageSettings }
-      : {};
-    const logoPath = req.body.replacementPageLogo.includes("/") || req.body.replacementPageLogo.startsWith("http")
-      ? req.body.replacementPageLogo
-      : `uploads/replacementPageLogo/${req.body.replacementPageLogo}`;
-    const logoUrl = getImageFullUrl(logoPath.startsWith("/") ? logoPath : `/${logoPath}`);
-    const fromBody = req.body.replacementPageSettings !== undefined
-      ? (typeof req.body.replacementPageSettings === "string"
+    const cust = await Customer.findById(req.customer._id)
+      .select("replacementPageSettings")
+      .lean();
+    const current =
+      cust?.replacementPageSettings &&
+      typeof cust.replacementPageSettings === "object"
+        ? { ...cust.replacementPageSettings }
+        : {};
+    const logoPath =
+      req.body.replacementPageLogo.includes("/") ||
+      req.body.replacementPageLogo.startsWith("http")
+        ? req.body.replacementPageLogo
+        : `uploads/replacementPageLogo/${req.body.replacementPageLogo}`;
+    const logoUrl = getImageFullUrl(
+      logoPath.startsWith("/") ? logoPath : `/${logoPath}`
+    );
+    const fromBody =
+      req.body.replacementPageSettings !== undefined
+        ? typeof req.body.replacementPageSettings === "string"
           ? JSON.parse(req.body.replacementPageSettings)
-          : req.body.replacementPageSettings)
-      : {};
+          : req.body.replacementPageSettings
+        : {};
     updateData.replacementPageSettings = { ...current, ...fromBody, logoUrl };
-    console.log("✅ سيتم تحديث replacementPageSettings (مع logoUrl من رفع الشعار)");
+    console.log(
+      "✅ سيتم تحديث replacementPageSettings (مع logoUrl من رفع الشعار)"
+    );
   } else if (req.body.replacementPageSettings !== undefined) {
-    updateData.replacementPageSettings = typeof req.body.replacementPageSettings === "string"
-      ? JSON.parse(req.body.replacementPageSettings)
-      : req.body.replacementPageSettings;
-    const existingRep = await Customer.findById(req.customer._id).select("replacementPageSlug").lean();
+    updateData.replacementPageSettings =
+      typeof req.body.replacementPageSettings === "string"
+        ? JSON.parse(req.body.replacementPageSettings)
+        : req.body.replacementPageSettings;
+    const existingRep = await Customer.findById(req.customer._id)
+      .select("replacementPageSlug")
+      .lean();
     if (!existingRep?.replacementPageSlug) {
       const slug = crypto.randomBytes(8).toString("base64url");
       updateData.replacementPageSlug = slug;
@@ -486,44 +551,64 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   // إضافة المسار الكامل مع base URL للصور
   const customerData = customer.toObject();
   if (customerData.profileImage) {
-    if (!customerData.profileImage.includes('/uploads/') && 
-        !customerData.profileImage.startsWith('http')) {
-      customerData.profileImage = getImageFullUrl(`/uploads/customers/${customerData.profileImage}`);
+    if (
+      !customerData.profileImage.includes("/uploads/") &&
+      !customerData.profileImage.startsWith("http")
+    ) {
+      customerData.profileImage = getImageFullUrl(
+        `/uploads/customers/${customerData.profileImage}`
+      );
     } else {
       customerData.profileImage = getImageFullUrl(customerData.profileImage);
     }
     console.log("✅ profileImage مع base URL:", customerData.profileImage);
   }
   if (customerData.brand_logo) {
-    if (!customerData.brand_logo.includes('/uploads/') && 
-        !customerData.brand_logo.startsWith('http')) {
-      customerData.brand_logo = getImageFullUrl(`/uploads/Logo/${customerData.brand_logo}`);
+    if (
+      !customerData.brand_logo.includes("/uploads/") &&
+      !customerData.brand_logo.startsWith("http")
+    ) {
+      customerData.brand_logo = getImageFullUrl(
+        `/uploads/Logo/${customerData.brand_logo}`
+      );
     } else {
       customerData.brand_logo = getImageFullUrl(customerData.brand_logo);
     }
     console.log("✅ brand_logo مع base URL:", customerData.brand_logo);
   }
   if (customerData.trackingSettings?.logo) {
-    customerData.trackingSettings.logo = getImageFullUrl(customerData.trackingSettings.logo);
+    customerData.trackingSettings.logo = getImageFullUrl(
+      customerData.trackingSettings.logo
+    );
   }
   if (customerData.returnPageSettings?.logoUrl) {
     const logo = customerData.returnPageSettings.logoUrl;
     if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
-      customerData.returnPageSettings.logoUrl = getImageFullUrl(`/uploads/returnPageLogo/${logo}`);
+      customerData.returnPageSettings.logoUrl = getImageFullUrl(
+        `/uploads/returnPageLogo/${logo}`
+      );
     } else {
-      customerData.returnPageSettings.logoUrl = getImageFullUrl(logo.startsWith("/") ? logo : `/${logo}`);
+      customerData.returnPageSettings.logoUrl = getImageFullUrl(
+        logo.startsWith("/") ? logo : `/${logo}`
+      );
     }
   }
   if (customerData.replacementPageSettings?.logoUrl) {
     const logo = customerData.replacementPageSettings.logoUrl;
     if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
-      customerData.replacementPageSettings.logoUrl = getImageFullUrl(`/uploads/replacementPageLogo/${logo}`);
+      customerData.replacementPageSettings.logoUrl = getImageFullUrl(
+        `/uploads/replacementPageLogo/${logo}`
+      );
     } else {
-      customerData.replacementPageSettings.logoUrl = getImageFullUrl(logo.startsWith("/") ? logo : `/${logo}`);
+      customerData.replacementPageSettings.logoUrl = getImageFullUrl(
+        logo.startsWith("/") ? logo : `/${logo}`
+      );
     }
   }
 
-  console.log("========== End updateLoggedCustomerdata Controller ==========\n");
+  console.log(
+    "========== End updateLoggedCustomerdata Controller ==========\n"
+  );
 
   res.status(200).json({
     status: "success",
@@ -603,7 +688,9 @@ exports.getReturnPageBySlug = asyncHandler(async (req, res, next) => {
     .select("returnPageSettings returnPageSlug")
     .lean();
   if (!customer) {
-    return next(new ApiError("صفحة الاسترجاع غير موجودة أو الرابط غير صحيح", 404));
+    return next(
+      new ApiError("صفحة الاسترجاع غير موجودة أو الرابط غير صحيح", 404)
+    );
   }
   const raw = customer.returnPageSettings || {};
   const settings = { ...raw };
@@ -612,7 +699,9 @@ exports.getReturnPageBySlug = asyncHandler(async (req, res, next) => {
     if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
       settings.logoUrl = getImageFullUrl(`/uploads/returnPageLogo/${logo}`);
     } else {
-      settings.logoUrl = getImageFullUrl(logo.startsWith("/") ? logo : `/${logo}`);
+      settings.logoUrl = getImageFullUrl(
+        logo.startsWith("/") ? logo : `/${logo}`
+      );
     }
   }
   res.status(200).json({
@@ -633,16 +722,22 @@ exports.getReplacementPageBySlug = asyncHandler(async (req, res, next) => {
     .select("replacementPageSettings replacementPageSlug")
     .lean();
   if (!customer) {
-    return next(new ApiError("صفحة الاستبدال غير موجودة أو الرابط غير صحيح", 404));
+    return next(
+      new ApiError("صفحة الاستبدال غير موجودة أو الرابط غير صحيح", 404)
+    );
   }
   const raw = customer.replacementPageSettings || {};
   const settings = { ...raw };
   if (settings.logoUrl) {
     const logo = settings.logoUrl;
     if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
-      settings.logoUrl = getImageFullUrl(`/uploads/replacementPageLogo/${logo}`);
+      settings.logoUrl = getImageFullUrl(
+        `/uploads/replacementPageLogo/${logo}`
+      );
     } else {
-      settings.logoUrl = getImageFullUrl(logo.startsWith("/") ? logo : `/${logo}`);
+      settings.logoUrl = getImageFullUrl(
+        logo.startsWith("/") ? logo : `/${logo}`
+      );
     }
   }
   res.status(200).json({
