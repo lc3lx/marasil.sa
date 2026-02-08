@@ -2620,11 +2620,12 @@ async function handleCreateShipmentFlow(
       };
       const creationResult = await services.shipmentService.createShipmentFromAI(shipmentPayload);
       if (!creationResult.success) {
+        stateManager.clearState(userId);
         return {
           success: false,
           intent: "CHAT",
           result: creationResult,
-          message: creationResult.message || "صار خطأ أثناء إنشاء الشحنة. حاول مرة ثانية.",
+          message: (creationResult.message || "صار خطأ أثناء إنشاء الشحنة. حاول مرة ثانية.") + "\n\nيمكنك البدء من جديد بقول: بدي اعمل شحنة...",
         };
       }
       stateManager.clearState(userId);
@@ -3071,13 +3072,15 @@ async function handleCreateShipmentFlow(
       );
 
       if (!creationResult.success) {
+        stateManager.clearState(userId);
         return {
           success: false,
           intent: "CHAT",
           result: creationResult,
           message:
-            creationResult.message ||
-            "صار خطأ أثناء إنشاء الشحنة. حاول مرة ثانية.",
+            (creationResult.message ||
+            "صار خطأ أثناء إنشاء الشحنة. حاول مرة ثانية.") +
+            "\n\nيمكنك البدء من جديد بقول: بدي اعمل شحنة...",
         };
       }
 
