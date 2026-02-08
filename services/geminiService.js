@@ -7,10 +7,10 @@ const ENABLE_DEEP_THINKING =
   process.env.GEMINI_ALLOW_EXPANSIVE_RESPONSES !== "false";
 
 const GENERATION_CONFIG = {
-  temperature: 0.7,
+  temperature: 0.5,
   topK: 40,
   topP: 0.9,
-  maxOutputTokens: 1536,
+  maxOutputTokens: 2048,
 };
 
 const ARABIC_INDIC_DIGITS_MAP = Object.freeze({
@@ -98,12 +98,22 @@ const SYSTEM_PROMPT = `أنت مساعد ذكاء اصطناعي رسمي لمن
 قدّم بديلًا أو حلًا في كل رد
 استخدم التوضيح الاستباقي لتجنب الشكوى
 
-=== تفكير خطوة بخطوة ===
-قبل الرد، فكر خطوة بخطوة:
-1. فهم السؤال: ما هي نية الزبون؟ (مثل تتبع، إنشاء، رصيد، إلخ)
-2. تحديد الـ API المطلوب: بناءً على النية، اختر الـ API المناسب (مثل trackShipment للتتبع)
-3. الوصول إلى البيانات: إذا لزم، استدعي الـ API للوصول إلى قاعدة البيانات
-4. بناء الرد: اجعل الرد ودي، مفيد، ومطمئن
+=== تفكير خطوة بخطوة (إلزامي) ===
+قبل أي رد، نفّذ بالترتيب:
+1. **التحليل:** ما نية المستخدم الحقيقية؟ (تتبع، إنشاء، رصيد، قائمة، إلغاء، معلومات، أسعار، إلخ)
+2. **السياق:** ماذا سبق في المحادثة؟ لا تُعيد من الصفر عند تغيير صياغة المستخدم
+3. **القرار:** أي API يناسب النية؟ هل البيانات كافية؟
+4. **المخرجات:** صغ جملة JSON واحدة فقط كما في الصيغة أدناه
+
+=== اللهجة والنية (مهم جداً) ===
+- تغيير اللهجة أو الأسلوب (سعودي، مصري، شامي، فصحى، عامية) **لا يغيّر النية**
+- إذا قال المستخدم نفس الطلب بصيغة أخرى أو لهجة أخرى → نفس الـ intent ونفس القرار
+- لا "تفرش" ولا تعيد السياق من الصفر: استمر من حيث انتهت المحادثة
+- ركّز على **ماذا يريد** (النية) وليس **كيف قاله** (الصياغة/اللهجة)
+- أمثلة لنفس النية بصيغ مختلفة:
+  • تتبع: "وين شحنتي" = "فين الشحنة دي" = "أين طلبي" = "track 123" → intent: TRACK
+  • رصيد: "كم رصيدي" = "فلوسي كم" = "ما هو رصيد المحفظة" → intent: BALANCE
+  • قائمة: "شحناتي" = "وريني الطلبات" = "قائمة الشحنات" → intent: LIST
 
 === شرح مفصل للـ APIs المتاحة ===
 
@@ -169,14 +179,19 @@ const SYSTEM_PROMPT = `أنت مساعد ذكاء اصطناعي رسمي لمن
 
 إذا كان السؤال يتطلب API، حدد الـ intent واستدعيها عبر function calling.
 
-=== صيغة الرد (JSON فقط) ===
+=== صيغة الرد (جملة JSON واحدة فقط) ===
+يجب أن يكون ردك جملة JSON صالحة واحدة فقط. بدون نص قبلها أو بعدها (أو سيتم استخراج الـ JSON فقط).
+الحقول الاختيارية للتحليل الداخلي (لا تظهر للمستخدم): reasoning.
+الحقول المطلوبة للباكند: intent, confidence, message, data, واختياري api_call و missing_fields.
+
 {
+  "reasoning": "تحليل قصير: النية من الرسالة، السياق، ولماذا اخترت هذا الـ intent (داخلي فقط)",
   "intent": "CREATE | TRACK | CANCEL | BALANCE | LIST | CHAT | COMPANY_INFO | SHIPPING_COMPANIES | PRICING",
   "confidence": 0.0-1.0,
   "missing_fields": ["recipient_name", "phone", "weight"],
-  "message": "رسالة ودية بالعامية السعودية",
+  "message": "رسالة ودية بالعامية السعودية تلائم المستخدم",
   "data": {"tracking_number": "123", "recipient_name": "أحمد"},
-  "api_call": {"name": "trackShipment", "params": {"tracking_number": "123"}}  // إضافة لـ function calling
+  "api_call": {"name": "trackShipment", "params": {"tracking_number": "123"}}
 }
 
 === شرح شامل لكل أقسام المنصة ===
@@ -210,6 +225,11 @@ const SYSTEM_PROMPT = `أنت مساعد ذكاء اصطناعي رسمي لمن
 **مثال 6: حساب الأسعار**
 السؤال: "كم تكلفة شحنة 2 كيلو"
 الرد: {"intent": "PRICING", "confidence": 0.9, "missing_fields": [], "message": "تمام، لحساب تكلفة شحنة 2 كيلو...", "data": {"weight": 2}, "api_call": {"name": "getPricingInfo", "params": {"weight": 2}}}
+
+**أمثلة نفس النية بلهجات مختلفة (نفس الـ intent والقرار):**
+- "فين الشحنة دي رقم 123" (مصري) → مثل "وين شحنتي 123" → intent: TRACK, data.tracking_number: "123"
+- "شو رصيدي" (شامي) أو "كم فلوسي" → مثل "كم رصيدي" → intent: BALANCE
+- "وريني الطلبات" أو "اعرض الشحنات" → مثل "شحناتي" → intent: LIST
 
 === مخرجات الرد المثالي ===
 // (ابقِ كما هو)
@@ -1251,10 +1271,14 @@ async function sendToGemini(
       generationConfig: GENERATION_CONFIG,
     });
 
-    // بناء الـ prompt مع إرشادات تفكير
+    // بناء الـ prompt مع إرشادات تحليل وقرار ثم JSON فقط
     const deepThinkingDirectives = ENABLE_DEEP_THINKING
-      ? `فكر بتسلسل واضح: 1) فهم نية المستخدم بدقة 2) تقييم البيانات المتاحة والسياق 3) تحديد ما إذا كان يلزم استدعاء API 4) صغ ردًا غنيًا ومطمئنًا يشرح المنطق والخطوات التالية.`
-      : "فكر خطوة بخطوة ثم حدد الـ intent والـ API إذا لزم.";
+      ? `التحليل ثم القرار ثم المخرجات:
+1) حلل: ما نية المستخدم (بدون التأثر باللهجة أو تغيير الصياغة)؟ ما السياق السابق؟
+2) قرر: أي intent و أي API يناسبان النية؟ هل البيانات كافية؟
+3) أخرج: جملة JSON واحدة فقط (يمكن أن تتضمن حقل reasoning للتحليل الداخلي). لا نص قبل أو بعد الـ JSON.
+تذكّر: تغيير اللهجة لا يغيّر النية؛ حافظ على استمرارية السياق.`
+      : "حلل النية والسياق ثم قرر الـ intent والـ API. أخرج جملة JSON واحدة فقط.";
 
     const quickIntentHint = quickResult
       ? {
@@ -1272,7 +1296,9 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
 
     const normalizedContext = context || NO_CONTEXT_PLACEHOLDER;
 
-    const fullPrompt = `${SYSTEM_PROMPT}\n\n${deepThinkingDirectives}\n\nContext: ${normalizedContext}\nUser: ${userMessage}${hintSection}`;
+    const outputReminder = `\n\nمطلوب: ردّك يجب أن يكون جملة JSON واحدة صالحة فقط (بدون شرح خارج الـ JSON).`;
+
+    const fullPrompt = `${SYSTEM_PROMPT}\n\n${deepThinkingDirectives}\n\nContext: ${normalizedContext}\nUser: ${userMessage}${hintSection}${outputReminder}`;
 
     const result = await model.generateContent(fullPrompt);
     const response = await result.response;
@@ -1303,6 +1329,12 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
         console.log("🔍 [Gemini] Extracted JSON:", jsonText);
 
         const geminiData = JSON.parse(jsonText);
+
+        // إزالة حقل التحليل الداخلي قبل إرسال القرار للباكند (الباكند يهتم بالـ intent والـ data فقط)
+        if (Object.prototype.hasOwnProperty.call(geminiData, "reasoning")) {
+          console.log("🧠 [Gemini] Reasoning (internal):", geminiData.reasoning?.substring?.(0, 120) || geminiData.reasoning);
+          delete geminiData.reasoning;
+        }
 
         if (quickResult) {
           geminiData.intent = geminiData.intent || quickResult.intent;
