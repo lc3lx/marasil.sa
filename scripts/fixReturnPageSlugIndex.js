@@ -1,19 +1,26 @@
 // إصلاح خطأ E11000 duplicate key على returnPageSlug
-// يشغّل على نفس قاعدة البيانات من .env (مثلاً test)
+// للتشغيل على قاعدة "test": MONGO_DB_NAME=test node scripts/fixReturnPageSlugIndex.js
 const mongoose = require("mongoose");
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
 (async () => {
   try {
-    const uri = process.env.DATABASE_URL;
+    let uri = process.env.DATABASE_URL;
     if (!uri) {
       console.error("❌ DATABASE_URL غير موجود في .env");
       process.exit(1);
     }
+    const dbNameOverride = process.env.MONGO_DB_NAME;
+    if (dbNameOverride) {
+      uri = uri.replace(/\/([^/?]+)(\?|$)/, "/" + dbNameOverride + "$2");
+      console.log("Using database (from MONGO_DB_NAME):", dbNameOverride);
+    }
     console.log("Connecting to DB...");
     await mongoose.connect(uri);
     const db = mongoose.connection.db;
+    const connectedDbName = db.databaseName;
+    console.log("Connected to database:", connectedDbName);
     const collection = db.collection("customers");
 
     // عرض الفهارس الحالية
