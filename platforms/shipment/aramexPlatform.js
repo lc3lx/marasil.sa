@@ -39,6 +39,18 @@ class AramexService {
   }
 
   /**
+   * تحويل رمز/اسم الدولة إلى ISO Alpha-2 (أرامكس تقبل رموز فقط مثل SA)
+   */
+  _toCountryCode(value) {
+    const v = (value || "").toString().trim();
+    if (!v) return "SA";
+    if (v.length === 2) return v.toUpperCase();
+    const n = v.replace(/\s+/g, " ").toLowerCase();
+    if (n.includes("سعود") || n.includes("السعودية") || n.includes("saudi") || n === "sa") return "SA";
+    return v.slice(0, 2).toUpperCase();
+  }
+
+  /**
    * تحويل عنوان العميل إلى صيغة Aramex
    * @param {Object} address عنوان العميل من قاعدة البيانات
    * @returns {Object} عنوان بصيغة Aramex
@@ -51,7 +63,7 @@ class AramexService {
       City: address.city || address.City || "",
       StateOrProvinceCode: address.state || address.StateOrProvinceCode || "",
       PostCode: address.postalCode || address.PostCode || "",
-      CountryCode: address.country || address.CountryCode || "SA",
+      CountryCode: this._toCountryCode(address.country || address.CountryCode),
     };
   }
 

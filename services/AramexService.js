@@ -9,6 +9,25 @@ exports.formatAramexDate = (date) => {
 };
 
 /**
+ * تحويل اسم/رمز الدولة إلى رمز ISO Alpha-2 (أرامكس تقبل رموز فقط مثل SA)
+ */
+function toAramexCountryCode(value) {
+  const v = (value || "").toString().trim();
+  if (!v) return "SA";
+  const upper = v.toUpperCase();
+  if (upper.length === 2) return upper;
+  const normalized = v.replace(/\s+/g, " ").toLowerCase();
+  if (
+    normalized.includes("سعود") ||
+    normalized.includes("السعودية") ||
+    normalized.includes("saudi") ||
+    normalized === "sa"
+  )
+    return "SA";
+  return upper.slice(0, 2);
+}
+
+/**
  * تحويل عنوان العميل إلى صيغة Aramex
  * @param {Object} address عنوان العميل من قاعدة البيانات
  * @returns {Object} عنوان بصيغة Aramex
@@ -21,7 +40,7 @@ exports.formatAddress = (address) => {
     City: address.city || address.City || "Riyadh",
     StateOrProvinceCode: address.state || address.StateOrProvinceCode || "",
     PostCode: address.postalCode || address.postCode || "",
-    CountryCode: (address.country || address.CountryCode || "SA").toUpperCase(),
+    CountryCode: toAramexCountryCode(address.country || address.CountryCode),
   };
 };
 
@@ -31,18 +50,19 @@ exports.formatAddress = (address) => {
  * @returns {Object} بيانات الطرف بصيغة Aramex
  */
 exports.formatParty = (partyData) => {
+  const countryCode = toAramexCountryCode(partyData.country || partyData.CountryCode);
   return {
     AccountEntity: process.env.ARAMEX_ACCOUNT_ENTITY || "JED",
     AccountNumber: process.env.ARAMEX_ACCOUNT_NUMBER,
 
     Reference1: partyData._id || "Ref1",
     PartyAddress: {
-      Line1: partyData.city + partyData.country + (partyData.address || ""),
+      Line1: (partyData.city || "") + (partyData.address || ""),
       Line2: partyData.addressLine2 || "",
       Line3: partyData.addressLine3 || "",
       City: partyData.city,
       PostCode: partyData.postCode || "",
-      CountryCode: partyData.country ? partyData.country.toUpperCase() : "SA",
+      CountryCode: countryCode,
     },
     Contact: {
       PersonName: partyData.full_name,
