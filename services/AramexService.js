@@ -50,14 +50,16 @@ exports.formatAddress = (address) => {
  * @returns {Object} بيانات الطرف بصيغة Aramex
  */
 exports.formatParty = (partyData) => {
-  const countryCode = toAramexCountryCode(partyData.country || partyData.CountryCode);
+  const countryCode = toAramexCountryCode(
+    partyData.country || partyData.CountryCode,
+  );
   return {
     AccountEntity: process.env.ARAMEX_ACCOUNT_ENTITY || "JED",
     AccountNumber: process.env.ARAMEX_ACCOUNT_NUMBER,
 
     Reference1: partyData._id || "Ref1",
     PartyAddress: {
-      Line1: (partyData.city || "") + (partyData.address || ""),
+      Line1: partyData.city + partyData.country + (partyData.address || ""),
       Line2: partyData.addressLine2 || "",
       Line3: partyData.addressLine3 || "",
       City: partyData.city,
@@ -92,12 +94,12 @@ exports.shipmentData = (
   weight,
   Parcels,
   orderDescription,
-  dimension = {}
+  dimension = {},
 ) => {
   // التحقق من البيانات المطلوبة
   if (!order || !shipperAddress || !weight || !Parcels) {
     throw new Error(
-      "جميع البيانات مطلوبة: order, shipperAddress, weight, Parcels"
+      "جميع البيانات مطلوبة: order, shipperAddress, weight, Parcels",
     );
   }
 
@@ -218,10 +220,10 @@ exports.pickupData = (pickupData) => {
     mobile: pickupData.mobile || "0000000000",
     email: pickupData.email || "test@example.com",
     pickupDateTime: exports.formatAramexDate(
-      new Date(pickupData.pickup_date_time || Date.now())
+      new Date(pickupData.pickup_date_time || Date.now()),
     ),
     closingDateTime: exports.formatAramexDate(
-      new Date(pickupData.closing_date_time || Date.now() + 3600000)
+      new Date(pickupData.closing_date_time || Date.now() + 3600000),
     ),
   };
 };
@@ -265,7 +267,7 @@ exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
 exports.deliveryData = (deliveryData) => {
   return {
     deliveryDateTime: exports.formatAramexDate(
-      new Date(deliveryData.delivery_date_time || Date.now())
+      new Date(deliveryData.delivery_date_time || Date.now()),
     ),
     address: exports.formatAddress(deliveryData.address),
     contactName: deliveryData.full_name || "customer marasil ",
@@ -290,7 +292,7 @@ exports.createPickupRequest = async (shipperAddress, shipmentInfo) => {
     // إعداد بيانات طلب الاستلام
     const pickupData = exports.createPickupRequestData(
       shipperAddress,
-      shipmentInfo
+      shipmentInfo,
     );
 
     console.log("📦 [AramexService] إنشاء طلب استلام - بيانات الإدخال:", {
@@ -312,7 +314,7 @@ exports.createPickupRequest = async (shipperAddress, shipmentInfo) => {
 
     console.log(
       "✅ [AramexService] تم إنشاء طلب الاستلام بنجاح:",
-      pickupResult
+      pickupResult,
     );
 
     return {
@@ -326,7 +328,7 @@ exports.createPickupRequest = async (shipperAddress, shipmentInfo) => {
   } catch (error) {
     console.error(
       "❌ [AramexService] فشل في إنشاء طلب الاستلام:",
-      error.message
+      error.message,
     );
 
     return {
