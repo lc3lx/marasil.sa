@@ -10,45 +10,81 @@ const createToken = require("../utils/createToken");
 const { sanitizeUser } = require("../utils/sanitizeData");
 
 // @desc    Signup
-// @route   GET /api/auth/signup
+// @route   POST /api/auth/signup
 // @access  Public
 exports.SignUp = asyncHandler(async (req, res, next) => {
-  // 1- Create user
-  const customer = await Customer.create({
-    firstName: req.body.firstName,
-    lastName: req.body.lastName,
-    phone: req.body.phone,
-    email: req.body.email,
-    password: req.body.password,
-  });
+  try {
+    // 1- Create user (validation already done by SignUpValidator)
+    const customer = await Customer.create({
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+      phone: req.body.phone || undefined,
+      email: req.body.email,
+      password: req.body.password,
+    });
 
-  // 2- Generate token
-  const token = createToken(customer._id);
+    // 2- Generate token
+    const token = createToken(customer._id);
 
-  res.status(201).json({ data: sanitizeUser(customer), token });
+    res.status(201).json({ data: sanitizeUser(customer), token });
+  } catch (err) {
+    // معالجة أخطاء Mongoose: تكرار البريد أو الهاتف أو أخطاء التحقق
+    if (err.name === "ValidationError") {
+      const firstMsg = err.message || Object.values(err.errors || {}).map((e) => e.message).join(". ");
+      return next(new ApiError(firstMsg, 400));
+    }
+    if (err.code === 11000) {
+      const field = err.keyValue?.email ? "email" : err.keyValue?.phone ? "phone" : "field";
+      const msg = field === "email"
+        ? "البريد الإلكتروني مسجل مسبقاً. استخدم بريداً آخر أو سجّل الدخول."
+        : "رقم الهاتف مستخدم من قبل. استخدم رقماً آخر أو سجّل الدخول.";
+      return next(new ApiError(msg, 409));
+    }
+    if (err.statusCode && err.statusCode >= 400 && err.statusCode < 500) {
+      return next(err);
+    }
+    return next(new ApiError("فشل إنشاء الحساب. يرجى المحاولة لاحقاً أو التواصل مع الدعم.", 500));
+  }
 });
 
 // @desc    Login
-// @route   GET /api/auth/login
+// @route   POST /api/auth/login
 // @access  Public
 exports.LogIn = asyncHandler(async (req, res, next) => {
-  // 2) check if user exist & check if password is correct
-  const customer = await Customer.findOne({ email: req.body.email });
+  try {
+    const email = req.body?.email?.trim?.();
+    const password = req.body?.password;
 
-  if (
-    !customer ||
-    !(await bcrypt.compare(req.body.password, customer.password))
-  ) {
-    return next(new ApiError("Incorrect email or password", 401));
+    if (!email || !password) {
+      return next(new ApiError("البريد الإلكتروني وكلمة المرور مطلوبان.", 400));
+    }
+
+    const customer = await Customer.findOne({ email: email.toLowerCase() });
+
+    if (!customer) {
+      return next(new ApiError("البريد الإلكتروني أو كلمة المرور غير صحيحة.", 401));
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, customer.password);
+    if (!isPasswordValid) {
+      return next(new ApiError("البريد الإلكتروني أو كلمة المرور غير صحيحة.", 401));
+    }
+
+    // التحقق من أن الحساب نشط
+    if (customer.active === false) {
+      return next(new ApiError("حسابك غير نشط. يرجى التواصل مع الدعم لتفعيل الحساب.", 403));
+    }
+
+    const token = createToken(customer._id);
+    delete customer._doc.password;
+
+    res.status(200).json({ data: sanitizeUser(customer), token });
+  } catch (err) {
+    if (err.statusCode && err.statusCode >= 400 && err.statusCode < 500) {
+      return next(err);
+    }
+    return next(new ApiError("فشل تسجيل الدخول. يرجى المحاولة لاحقاً أو التواصل مع الدعم.", 500));
   }
-  // 3) generate token
-  const token = createToken(customer._id);
-
-  // Delete password from response
-  delete customer._doc.password;
-
-  // 4) send response to client side
-  res.status(200).json({ data: sanitizeUser(customer), token });
 });
 
 // @desc   make sure the user is logged in

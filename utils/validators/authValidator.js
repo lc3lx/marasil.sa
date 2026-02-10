@@ -3,21 +3,22 @@ const { check } = require("express-validator");
 const validatorMiddleware = require("../../middlewares/validatormiddelware");
 const User = require("../../models/customerModel");
 
+// رسائل موحدة للتحقق — تُرجع للعميل مع توضيح السبب
 exports.SignUpValidator = [
   check("firstName")
     .notEmpty()
-    .withMessage("firstName is  required")
+    .withMessage("الاسم الأول مطلوب.")
     .isLength({ min: 3 })
-    .withMessage("Too short first name")
+    .withMessage("الاسم الأول يجب أن يكون 3 أحرف على الأقل.")
     .custom((val, { req }) => {
       req.body.slug = slugify(val);
       return true;
     }),
   check("lastName")
     .notEmpty()
-    .withMessage("lastName is  required")
+    .withMessage("الاسم الأخير مطلوب.")
     .isLength({ min: 3 })
-    .withMessage("Too short last name")
+    .withMessage("الاسم الأخير يجب أن يكون 3 أحرف على الأقل.")
     .custom((val, { req }) => {
       req.body.slug = slugify(val);
       return true;
@@ -25,47 +26,50 @@ exports.SignUpValidator = [
 
   check("email")
     .notEmpty()
-    .withMessage("Email required")
+    .withMessage("البريد الإلكتروني مطلوب.")
     .isEmail()
-    .withMessage("Invalid email address")
+    .withMessage("صيغة البريد الإلكتروني غير صحيحة.")
     .custom((val) =>
-      User.findOne({ email: val }).then((user) => {
+      User.findOne({ email: val.toLowerCase() }).then((user) => {
         if (user) {
-          throw new Error("email addresss is exists");
+          throw new Error("البريد الإلكتروني مسجل مسبقاً. استخدم بريداً آخر أو سجّل الدخول.");
         }
       })
     ),
 
   check("password")
     .notEmpty()
-    .withMessage("Password required")
+    .withMessage("كلمة المرور مطلوبة.")
     .isLength({ min: 6 })
-    .withMessage("Password must be at least 6 characters")
+    .withMessage("كلمة المرور يجب أن تكون 6 أحرف على الأقل.")
     .custom((password, { req }) => {
       if (password !== req.body.confirmPassword) {
-        throw new Error("Password Confirmation inncorrect");
+        throw new Error("تأكيد كلمة المرور غير مطابق.");
       }
       return true;
     })
-    .matches(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/g) // pass match one digit and upper case and lower case and the at last 8 tall
+    .matches(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/g)
     .withMessage(
-      "password must be at least one lowercase and uppercae letter and one digit  and 8 characters long"
+      "كلمة المرور يجب أن تحتوي على حرف كبير وحرف صغير ورقم واحد على الأقل و8 أحرف كحد أدنى."
     ),
 
   check("confirmPassword")
     .notEmpty()
-    .withMessage("Password confirmation required"),
+    .withMessage("تأكيد كلمة المرور مطلوب."),
 
   validatorMiddleware,
 ];
+
 exports.LogInValidator = [
   check("email")
     .notEmpty()
-    .withMessage("Email required")
+    .withMessage("البريد الإلكتروني مطلوب.")
     .isEmail()
-    .withMessage("Invalid email address"),
+    .withMessage("صيغة البريد الإلكتروني غير صحيحة."),
 
-  check("password").notEmpty().withMessage("Password required"),
+  check("password")
+    .notEmpty()
+    .withMessage("كلمة المرور مطلوبة."),
 
   validatorMiddleware,
 ];
