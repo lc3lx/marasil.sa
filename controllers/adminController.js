@@ -305,7 +305,9 @@ exports.getMe = asyncHandler(async (req, res, next) => {
   }
   if (customerData.returnPageSettings?.logoUrl) {
     const logo = customerData.returnPageSettings.logoUrl;
-    if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
+    if (logo.startsWith("http://") || logo.startsWith("https://")) {
+      customerData.returnPageSettings.logoUrl = logo;
+    } else if (!logo.includes("/uploads/")) {
       customerData.returnPageSettings.logoUrl = getImageFullUrl(
         `/uploads/returnPageLogo/${logo}`
       );
@@ -317,7 +319,9 @@ exports.getMe = asyncHandler(async (req, res, next) => {
   }
   if (customerData.replacementPageSettings?.logoUrl) {
     const logo = customerData.replacementPageSettings.logoUrl;
-    if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
+    if (logo.startsWith("http://") || logo.startsWith("https://")) {
+      customerData.replacementPageSettings.logoUrl = logo;
+    } else if (!logo.includes("/uploads/")) {
       customerData.replacementPageSettings.logoUrl = getImageFullUrl(
         `/uploads/replacementPageLogo/${logo}`
       );
@@ -448,9 +452,10 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
       req.body.returnPageLogo.startsWith("http")
         ? req.body.returnPageLogo
         : `uploads/returnPageLogo/${req.body.returnPageLogo}`;
-    const logoUrl = getImageFullUrl(
-      logoPath.startsWith("/") ? logoPath : `/${logoPath}`
-    );
+    const logoUrl =
+      logoPath.startsWith("http://") || logoPath.startsWith("https://")
+        ? logoPath
+        : getImageFullUrl(logoPath.startsWith("/") ? logoPath : `/${logoPath}`);
     const fromBody =
       req.body.returnPageSettings !== undefined
         ? typeof req.body.returnPageSettings === "string"
@@ -490,9 +495,10 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
       req.body.replacementPageLogo.startsWith("http")
         ? req.body.replacementPageLogo
         : `uploads/replacementPageLogo/${req.body.replacementPageLogo}`;
-    const logoUrl = getImageFullUrl(
-      logoPath.startsWith("/") ? logoPath : `/${logoPath}`
-    );
+    const logoUrl =
+      logoPath.startsWith("http://") || logoPath.startsWith("https://")
+        ? logoPath
+        : getImageFullUrl(logoPath.startsWith("/") ? logoPath : `/${logoPath}`);
     const fromBody =
       req.body.replacementPageSettings !== undefined
         ? typeof req.body.replacementPageSettings === "string"
@@ -583,7 +589,9 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   }
   if (customerData.returnPageSettings?.logoUrl) {
     const logo = customerData.returnPageSettings.logoUrl;
-    if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
+    if (logo.startsWith("http://") || logo.startsWith("https://")) {
+      customerData.returnPageSettings.logoUrl = logo;
+    } else if (!logo.includes("/uploads/")) {
       customerData.returnPageSettings.logoUrl = getImageFullUrl(
         `/uploads/returnPageLogo/${logo}`
       );
@@ -595,7 +603,9 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   }
   if (customerData.replacementPageSettings?.logoUrl) {
     const logo = customerData.replacementPageSettings.logoUrl;
-    if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
+    if (logo.startsWith("http://") || logo.startsWith("https://")) {
+      customerData.replacementPageSettings.logoUrl = logo;
+    } else if (!logo.includes("/uploads/")) {
       customerData.replacementPageSettings.logoUrl = getImageFullUrl(
         `/uploads/replacementPageLogo/${logo}`
       );
@@ -696,7 +706,9 @@ exports.getReturnPageBySlug = asyncHandler(async (req, res, next) => {
   const settings = { ...raw };
   if (settings.logoUrl) {
     const logo = settings.logoUrl;
-    if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
+    if (logo.startsWith("http://") || logo.startsWith("https://")) {
+      settings.logoUrl = logo;
+    } else if (!logo.includes("/uploads/")) {
       settings.logoUrl = getImageFullUrl(`/uploads/returnPageLogo/${logo}`);
     } else {
       settings.logoUrl = getImageFullUrl(
@@ -730,7 +742,9 @@ exports.getReplacementPageBySlug = asyncHandler(async (req, res, next) => {
   const settings = { ...raw };
   if (settings.logoUrl) {
     const logo = settings.logoUrl;
-    if (!logo.includes("/uploads/") && !logo.startsWith("http")) {
+    if (logo.startsWith("http://") || logo.startsWith("https://")) {
+      settings.logoUrl = logo;
+    } else if (!logo.includes("/uploads/")) {
       settings.logoUrl = getImageFullUrl(
         `/uploads/replacementPageLogo/${logo}`
       );
