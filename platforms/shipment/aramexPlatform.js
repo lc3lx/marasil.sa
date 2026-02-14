@@ -339,12 +339,28 @@ class AramexService {
         throw new Error(errMsg);
       }
 
+      // تسجيل الاستجابة الكاملة للتشخيص ودعم أشكال مختلفة من أرامكس
+      console.log("📥 [Aramex] CreatePickup API Response (full):", JSON.stringify(respData, null, 2));
+
+      // استخراج معرف الاستلام من أماكن محتملة في استجابة أرامكس
       const pickupGUID =
-        respData.PickupGUID ?? respData.pickupGUID ?? respData.GUID;
+        respData.PickupGUID ??
+        respData.pickupGUID ??
+        respData.GUID ??
+        (respData.Pickup && (respData.Pickup.PickupGUID ?? respData.Pickup.pickupGUID ?? respData.Pickup.GUID ?? respData.Pickup.ID)) ??
+        (respData.Transaction && (respData.Transaction.PickupGUID ?? respData.Transaction.Reference1)) ??
+        respData.PickupId ??
+        respData.pickupId ??
+        respData.Id ??
+        respData.ID;
+
+      const pickupId = pickupGUID != null ? String(pickupGUID) : (pickupData.reference || null);
+
       return {
         success: true,
-        pickupGUID,
-        pickupId: pickupGUID,
+        pickupGUID: pickupGUID ?? undefined,
+        pickupId: pickupId ?? undefined,
+        rawResponse: respData,
       };
     } catch (error) {
       const detail =

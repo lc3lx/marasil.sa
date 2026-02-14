@@ -20,7 +20,7 @@ exports.getAuthUrl = async (req, res) => {
     const authUrl = SallaPlatform.getAuthUrl(
       process.env.SALLA_CLIENT_ID,
       process.env.SALLA_REDIRECT_URI,
-      state
+      state,
     );
 
     res.json({
@@ -54,7 +54,7 @@ exports.handleCallback = async (req, res) => {
     const salla = new SallaPlatform(
       process.env.SALLA_CLIENT_ID,
       process.env.SALLA_CLIENT_SECRET,
-      process.env.SALLA_REDIRECT_URI
+      process.env.SALLA_REDIRECT_URI,
     );
 
     // Get access token
@@ -81,7 +81,7 @@ exports.handleCallback = async (req, res) => {
         isActive: true,
         customer: req.customer._id,
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
 
     res.json({
@@ -117,7 +117,7 @@ exports.getStoreOrders = async (req, res) => {
       const salla = new SallaPlatform(
         process.env.SALLA_CLIENT_ID,
         process.env.SALLA_CLIENT_SECRET,
-        process.env.SALLA_REDIRECT_URI
+        process.env.SALLA_REDIRECT_URI,
       );
 
       const tokens = await salla.refreshAccessToken(store.refreshToken);
@@ -132,7 +132,7 @@ exports.getStoreOrders = async (req, res) => {
     const salla = new SallaPlatform(
       process.env.SALLA_CLIENT_ID,
       process.env.SALLA_CLIENT_SECRET,
-      process.env.SALLA_REDIRECT_URI
+      process.env.SALLA_REDIRECT_URI,
     );
 
     const response = await salla.getOrders(store.accessToken, req.query);
@@ -193,7 +193,7 @@ exports.getStoreOrders = async (req, res) => {
         const updatedOrder = await Order.findOneAndUpdate(
           { id: order.id },
           orderData,
-          { upsert: true, new: true }
+          { upsert: true, new: true },
         );
 
         // console.log(`Synced order ${order.id} for store ${store.name}`);
@@ -209,13 +209,13 @@ exports.getStoreOrders = async (req, res) => {
         if (notification.customerId) {
           io.to(`user_${notification.customerId}`).emit(
             "new_notification",
-            notification
+            notification,
           );
         }
       } catch (orderError) {
         console.error(
           `Error processing order ${order.id}:`,
-          orderError.message
+          orderError.message,
         );
       }
     }
@@ -280,7 +280,7 @@ exports.updateOrderStatus = async (req, res) => {
     const salla = new SallaPlatform(
       process.env.SALLA_CLIENT_ID,
       process.env.SALLA_CLIENT_SECRET,
-      process.env.SALLA_REDIRECT_URI
+      process.env.SALLA_REDIRECT_URI,
     );
 
     if (store.tokenExpiresAt < new Date()) {
@@ -303,14 +303,14 @@ exports.updateOrderStatus = async (req, res) => {
       const updatedOrder = await salla.updateOrderStatus(
         store.accessToken,
         orderId,
-        status
+        status,
       );
 
       // update order in db
       await Order.findOneAndUpdate(
         { id: orderId },
         { status: status.slug },
-        { new: true }
+        { new: true },
       );
 
       return res.json({
@@ -370,7 +370,7 @@ exports.handleOrderCreated = async (req, res) => {
             headers: {
               Authorization: `Bearer ${accessToken}`,
             },
-          }
+          },
         );
         orderData = response.data.data;
       } catch (fetchErr) {
@@ -433,7 +433,7 @@ exports.handleOrderCreated = async (req, res) => {
         },
         Customer: customerId,
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
 
     const notification = new Notification({
@@ -447,7 +447,7 @@ exports.handleOrderCreated = async (req, res) => {
     if (notification.customerId) {
       io.to(`user_${notification.customerId}`).emit(
         "new_notification",
-        notification
+        notification,
       );
     }
 

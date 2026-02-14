@@ -59,7 +59,7 @@ exports.formatParty = (partyData) => {
 
     Reference1: partyData._id || "Ref1",
     PartyAddress: {
-      Line1: partyData.city + partyData.country + (partyData.address || ""),
+      Line1: [partyData.address, partyData.city, partyData.country].filter(Boolean).join("، ") || "Address not specified",
       Line2: partyData.addressLine2 || "",
       Line3: partyData.addressLine3 || "",
       City: partyData.city,
@@ -312,14 +312,26 @@ exports.createPickupRequest = async (shipperAddress, shipmentInfo) => {
     // إنشاء طلب الاستلام
     const pickupResult = await aramex.createPickup(pickupData);
 
+    const pickupId =
+      pickupResult?.pickupId ??
+      pickupResult?.pickupGUID ??
+      pickupResult?.GUID;
+    const fallbackRef = pickupData?.reference || shipmentInfo?.trackingNumber;
+
     console.log(
       "✅ [AramexService] تم إنشاء طلب الاستلام بنجاح:",
-      pickupResult,
+      {
+        success: pickupResult?.success,
+        pickupId: pickupId || fallbackRef || "غير محدد",
+        pickupGUID: pickupResult?.pickupGUID,
+        reference: fallbackRef,
+      },
     );
 
     return {
       success: true,
-      pickupId: pickupResult?.pickupId || pickupResult?.GUID || "غير محدد",
+      pickupId: pickupId || fallbackRef || "غير محدد",
+      pickupGUID: pickupResult?.pickupGUID,
       pickupData: pickupData,
       message: "تم إنشاء طلب الاستلام بنجاح",
       scheduledDate: pickupData.pickupDateTime,
