@@ -207,18 +207,23 @@ class AramexService {
    */
   buildPickupItems(pickupData) {
     if (Array.isArray(pickupData.pickupItems) && pickupData.pickupItems.length > 0) {
-      return pickupData.pickupItems.map((item) => ({
-        ...item,
-        ShipmentVolume: item.ShipmentVolume ?? { Value: 0, Unit: "CBM" },
-        CashAmount: item.CashAmount ?? { CurrencyCode: "SAR", Value: 0 },
-        ExtraCharges: item.ExtraCharges ?? { CurrencyCode: "SAR", Value: 0 },
-      }));
+      return pickupData.pickupItems.map((item) => {
+        const vol = item.ShipmentVolume;
+        const volValue = vol && Number(vol.Value) > 0 ? Number(vol.Value) : 0.001;
+        return {
+          ...item,
+          ShipmentVolume: { Value: volValue, Unit: (vol && vol.Unit) || "CBM" },
+          CashAmount: item.CashAmount ?? { CurrencyCode: "SAR", Value: 0 },
+          ExtraCharges: item.ExtraCharges ?? { CurrencyCode: "SAR", Value: 0 },
+        };
+      });
     }
 
     const pt = String(pickupData.paymentType ?? pickupData.payment ?? "3").trim();
     const payment = pt === "2" ? "C" : "P";
 
-    const numberOfPieces = Math.max(1, Math.min(100, Number(pickupData.numberOfPieces) || 1));
+    // مطابقة الشحنة: عدد القطع والوزن والحجم من بيانات الشحنة (وإلا ERR33)
+    const numberOfPieces = Math.max(1, Math.min(100, Number(pickupData.numberOfPieces) || 6));
     const productGroup = (pickupData.productGroup || "DOM").toString().trim().slice(0, 3);
     const productType = (pickupData.productType || "CDS").toString().trim().slice(0, 3);
     const weight = Math.max(0.1, Number(pickupData.weight) || 1);
@@ -228,7 +233,11 @@ class AramexService {
     const trackingNumber = (pickupData.reference || pickupData.trackingNumber || "").toString().trim();
     const comments = (pickupData.comments || "").toString().trim().slice(0, 50) || "Pickup request from Marasil";
 
-    const shipmentVolumeValue = Number(pickupData.volumeCBM) || 0;
+    const volumeCBM = Number(pickupData.volumeCBM);
+    const shipmentVolumeValue =
+      Number.isFinite(volumeCBM) && volumeCBM > 0
+        ? volumeCBM
+        : Math.max(0.001, (length * width * height) / 1_000_000);
     const cashAmountValue = Number(pickupData.cashAmount) || 0;
     const extraChargesValue = Number(pickupData.extraCharges) || 0;
 
@@ -324,9 +333,7 @@ class AramexService {
       },
     };
 
-    console.log("📦 [Aramex] Pickup Data Received:", JSON.stringify(pickupData, null, 2));
-    console.log("📤 [Aramex] Pickup Payload:", JSON.stringify(payload, null, 2));
-    console.log("📤 [Aramex] Pickup.PickupItems (للتحقق من ShipmentVolume, CashAmount, ExtraCharges):", JSON.stringify(payload.Pickup.PickupItems, null, 2));
+    console.log(payload.Pickup.PickupItems[0]);
 
     let response;
     try {

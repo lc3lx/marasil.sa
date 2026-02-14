@@ -268,6 +268,7 @@ exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
     length,
     width,
     height,
+    volumeCBM: Math.max(0.001, (length * width * height) / 1_000_000),
   };
 };
 
