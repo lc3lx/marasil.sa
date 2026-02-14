@@ -220,7 +220,7 @@ async function createShipment(customerId, body) {
         }
         const pickupResult = await aramxServers.createPickupRequest(shipperAddress, {
           trackingNumber: trackingInfo.trackingNumber,
-          numberOfPieces: Parcels || 6,
+          numberOfPieces: 6,
           weight,
           dimension: dimensionPayload || normalizedDimension || {},
           paymentType: "3",

@@ -247,6 +247,7 @@ exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
   const height = Number(dimension.height) || Number(shipmentInfo.height) || 10;
 
   const numberOfPiecesFromShipment = Number(shipmentInfo.numberOfPieces ?? shipmentInfo.Parcels ?? 6);
+  const weightFromShipment = Number(shipmentInfo.weight);
 
   return {
     pickupAddress: exports.formatAddress(shipperData),
@@ -264,7 +265,7 @@ exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
     productType: shipmentInfo.productType || "CDS",
     paymentType: shipmentInfo.paymentType || "3",
     numberOfPieces: Math.max(1, Math.min(100, numberOfPiecesFromShipment)),
-    weight: Number(shipmentInfo.weight) || 1,
+    weight: weightFromShipment > 0 ? weightFromShipment : 1,
     length,
     width,
     height,

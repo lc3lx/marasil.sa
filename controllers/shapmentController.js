@@ -345,7 +345,7 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           console.log("🚛 [Controller] إنشاء طلب استلام لأرامكس...");
           const pickupResult = await aramxServers.createPickupRequest(shipperAddress, {
             trackingNumber: trackingInfo.trackingNumber,
-            numberOfPieces: Parcels || 6,
+            numberOfPieces: 6,
             weight,
             dimension: dimensionPayload || normalizedDimension || {},
             paymentType: "3",
