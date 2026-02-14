@@ -343,10 +343,13 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
 
           // إنشاء طلب الاستلام تلقائياً بعد إنشاء الشحنة
           console.log("🚛 [Controller] إنشاء طلب استلام لأرامكس...");
-          const pickupResult = await aramxServers.createPickupRequest(
-            shipperAddress,
-            { trackingNumber: trackingInfo.trackingNumber }
-          );
+          const pickupResult = await aramxServers.createPickupRequest(shipperAddress, {
+            trackingNumber: trackingInfo.trackingNumber,
+            numberOfPieces: Parcels || 6,
+            weight,
+            dimension: dimensionPayload || normalizedDimension || {},
+            paymentType: "3",
+          });
 
           if (pickupResult.success) {
             console.log("✅ [Controller] تم إنشاء طلب الاستلام بنجاح");

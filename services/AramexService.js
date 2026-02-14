@@ -241,6 +241,11 @@ exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
   const closingTime = new Date(tomorrow);
   closingTime.setHours(17, 0, 0, 0);
 
+  const dimension = shipmentInfo.dimension || {};
+  const length = Number(dimension.length) || Number(shipmentInfo.length) || 10;
+  const width = Number(dimension.width) || Number(shipmentInfo.width) || 10;
+  const height = Number(dimension.height) || Number(shipmentInfo.height) || 10;
+
   return {
     pickupAddress: exports.formatAddress(shipperData),
     contactName: shipperData.full_name || shipperData.contactName || "غير محدد",
@@ -252,9 +257,16 @@ exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
     closingDateTime: closingTime.getTime(),
     reference: shipmentInfo.trackingNumber || "غير محدد",
     comments: `استلام شحنة رقم: ${shipmentInfo.trackingNumber || "غير محدد"}`,
-    // مطابقة نوع الخدمة مع الشحنة الأصلية (DOM/CDS للشحن الداخلي)
     productGroup: shipmentInfo.productGroup || "DOM",
     productType: shipmentInfo.productType || "CDS",
+    paymentType: shipmentInfo.paymentType || "3",
+    numberOfPieces: Math.max(1, Math.min(100, Number(shipmentInfo.numberOfPieces) || Number(shipmentInfo.Parcels) || 6)),
+    numberOfShipments: 1,
+    weight: Number(shipmentInfo.weight) || 1,
+    length,
+    width,
+    height,
+    volumeCBM: (length * width * height) / 1_000_000,
   };
 };
 
