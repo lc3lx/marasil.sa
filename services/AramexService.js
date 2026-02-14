@@ -243,17 +243,46 @@ exports.pickupData = (pickupData) => {
 };
 
 /**
- * عنوان استلام مطابق للمرسل مع التأكد من Line1, Line2, City, CountryCode, PostCode
+ * تحويل اسم المدينة للاستخدام في أرامكس (إنجليزي لتجنب ERR05/رفض التحقق)
+ */
+function toAramexCityName(city) {
+  if (!city || typeof city !== "string") return "Riyadh";
+  const t = city.trim();
+  const c = t.toLowerCase();
+  const map = {
+    الرياض: "Riyadh",
+    riyadh: "Riyadh",
+    جدة: "Jeddah",
+    jeddah: "Jeddah",
+    المدينة: "Madinah",
+    "المدينة المنورة": "Madinah",
+    madinah: "Madinah",
+    مكة: "Makkah",
+    "مكة المكرمة": "Makkah",
+    makkah: "Makkah",
+    الدمام: "Dammam",
+    dammam: "Dammam",
+    الخبر: "Khobar",
+    khobar: "Khobar",
+    الطائف: "Taif",
+    taif: "Taif",
+  };
+  return map[t] || map[c] || (t.length > 0 ? t : "Riyadh");
+}
+
+/**
+ * عنوان استلام مطابق للمرسل: Line1, Line2, City (إنجليزي), CountryCode، PostCode فارغ إذا غير متوفر (تجنب ERR06)
  */
 function formatPickupAddress(shipperData) {
   const addr = exports.formatAddress(shipperData);
+  const postCodeRaw = String(addr.PostCode ?? "").trim();
   return {
     Line1: String(addr.Line1 ?? "").trim() || "Address not specified",
     Line2: String(addr.Line2 ?? "").trim(),
     Line3: String(addr.Line3 ?? "").trim(),
-    City: String(addr.City ?? "").trim() || "Riyadh",
+    City: toAramexCityName(addr.City),
     StateOrProvinceCode: String(addr.StateOrProvinceCode ?? "").trim(),
-    PostCode: String(addr.PostCode ?? "").trim() || "00000",
+    PostCode: postCodeRaw,
     CountryCode: String(addr.CountryCode ?? "SA").trim().toUpperCase().slice(0, 2),
   };
 }
@@ -269,6 +298,7 @@ exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
   const now = Date.now();
   const pickupDateTime = now + 2 * 60 * 1000;
   const closingDateTime = pickupDateTime + 60 * 60 * 1000;
+  const lastPickupTime = closingDateTime - 60 * 60 * 1000;
 
   const dimension = shipmentInfo.dimension || {};
   const length = Number(dimension.length) || Number(shipmentInfo.length) || 10;
@@ -287,7 +317,10 @@ exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
     mobile: toAramexPhone(shipperData.mobile || shipperData.phone),
     email: shipperData.email || "test@example.com",
     pickupDateTime,
+    lastPickupTime,
     closingDateTime,
+    pickupLocation: "Business",
+    status: "Ready",
     reference: trackingNumber,
     trackingNumber,
     comments: trackingNumber ? `استلام شحنة رقم: ${trackingNumber}` : "Pickup request from Marasil",

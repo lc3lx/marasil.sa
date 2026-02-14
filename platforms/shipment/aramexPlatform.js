@@ -291,8 +291,9 @@ class AramexService {
     const line1 = (addr.Line1 ?? addr.AddressLine1 ?? "Address not specified").trim();
     const readyMs = Number(pickupData.pickupDateTime);
     const closingMs = Number(pickupData.closingDateTime);
+    const lastPickupMs = Number(pickupData.lastPickupTime);
+    const lastPickupTimeMs = Number.isFinite(lastPickupMs) && lastPickupMs > 0 ? lastPickupMs : closingMs - 60 * 60 * 1000;
 
-    // الحقول النصية الفارغة كـ "" وليس مسافات (حسب متطلبات أرامكس)
     const emptyStr = (v) => (v != null && String(v).trim() !== "" ? String(v).trim() : "");
 
     const payload = {
@@ -317,15 +318,12 @@ class AramexService {
           Line1: line1.length >= 3 ? line1 : line1 + "   ",
           Line2: emptyStr(addr.Line2 ?? addr.AddressLine2),
           Line3: emptyStr(addr.Line3),
-          City: (addr.City ?? "").trim() || " ",
+          City: (addr.City ?? "").trim() || "Riyadh",
           StateOrProvinceCode: emptyStr(addr.StateOrProvinceCode ?? addr.State),
           PostCode: emptyStr(addr.PostCode ?? addr.PostalCode),
           CountryCode: (addr.CountryCode ?? "SA").toString().toUpperCase().slice(0, 2),
         },
-        PickupLocation:
-          typeof pickupData.pickupLocation === "string"
-            ? pickupData.pickupLocation
-            : (addr.Line1 || addr.AddressLine1 || "استلام من العنوان"),
+        PickupLocation: (pickupData.pickupLocation && String(pickupData.pickupLocation).trim()) || "Business",
         PickupContact: {
           PersonName: (pickupData.contactName || "غير محدد").slice(0, 50),
           CompanyName: (pickupData.companyName || "غير محدد").slice(0, 50),
@@ -337,7 +335,7 @@ class AramexService {
         },
         PickupDate: "/Date(" + readyMs + ")/",
         ReadyTime: "/Date(" + readyMs + ")/",
-        LastPickupTime: "/Date(" + closingMs + ")/",
+        LastPickupTime: "/Date(" + lastPickupTimeMs + ")/",
         ClosingTime: "/Date(" + closingMs + ")/",
         Vehicle: (pickupData.vehicle || "Van").slice(0, 50),
         Status: pickupData.status === "Pending" ? "Pending" : "Ready",
