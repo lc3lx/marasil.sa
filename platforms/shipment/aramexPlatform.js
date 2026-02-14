@@ -203,7 +203,7 @@ class AramexService {
 
   /**
    * بناء مصفوفة Pickup Items حسب الدليل (Table 32 - Pickup Item Structure)
-   * الحقول الإلزامية: ProductGroup, Payment, NumberOfPieces, ShipmentWeight, NumberOfShipments, ShipmentVolume
+   * يجب أن تتطابق ProductGroup و ProductType مع الشحنة الأصلية (DOM/CDS للشحن الداخلي).
    */
   buildPickupItems(pickupData) {
     if (Array.isArray(pickupData.pickupItems) && pickupData.pickupItems.length > 0) {
@@ -212,10 +212,12 @@ class AramexService {
     const weight = Math.max(0.1, Number(pickupData.weight) || 1);
     const pieces = Math.max(1, Math.min(100, Number(pickupData.numberOfPieces) || 1));
     const numShipments = Math.max(1, Math.min(100, Number(pickupData.numberOfShipments) || 1));
+    const productGroup = (pickupData.productGroup || "DOM").toString().trim().slice(0, 3);
+    const productType = (pickupData.productType || "CDS").toString().trim().slice(0, 3);
     return [
       {
-        ProductGroup: (pickupData.productGroup || "EXP").slice(0, 3),
-        ProductType: (pickupData.productType || "OND").slice(0, 3),
+        ProductGroup: productGroup,
+        ProductType: productType,
         Payment: (pickupData.payment || "P").slice(0, 1),
         NumberOfPieces: pieces,
         NumberOfShipments: numShipments,
@@ -236,142 +238,145 @@ class AramexService {
   }
 
   /**
-   * إنشاء استلام
+   * إنشاء استلام (Create Pickup)
    * @param {Object} pickupData - بيانات الاستلام
-   * @returns {Promise<Object>} - تفاصيل الاستلام
+   * @returns {Promise<Object>} - { success, pickupId?, pickupGUID?, errors? }
+   * - عند النجاح: success: true مع ProcessedPickup.ID و ProcessedPickup.GUID فقط
+   * - عند الفشل: success: false مع errors من Notifications (لا يُستخدم رقم الشحنة كبديل)
    */
   async createPickup(pickupData) {
+    const addr = pickupData.pickupAddress || {};
+    const line1 = (addr.Line1 ?? addr.AddressLine1 ?? "Address not specified").trim();
+    const readyMs = Number(pickupData.pickupDateTime);
+    const closingMs = Number(pickupData.closingDateTime);
+
+    // الحقول النصية الفارغة كـ "" وليس مسافات (حسب متطلبات أرامكس)
+    const emptyStr = (v) => (v != null && String(v).trim() !== "" ? String(v).trim() : "");
+
+    const payload = {
+      ClientInfo: {
+        UserName: this.username,
+        Password: this.password,
+        Version: "v1.0",
+        AccountNumber: this.accountNumber,
+        AccountPin: this.accountPin,
+        AccountEntity: this.accountEntity,
+        AccountCountryCode: this.accountCountryCode,
+      },
+      Transaction: {
+        Reference1: pickupData.reference || "PICKUP-" + Date.now(),
+        Reference2: "",
+        Reference3: "",
+        Reference4: "",
+        Reference5: "",
+      },
+      Pickup: {
+        PickupAddress: {
+          Line1: line1.length >= 3 ? line1 : line1 + "   ",
+          Line2: emptyStr(addr.Line2 ?? addr.AddressLine2),
+          Line3: emptyStr(addr.Line3),
+          City: (addr.City ?? "").trim() || " ",
+          StateOrProvinceCode: emptyStr(addr.StateOrProvinceCode ?? addr.State),
+          PostCode: emptyStr(addr.PostCode ?? addr.PostalCode),
+          CountryCode: (addr.CountryCode ?? "SA").toString().toUpperCase().slice(0, 2),
+        },
+        PickupLocation:
+          typeof pickupData.pickupLocation === "string"
+            ? pickupData.pickupLocation
+            : (addr.Line1 || addr.AddressLine1 || "استلام من العنوان"),
+        PickupContact: {
+          PersonName: (pickupData.contactName || "غير محدد").slice(0, 50),
+          CompanyName: (pickupData.companyName || "غير محدد").slice(0, 50),
+          PhoneNumber1: (pickupData.phone || "0000000000").slice(0, 30),
+          PhoneNumber2: (pickupData.phone2 || pickupData.phone || pickupData.mobile || "0000000000").slice(0, 30),
+          CellPhone: (pickupData.mobile || "0000000000").slice(0, 30),
+          EmailAddress: (pickupData.email || "test@example.com").slice(0, 50),
+          Type: (pickupData.contactType || "Business").slice(0, 50),
+        },
+        PickupDate: "/Date(" + readyMs + ")/",
+        ReadyTime: "/Date(" + readyMs + ")/",
+        LastPickupTime: "/Date(" + closingMs + ")/",
+        ClosingTime: "/Date(" + closingMs + ")/",
+        Vehicle: (pickupData.vehicle || "Van").slice(0, 50),
+        Status: pickupData.status === "Pending" ? "Pending" : "Ready",
+        Reference1: (pickupData.reference || "").slice(0, 50),
+        Comments: (pickupData.comments || "Pickup request from Marasil").slice(0, 1000),
+        PickupItems: this.buildPickupItems(pickupData),
+      },
+    };
+
+    console.log("📦 [Aramex] Pickup Data Received:", JSON.stringify(pickupData, null, 2));
+    console.log("📤 [Aramex] Pickup Payload:", JSON.stringify(payload, null, 2));
+
+    let response;
     try {
-      // طباعة البيانات الواردة للتشخيص
-      console.log(
-        "📦 [Aramex] Pickup Data Received:",
-        JSON.stringify(pickupData, null, 2)
-      );
-
-      // هيكل طلب الاستلام حسب الدليل الرسمي Aramex Shipping Services API (Table 13, 31, 32)
-        const addr = pickupData.pickupAddress || {};
-        const line1 = (addr.Line1 ?? addr.AddressLine1 ?? "Address not specified").trim();
-        const readyMs = Number(pickupData.pickupDateTime);
-        const closingMs = Number(pickupData.closingDateTime);
-        const payload = {
-          ClientInfo: {
-            UserName: this.username,
-            Password: this.password,
-            Version: "v1.0",
-            AccountNumber: this.accountNumber,
-            AccountPin: this.accountPin,
-            AccountEntity: this.accountEntity,
-            AccountCountryCode: this.accountCountryCode,
-          },
-          Transaction: {
-            Reference1: pickupData.reference || "PICKUP-" + Date.now(),
-            Reference2: "",
-            Reference3: "",
-            Reference4: "",
-            Reference5: "",
-          },
-          Pickup: {
-            PickupAddress: {
-              Line1: line1.length >= 3 ? line1 : line1 + "   ",
-              Line2: (addr.Line2 ?? addr.AddressLine2 ?? "").trim() || " ",
-              Line3: (addr.Line3 ?? "").trim() || " ",
-              City: (addr.City ?? "").trim() || " ",
-              StateOrProvinceCode: (addr.StateOrProvinceCode ?? addr.State ?? "").trim() || " ",
-              PostCode: (addr.PostCode ?? addr.PostalCode ?? "").trim() || " ",
-              CountryCode: (addr.CountryCode ?? "SA").toString().toUpperCase().slice(0, 2),
-            },
-            PickupLocation: typeof pickupData.pickupLocation === "string"
-              ? pickupData.pickupLocation
-              : (addr.Line1 || addr.AddressLine1 || "استلام من العنوان"),
-            PickupContact: {
-              PersonName: (pickupData.contactName || "غير محدد").slice(0, 50),
-              CompanyName: (pickupData.companyName || "غير محدد").slice(0, 50),
-              PhoneNumber1: (pickupData.phone || "0000000000").slice(0, 30),
-              PhoneNumber2: (pickupData.phone2 || pickupData.phone || pickupData.mobile || "0000000000").slice(0, 30),
-              CellPhone: (pickupData.mobile || "0000000000").slice(0, 30),
-              EmailAddress: (pickupData.email || "test@example.com").slice(0, 50),
-              Type: (pickupData.contactType || "Business").slice(0, 50),
-            },
-            PickupDate: "/Date(" + readyMs + ")/",
-            ReadyTime: "/Date(" + readyMs + ")/",
-            LastPickupTime: "/Date(" + closingMs + ")/",
-            ClosingTime: "/Date(" + closingMs + ")/",
-            Vehicle: (pickupData.vehicle || "Van").slice(0, 50),
-            Status: pickupData.status === "Pending" ? "Pending" : "Ready",
-            Reference1: (pickupData.reference || "").slice(0, 50),
-            Comments: (pickupData.comments || "Pickup request from Marasil").slice(0, 1000),
-            PickupItems: this.buildPickupItems(pickupData),
-          },
-        };
-
-      // طباعة الـ payload المرسل
-      console.log(
-        "📤 [Aramex] Pickup Payload:",
-        JSON.stringify(payload, null, 2)
-      );
-
-      const response = await axios.post(
+      response = await axios.post(
         `${this.shippingBaseURL}/CreatePickup`,
         payload,
         {
           headers: { "Content-Type": "application/json" },
-          validateStatus: () => true, // عدم رمي خطأ عند 4xx/5xx لمعالجة الرد يدوياً
+          validateStatus: () => true,
         }
       );
-
-      const respData = response.data;
-      const status = response.status;
-
-      if (status !== 200) {
-        const errBody =
-          typeof respData === "string"
-            ? respData
-            : JSON.stringify(respData, null, 2);
-        console.error("❌ [Aramex] CreatePickup API Response:", {
-          status,
-          statusText: response.statusText,
-          data: errBody,
-        });
-        const errMsg =
-          status === 400
-            ? `طلب غير صالح (400). تفاصيل أرامكس: ${errBody.substring(0, 500)}`
-            : `خطأ في إنشاء الاستلام (${status}): ${errBody.substring(0, 300)}`;
-        throw new Error(errMsg);
-      }
-
-      // تسجيل الاستجابة الكاملة للتشخيص ودعم أشكال مختلفة من أرامكس
-      console.log("📥 [Aramex] CreatePickup API Response (full):", JSON.stringify(respData, null, 2));
-
-      // استخراج معرف الاستلام من أماكن محتملة في استجابة أرامكس
-      const pickupGUID =
-        respData.PickupGUID ??
-        respData.pickupGUID ??
-        respData.GUID ??
-        (respData.Pickup && (respData.Pickup.PickupGUID ?? respData.Pickup.pickupGUID ?? respData.Pickup.GUID ?? respData.Pickup.ID)) ??
-        (respData.Transaction && (respData.Transaction.PickupGUID ?? respData.Transaction.Reference1)) ??
-        respData.PickupId ??
-        respData.pickupId ??
-        respData.Id ??
-        respData.ID;
-
-      const pickupId = pickupGUID != null ? String(pickupGUID) : (pickupData.reference || null);
-
+    } catch (err) {
+      console.error("Aramex Create Pickup Error:", err.message);
       return {
-        success: true,
-        pickupGUID: pickupGUID ?? undefined,
-        pickupId: pickupId ?? undefined,
-        rawResponse: respData,
+        success: false,
+        errors: [{ Code: "NETWORK", Message: err.message || "فشل الاتصال بأرامكس" }],
       };
-    } catch (error) {
-      const detail =
-        error.response?.data != null
-          ? typeof error.response.data === "string"
-            ? error.response.data.substring(0, 600)
-            : JSON.stringify(error.response.data).substring(0, 600)
-          : error.message;
-      console.error("Aramex Create Pickup Error:", detail);
-      throw new Error(`فشل إنشاء الاستلام: ${error.message}`);
     }
+
+    const respData = response.data || {};
+    const status = response.status;
+
+    if (status !== 200) {
+      const errBody = typeof respData === "string" ? respData : JSON.stringify(respData);
+      console.error("❌ [Aramex] CreatePickup HTTP Error:", { status, data: errBody });
+      return {
+        success: false,
+        errors: [
+          {
+            Code: "HTTP" + status,
+            Message: status === 400 ? `طلب غير صالح: ${errBody.substring(0, 300)}` : `خطأ من الخادم (${status})`,
+          },
+        ],
+      };
+    }
+
+    console.log("📥 [Aramex] CreatePickup API Response:", JSON.stringify(respData, null, 2));
+
+    const hasErrors = respData.HasErrors === true;
+    const notifications = Array.isArray(respData.Notifications) ? respData.Notifications : [];
+    const errors = notifications
+      .filter((n) => n && (n.Code || n.Message))
+      .map((n) => ({ Code: n.Code || "Error", Message: n.Message || "Unknown" }));
+
+    if (hasErrors) {
+      console.error("❌ [Aramex] CreatePickup فشل (HasErrors):", errors);
+      return { success: false, errors };
+    }
+
+    const processed = respData.ProcessedPickup || {};
+    const NULL_GUID = "00000000-0000-0000-0000-000000000000";
+    const guid = processed.GUID;
+    const id = processed.ID;
+
+    const validGUID = guid && String(guid).toLowerCase() !== NULL_GUID.toLowerCase();
+    const validId = id != null && String(id).trim() !== "";
+
+    if (!validGUID && !validId) {
+      console.error("❌ [Aramex] CreatePickup لا يوجد معرف صالح من ProcessedPickup:", processed);
+      return {
+        success: false,
+        errors: [{ Code: "INVALID_RESPONSE", Message: "لم تُرجع أرامكس معرف استلام صالح (ID/GUID)" }],
+      };
+    }
+
+    return {
+      success: true,
+      pickupId: validId ? String(id) : (validGUID ? String(guid) : undefined),
+      pickupGUID: validGUID ? String(guid) : undefined,
+    };
   }
 
   /**

@@ -235,14 +235,11 @@ exports.pickupData = (pickupData) => {
  * @returns {Object} بيانات طلب الاستلام
  */
 exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
-  // تحديد وقت الاستلام (اليوم التالي من الساعة 9 صباحاً)
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(9, 0, 0, 0); // 9:00 AM
-
-  // وقت انتهاء الاستلام (اليوم التالي من الساعة 5 مساءً)
+  tomorrow.setHours(9, 0, 0, 0);
   const closingTime = new Date(tomorrow);
-  closingTime.setHours(17, 0, 0, 0); // 5:00 PM
+  closingTime.setHours(17, 0, 0, 0);
 
   return {
     pickupAddress: exports.formatAddress(shipperData),
@@ -251,11 +248,13 @@ exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
     phone: shipperData.mobile || shipperData.phone || "0000000000",
     mobile: shipperData.mobile || shipperData.phone || "0000000000",
     email: shipperData.email || "test@example.com",
-    pickupDateTime: tomorrow.getTime(), // timestamp للـ Aramex format
-    closingDateTime: closingTime.getTime(), // timestamp للـ Aramex format
-    // إضافة معلومات إضافية للشحنة
+    pickupDateTime: tomorrow.getTime(),
+    closingDateTime: closingTime.getTime(),
     reference: shipmentInfo.trackingNumber || "غير محدد",
     comments: `استلام شحنة رقم: ${shipmentInfo.trackingNumber || "غير محدد"}`,
+    // مطابقة نوع الخدمة مع الشحنة الأصلية (DOM/CDS للشحن الداخلي)
+    productGroup: shipmentInfo.productGroup || "DOM",
+    productType: shipmentInfo.productType || "CDS",
   };
 };
 
@@ -309,44 +308,42 @@ exports.createPickupRequest = async (shipperAddress, shipmentInfo) => {
       reference: pickupData.reference,
     });
 
-    // إنشاء طلب الاستلام
     const pickupResult = await aramex.createPickup(pickupData);
 
-    const pickupId =
-      pickupResult?.pickupId ??
-      pickupResult?.pickupGUID ??
-      pickupResult?.GUID;
-    const fallbackRef = pickupData?.reference || shipmentInfo?.trackingNumber;
+    if (!pickupResult.success) {
+      const errMessage =
+        (pickupResult.errors || []).map((e) => `${e.Code || ""}: ${e.Message || ""}`).join("; ") ||
+        "فشل في إنشاء طلب الاستلام";
+      console.error("❌ [AramexService] فشل إنشاء طلب الاستلام:", pickupResult.errors);
+      return {
+        success: false,
+        errors: pickupResult.errors || [],
+        message: errMessage,
+        error: errMessage,
+        pickupData,
+      };
+    }
 
-    console.log(
-      "✅ [AramexService] تم إنشاء طلب الاستلام بنجاح:",
-      {
-        success: pickupResult?.success,
-        pickupId: pickupId || fallbackRef || "غير محدد",
-        pickupGUID: pickupResult?.pickupGUID,
-        reference: fallbackRef,
-      },
-    );
+    // النجاح فقط: استخدام ProcessedPickup.ID و ProcessedPickup.GUID دون بديل
+    console.log("✅ [AramexService] تم إنشاء طلب الاستلام بنجاح:", {
+      pickupId: pickupResult.pickupId,
+      pickupGUID: pickupResult.pickupGUID,
+    });
 
     return {
       success: true,
-      pickupId: pickupId || fallbackRef || "غير محدد",
-      pickupGUID: pickupResult?.pickupGUID,
-      pickupData: pickupData,
+      pickupId: pickupResult.pickupId,
+      pickupGUID: pickupResult.pickupGUID,
+      pickupData,
       message: "تم إنشاء طلب الاستلام بنجاح",
       scheduledDate: pickupData.pickupDateTime,
-      ...pickupResult,
     };
   } catch (error) {
-    console.error(
-      "❌ [AramexService] فشل في إنشاء طلب الاستلام:",
-      error.message,
-    );
-
+    console.error("❌ [AramexService] فشل في إنشاء طلب الاستلام:", error.message);
     return {
       success: false,
-      error: error.message,
-      message: "فشل في إنشاء طلب الاستلام",
+      errors: [{ Code: "EXCEPTION", Message: error.message || "فشل في إنشاء طلب الاستلام" }],
+      message: error.message || "فشل في إنشاء طلب الاستلام",
     };
   }
 };
