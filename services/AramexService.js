@@ -229,17 +229,32 @@ exports.pickupData = (pickupData) => {
 };
 
 /**
- * إنشاء بيانات طلب الاستلام من بيانات المرسل
- * @param {Object} shipperData بيانات المرسل
- * @param {Object} shipmentInfo معلومات الشحنة
- * @returns {Object} بيانات طلب الاستلام
+ * عنوان استلام مطابق للمرسل مع التأكد من Line1, Line2, City, CountryCode, PostCode
+ */
+function formatPickupAddress(shipperData) {
+  const addr = exports.formatAddress(shipperData);
+  return {
+    Line1: String(addr.Line1 ?? "").trim() || "Address not specified",
+    Line2: String(addr.Line2 ?? "").trim(),
+    Line3: String(addr.Line3 ?? "").trim(),
+    City: String(addr.City ?? "").trim() || "Riyadh",
+    StateOrProvinceCode: String(addr.StateOrProvinceCode ?? "").trim(),
+    PostCode: String(addr.PostCode ?? "").trim() || "00000",
+    CountryCode: String(addr.CountryCode ?? "SA").trim().toUpperCase().slice(0, 2),
+  };
+}
+
+/**
+ * إنشاء بيانات طلب الاستلام من بيانات المرسل واستجابة الشحنة
+ * - Reference1 = رقم تتبع الشحنة (TrackingNumber)
+ * - العنوان والاتصال من المرسل (Shipper)
+ * - pickupDateTime الآن أو بعد دقيقتين، closingDateTime بعد ساعة/ساعتين
+ * - PaymentType متوافق مع الشحنة (Prepaid = 3)
  */
 exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(9, 0, 0, 0);
-  const closingTime = new Date(tomorrow);
-  closingTime.setHours(17, 0, 0, 0);
+  const now = Date.now();
+  const pickupDateTime = now + 2 * 60 * 1000;
+  const closingDateTime = pickupDateTime + 60 * 60 * 1000;
 
   const dimension = shipmentInfo.dimension || {};
   const length = Number(dimension.length) || Number(shipmentInfo.length) || 10;
@@ -248,19 +263,20 @@ exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
 
   const numberOfPiecesFromShipment = Number(shipmentInfo.numberOfPieces ?? shipmentInfo.Parcels ?? 6);
   const weightFromShipment = Number(shipmentInfo.weight);
+  const trackingNumber = String(shipmentInfo.trackingNumber ?? "").trim();
 
   return {
-    pickupAddress: exports.formatAddress(shipperData),
+    pickupAddress: formatPickupAddress(shipperData),
     contactName: shipperData.full_name || shipperData.contactName || "غير محدد",
     companyName: shipperData.full_name || shipperData.companyName || "Marasil",
     phone: shipperData.mobile || shipperData.phone || "0000000000",
     mobile: shipperData.mobile || shipperData.phone || "0000000000",
     email: shipperData.email || "test@example.com",
-    pickupDateTime: tomorrow.getTime(),
-    closingDateTime: closingTime.getTime(),
-    reference: shipmentInfo.trackingNumber || "",
-    trackingNumber: shipmentInfo.trackingNumber || "",
-    comments: `استلام شحنة رقم: ${shipmentInfo.trackingNumber || ""}`,
+    pickupDateTime,
+    closingDateTime,
+    reference: trackingNumber,
+    trackingNumber,
+    comments: trackingNumber ? `استلام شحنة رقم: ${trackingNumber}` : "Pickup request from Marasil",
     productGroup: shipmentInfo.productGroup || "DOM",
     productType: shipmentInfo.productType || "CDS",
     paymentType: shipmentInfo.paymentType || "3",
@@ -329,7 +345,7 @@ exports.createPickupRequest = async (shipperAddress, shipmentInfo) => {
       const errMessage =
         (pickupResult.errors || []).map((e) => `${e.Code || ""}: ${e.Message || ""}`).join("; ") ||
         "فشل في إنشاء طلب الاستلام";
-      console.error("❌ [AramexService] فشل إنشاء طلب الاستلام:", pickupResult.errors);
+      console.error("❌ فشل إنشاء طلب الاستلام (CreatePickup HasErrors):", pickupResult.errors || errMessage);
       return {
         success: false,
         errors: pickupResult.errors || [],
