@@ -202,51 +202,46 @@ class AramexService {
   }
 
   /**
-   * بناء مصفوفة Pickup Items حسب الدليل (Table 32 - Pickup Item Structure).
-   * يجب أن تتطابق مع الشحنة: ProductGroup, ProductType, NumberOfPieces, Payment, الوزن، الحجم.
-   * - NumberOfPieces: نفس عدد قطع الشحنة المُنشأة (إلا يفشل الحفظ ERR33).
-   * - ShipmentVolume: بالـ CBM (متر مكعب) حسب دليل أرامكس.
-   * - Payment: "3" للطرف الثالث (مطابق لـ PaymentType في الشحنة).
+   * بناء مصفوفة Pickup Items فقط من بيانات الشحنة المُنشأة.
+   * لا يُرسل: ShipmentVolume, CashAmount, ExtraCharges (تسبب فشل الحفظ).
+   * Payment: حرف فقط — "3" → "P", "2" → "C".
+   * NumberOfPieces و ProductGroup و ProductType من الشحنة فقط.
    */
   buildPickupItems(pickupData) {
     if (Array.isArray(pickupData.pickupItems) && pickupData.pickupItems.length > 0) {
       return pickupData.pickupItems;
     }
+
+    const pt = String(pickupData.paymentType ?? pickupData.payment ?? "3").trim();
+    const payment = pt === "2" ? "C" : "P";
+
+    const numberOfPieces = Math.max(1, Math.min(100, Number(pickupData.numberOfPieces) || 1));
+    const productGroup = (pickupData.productGroup || "DOM").toString().trim().slice(0, 3);
+    const productType = (pickupData.productType || "CDS").toString().trim().slice(0, 3);
     const weight = Math.max(0.1, Number(pickupData.weight) || 1);
     const length = Math.max(0, Number(pickupData.length) || 10);
     const width = Math.max(0, Number(pickupData.width) || 10);
     const height = Math.max(0, Number(pickupData.height) || 10);
-    const volumeCBM = Number(pickupData.volumeCBM);
-    const volumeValue =
-      Number.isFinite(volumeCBM) && volumeCBM > 0
-        ? volumeCBM
-        : (length * width * height) / 1_000_000;
-    const pieces = Math.max(1, Math.min(100, Number(pickupData.numberOfPieces) || 1));
-    const numShipments = Math.max(1, Math.min(100, Number(pickupData.numberOfShipments) || 1));
-    const productGroup = (pickupData.productGroup || "DOM").toString().trim().slice(0, 3);
-    const productType = (pickupData.productType || "CDS").toString().trim().slice(0, 3);
-    const payment =
-      pickupData.paymentType === "3" || pickupData.payment === "3" ? "3" : (pickupData.payment || "P").slice(0, 1);
+    const trackingNumber = (pickupData.reference || pickupData.trackingNumber || "").toString().trim();
+    const comments = (pickupData.comments || "").toString().trim().slice(0, 50) || "Pickup request from Marasil";
 
     return [
       {
         ProductGroup: productGroup,
         ProductType: productType,
         Payment: payment,
-        NumberOfPieces: pieces,
-        NumberOfShipments: numShipments,
-        PackageType: (pickupData.packageType || "Box").slice(0, 50),
+        NumberOfPieces: numberOfPieces,
+        NumberOfShipments: 1,
+        PackageType: "Box",
+        Reference1: trackingNumber,
         ShipmentWeight: { Value: weight, Unit: "KG" },
-        ShipmentVolume: { Value: Math.max(0.0001, volumeValue), Unit: "CBM" },
-        CashAmount: { CurrencyCode: "SAR", Value: Number(pickupData.cashAmount) || 0 },
-        ExtraCharges: { CurrencyCode: "SAR", Value: 0 },
         ShipmentDimensions: {
           Length: length,
           Width: width,
           Height: height,
           Unit: "CM",
         },
-        Comments: (pickupData.comments || "").slice(0, 50) || "Pickup request from Marasil",
+        Comments: comments,
       },
     ];
   }

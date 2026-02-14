@@ -246,6 +246,8 @@ exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
   const width = Number(dimension.width) || Number(shipmentInfo.width) || 10;
   const height = Number(dimension.height) || Number(shipmentInfo.height) || 10;
 
+  const numberOfPiecesFromShipment = Number(shipmentInfo.numberOfPieces ?? shipmentInfo.Parcels ?? 6);
+
   return {
     pickupAddress: exports.formatAddress(shipperData),
     contactName: shipperData.full_name || shipperData.contactName || "غير محدد",
@@ -255,18 +257,17 @@ exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
     email: shipperData.email || "test@example.com",
     pickupDateTime: tomorrow.getTime(),
     closingDateTime: closingTime.getTime(),
-    reference: shipmentInfo.trackingNumber || "غير محدد",
-    comments: `استلام شحنة رقم: ${shipmentInfo.trackingNumber || "غير محدد"}`,
+    reference: shipmentInfo.trackingNumber || "",
+    trackingNumber: shipmentInfo.trackingNumber || "",
+    comments: `استلام شحنة رقم: ${shipmentInfo.trackingNumber || ""}`,
     productGroup: shipmentInfo.productGroup || "DOM",
     productType: shipmentInfo.productType || "CDS",
     paymentType: shipmentInfo.paymentType || "3",
-    numberOfPieces: Math.max(1, Math.min(100, Number(shipmentInfo.numberOfPieces) || Number(shipmentInfo.Parcels) || 6)),
-    numberOfShipments: 1,
+    numberOfPieces: Math.max(1, Math.min(100, numberOfPiecesFromShipment)),
     weight: Number(shipmentInfo.weight) || 1,
     length,
     width,
     height,
-    volumeCBM: (length * width * height) / 1_000_000,
   };
 };
 
