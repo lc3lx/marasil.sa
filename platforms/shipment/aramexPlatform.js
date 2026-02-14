@@ -39,6 +39,20 @@ class AramexService {
   }
 
   /**
+   * تنسيق رقم الجوال لأرامكس: +966 والرقم بدون الصفر (مثال: 0501234567 → +966501234567)
+   */
+  _toAramexPhone(value) {
+    if (value == null || value === "") return "+966500000000";
+    const digits = String(value).replace(/\D/g, "");
+    if (!digits.length) return "+966500000000";
+    let num = digits;
+    if (num.startsWith("0")) num = num.slice(1);
+    if (num.startsWith("966")) num = num.slice(3);
+    if (!num.length) return "+966500000000";
+    return "+966" + num;
+  }
+
+  /**
    * تحويل رمز/اسم الدولة إلى ISO Alpha-2 (أرامكس تقبل رموز فقط مثل SA)
    */
   _toCountryCode(value) {
@@ -315,9 +329,9 @@ class AramexService {
         PickupContact: {
           PersonName: (pickupData.contactName || "غير محدد").slice(0, 50),
           CompanyName: (pickupData.companyName || "غير محدد").slice(0, 50),
-          PhoneNumber1: (pickupData.phone || "0000000000").slice(0, 30),
-          PhoneNumber2: (pickupData.phone2 || pickupData.phone || pickupData.mobile || "0000000000").slice(0, 30),
-          CellPhone: (pickupData.mobile || "0000000000").slice(0, 30),
+          PhoneNumber1: this._toAramexPhone(pickupData.phone || pickupData.mobile).slice(0, 30),
+          PhoneNumber2: this._toAramexPhone(pickupData.phone2 || pickupData.phone || pickupData.mobile).slice(0, 30),
+          CellPhone: this._toAramexPhone(pickupData.mobile || pickupData.phone).slice(0, 30),
           EmailAddress: (pickupData.email || "test@example.com").slice(0, 50),
           Type: (pickupData.contactType || "Business").slice(0, 50),
         },
@@ -571,8 +585,8 @@ class AramexService {
           Contact: {
             PersonName: deliveryData.contactName || "غير محدد",
             CompanyName: deliveryData.companyName || "غير محدد",
-            PhoneNumber1: deliveryData.phone || "0000000000",
-            CellPhone: deliveryData.mobile || "0000000000",
+            PhoneNumber1: this._toAramexPhone(deliveryData.phone || deliveryData.mobile),
+            CellPhone: this._toAramexPhone(deliveryData.mobile || deliveryData.phone),
             EmailAddress: deliveryData.email || "test@example.com",
           },
         },

@@ -9,6 +9,20 @@ exports.formatAramexDate = (date) => {
 };
 
 /**
+ * تنسيق رقم الجوال لأرامكس: +966 والرقم بدون الصفر في البداية (مثال: 0501234567 → +966501234567)
+ */
+function toAramexPhone(value) {
+  if (value == null || value === "") return "+966500000000";
+  const digits = String(value).replace(/\D/g, "");
+  if (!digits.length) return "+966500000000";
+  let num = digits;
+  if (num.startsWith("0")) num = num.slice(1);
+  if (num.startsWith("966")) num = num.slice(3);
+  if (!num.length) return "+966500000000";
+  return "+966" + num;
+}
+
+/**
  * تحويل اسم/رمز الدولة إلى رمز ISO Alpha-2 (أرامكس تقبل رموز فقط مثل SA)
  */
 function toAramexCountryCode(value) {
@@ -69,10 +83,10 @@ exports.formatParty = (partyData) => {
     Contact: {
       PersonName: partyData.full_name,
       CompanyName: partyData.full_name,
-      PhoneNumber1: partyData.mobile,
-      PhoneNumber2: partyData.phone2 || "",
+      PhoneNumber1: toAramexPhone(partyData.mobile),
+      PhoneNumber2: partyData.phone2 ? toAramexPhone(partyData.phone2) : "",
       Type: partyData.type || "Business",
-      CellPhone: partyData.mobile || "0000000000",
+      CellPhone: toAramexPhone(partyData.mobile || "0000000000"),
       EmailAddress: partyData.email || "test@example.com",
     },
   };
@@ -162,10 +176,10 @@ exports.shipmentData = (
           Contact: {
             PersonName: "Marasil",
             CompanyName: "Marasil",
-            PhoneNumber1: "00966123456789",
+            PhoneNumber1: "+966123456789",
             PhoneNumber2: "",
             Type: "Business",
-            CellPhone: "00966123456789",
+            CellPhone: "+966123456789",
             EmailAddress: "info@marasil.sa",
           },
         },
@@ -269,8 +283,8 @@ exports.createPickupRequestData = (shipperData, shipmentInfo = {}) => {
     pickupAddress: formatPickupAddress(shipperData),
     contactName: shipperData.full_name || shipperData.contactName || "غير محدد",
     companyName: shipperData.full_name || shipperData.companyName || "Marasil",
-    phone: shipperData.mobile || shipperData.phone || "0000000000",
-    mobile: shipperData.mobile || shipperData.phone || "0000000000",
+    phone: toAramexPhone(shipperData.mobile || shipperData.phone),
+    mobile: toAramexPhone(shipperData.mobile || shipperData.phone),
     email: shipperData.email || "test@example.com",
     pickupDateTime,
     closingDateTime,
@@ -302,8 +316,8 @@ exports.deliveryData = (deliveryData) => {
     address: exports.formatAddress(deliveryData.address),
     contactName: deliveryData.full_name || "customer marasil ",
     companyName: deliveryData.full_name || "Marasil",
-    phone: deliveryData.mobile || "0000000000",
-    mobile: deliveryData.mobile || "0000000000",
+    phone: toAramexPhone(deliveryData.mobile || deliveryData.phone),
+    mobile: toAramexPhone(deliveryData.mobile || deliveryData.phone),
     email: deliveryData.email || "test@example.com",
   };
 };
