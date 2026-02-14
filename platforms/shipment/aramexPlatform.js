@@ -202,14 +202,17 @@ class AramexService {
   }
 
   /**
-   * بناء مصفوفة Pickup Items فقط من بيانات الشحنة المُنشأة.
-   * لا يُرسل: ShipmentVolume, CashAmount, ExtraCharges (تسبب فشل الحفظ).
-   * Payment: حرف فقط — "3" → "P", "2" → "C".
-   * NumberOfPieces و ProductGroup و ProductType من الشحنة فقط.
+   * بناء مصفوفة Pickup Items (PickupItemDetail).
+   * أرامكس يتطلب وجود: ShipmentVolume, CashAmount, ExtraCharges في كل عنصر (قيم رقمية، افتراضياً 0).
    */
   buildPickupItems(pickupData) {
     if (Array.isArray(pickupData.pickupItems) && pickupData.pickupItems.length > 0) {
-      return pickupData.pickupItems;
+      return pickupData.pickupItems.map((item) => ({
+        ...item,
+        ShipmentVolume: item.ShipmentVolume ?? { Value: 0, Unit: "CBM" },
+        CashAmount: item.CashAmount ?? { CurrencyCode: "SAR", Value: 0 },
+        ExtraCharges: item.ExtraCharges ?? { CurrencyCode: "SAR", Value: 0 },
+      }));
     }
 
     const pt = String(pickupData.paymentType ?? pickupData.payment ?? "3").trim();
@@ -224,6 +227,10 @@ class AramexService {
     const height = Math.max(0, Number(pickupData.height) || 10);
     const trackingNumber = (pickupData.reference || pickupData.trackingNumber || "").toString().trim();
     const comments = (pickupData.comments || "").toString().trim().slice(0, 50) || "Pickup request from Marasil";
+
+    const shipmentVolumeValue = Number(pickupData.volumeCBM) || 0;
+    const cashAmountValue = Number(pickupData.cashAmount) || 0;
+    const extraChargesValue = Number(pickupData.extraCharges) || 0;
 
     return [
       {
@@ -241,6 +248,9 @@ class AramexService {
           Height: height,
           Unit: "CM",
         },
+        ShipmentVolume: { Value: shipmentVolumeValue, Unit: "CBM" },
+        CashAmount: { CurrencyCode: "SAR", Value: cashAmountValue },
+        ExtraCharges: { CurrencyCode: "SAR", Value: extraChargesValue },
         Comments: comments,
       },
     ];
@@ -316,6 +326,7 @@ class AramexService {
 
     console.log("📦 [Aramex] Pickup Data Received:", JSON.stringify(pickupData, null, 2));
     console.log("📤 [Aramex] Pickup Payload:", JSON.stringify(payload, null, 2));
+    console.log("📤 [Aramex] Pickup.PickupItems (للتحقق من ShipmentVolume, CashAmount, ExtraCharges):", JSON.stringify(payload.Pickup.PickupItems, null, 2));
 
     let response;
     try {
