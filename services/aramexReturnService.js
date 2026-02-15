@@ -54,25 +54,26 @@ const prepareAramexReturnShipment = (originalShipment) => {
  * @param {Object} aramexService - خدمة Aramex
  * @returns {Promise<Object>} - نتيجة إنشاء الشحنة المرتجعة
  */
-const createAramexReturnShipment = async (originalShipment, aramexService) => {
+const aramexDataService = require("./AramexService");
+
+const createAramexReturnShipment = async (originalShipment, aramexPlatform) => {
   try {
-    // تحضير بيانات الشحنة المرتجعة
-    const returnShipmentData = prepareAramexReturnShipment(originalShipment);
+    // بناء طلب CreateShipments بصيغة Aramex الصحيحة (وليس كائن قاعدة البيانات)
+    const aramexPayload = aramexDataService.returnShipmentData(originalShipment);
 
     // إنشاء الشحنة في نظام Aramex
-    const aramexResult = await aramexService.createShipment(returnShipmentData);
+    const aramexResult = await aramexPlatform.createShipment(aramexPayload);
 
-    // تحديث رقم التتبع في بيانات الشحنة المرتجعة
+    // حفظ الشحنة المرتجعة في قاعدة البيانات (بيانات محلية للتوثيق)
+    const returnShipmentDoc = prepareAramexReturnShipment(originalShipment);
     if (aramexResult && aramexResult.trackingNumber) {
-      returnShipmentData.trackingId = aramexResult.trackingNumber;
+      returnShipmentDoc.trackingId = aramexResult.trackingNumber;
     }
-
-    // حفظ الشحنة المرتجعة في قاعدة البيانات
     const ReturnShipment = mongoose.model(
       "Shapment",
       require("../models/shipmentModel").shapmentSchema
     );
-    const newReturnShipment = await ReturnShipment.create(returnShipmentData);
+    const newReturnShipment = await ReturnShipment.create(returnShipmentDoc).catch(() => null);
 
     return {
       success: true,

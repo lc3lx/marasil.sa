@@ -221,6 +221,117 @@ exports.shipmentData = (
 };
 
 /**
+ * تحويل عنوان عميل (ClientAddress أو كائن مرسل) إلى صيغة formatParty
+ */
+function addressToParty(addr) {
+  if (!addr) return null;
+  const full_name = addr.clientName || addr.full_name || addr.PersonName || "Unknown";
+  const address = addr.clientAddress || addr.address || addr.Line1 || "";
+  const city = addr.city || addr.City || "Riyadh";
+  const country = addr.country || addr.CountryCode || "SA";
+  const mobile = addr.clientPhone || addr.mobile || addr.PhoneNumber1 || addr.CellPhone || "";
+  const email = addr.clientEmail || addr.email || addr.EmailAddress || "noreply@marasil.sa";
+  return exports.formatParty({
+    _id: addr._id,
+    full_name,
+    address,
+    city,
+    country,
+    mobile,
+    email,
+    postCode: addr.postCode || addr.PostCode || addr.nationalAddress || "",
+  });
+}
+
+/**
+ * بناء طلب CreateShipments الخاص بشحنة الإرجاع (مرسل = المستلم الأصلي، مستلم = المرسل الأصلي)
+ * @param {Object} originalShipment - الشحنة الأصلية مع populate('receiverAddress')
+ * @returns {Object} نفس صيغة Aramex API (ClientInfo, Shipments, LabelInfo)
+ */
+exports.returnShipmentData = (originalShipment) => {
+  if (!originalShipment) throw new Error("بيانات الشحنة الأصلية مطلوبة");
+  const receiver = originalShipment.receiverAddress; // العميل (يصبح المرسل في الإرجاع)
+  const sender = originalShipment.senderAddress;     // التاجر (يصبح المستلم في الإرجاع)
+  const shipperParty = addressToParty(receiver);
+  const consigneeParty = addressToParty(sender);
+  if (!shipperParty || !consigneeParty) {
+    throw new Error("عنوان المرسل أو المستلم ناقص أو غير صالح لشحنة الإرجاع");
+  }
+  const weight = Number(originalShipment.weight) || 1;
+  const dimension = originalShipment.dimension || {};
+  const length = Number(dimension.length) || 10;
+  const width = Number(dimension.width) || 10;
+  const height = Number(dimension.height) || 10;
+  const now = new Date();
+  const dueDate = new Date();
+  dueDate.setDate(now.getDate() + 7);
+  const ref = originalShipment._id ? String(originalShipment._id) : `RET-${Date.now()}`;
+  return {
+    ClientInfo: {
+      UserName: process.env.ARAMEX_USERNAME,
+      Password: process.env.ARAMEX_PASSWORD,
+      Version: "v1.0",
+      AccountNumber: process.env.ARAMEX_ACCOUNT_NUMBER,
+      AccountPin: process.env.ARAMEX_ACCOUNT_PIN,
+      AccountEntity: process.env.ARAMEX_ACCOUNT_ENTITY || "JED",
+      AccountCountryCode: process.env.ARAMEX_ACCOUNT_COUNTRY_CODE || "SA",
+      Source: 24,
+    },
+    Shipments: [
+      {
+        Reference1: ref,
+        Reference2: originalShipment.trackingId ? `RET-${originalShipment.trackingId}` : "",
+        Reference3: "Return",
+        Shipper: shipperParty,
+        Consignee: consigneeParty,
+        ShippingDateTime: exports.formatAramexDate(now),
+        DueDate: exports.formatAramexDate(dueDate),
+        ThirdParty: {
+          PartyId: process.env.ARAMEX_ACCOUNT_NUMBER,
+          AccountNumber: process.env.ARAMEX_ACCOUNT_NUMBER,
+          AccountEntity: process.env.ARAMEX_ACCOUNT_ENTITY || "JED",
+          type: "Customer",
+          Name: "Marasil",
+          PartyAddress: {
+            Line1: "حي النهضة",
+            Line2: "",
+            Line3: "",
+            City: "الرياض",
+            StateOrProvinceCode: "",
+            PostCode: "12345",
+            CountryCode: "SA",
+          },
+          Contact: {
+            PersonName: "Marasil",
+            CompanyName: "Marasil",
+            PhoneNumber1: "+966123456789",
+            PhoneNumber2: "",
+            Type: "Business",
+            CellPhone: "+966123456789",
+            EmailAddress: "info@marasil.sa",
+          },
+        },
+        Details: {
+          Dimensions: { Length: length, Width: width, Height: height, Unit: "cm" },
+          ActualWeight: { Value: weight, Unit: "KG" },
+          ChargeableWeight: { Value: weight, Unit: "KG" },
+          DescriptionOfGoods: "Return shipment - Marasil",
+          GoodsOriginCountry: "SA",
+          NumberOfPieces: 6,
+          ProductGroup: "DOM",
+          ProductType: "CDS",
+          PaymentType: "3",
+          PaymentOptions: "",
+          ItemCount: 1,
+          CustomsValueAmount: { Value: 0, CurrencyCode: "SAR" },
+        },
+      },
+    ],
+    LabelInfo: { ReportID: 9729, ReportType: "URL" },
+  };
+};
+
+/**
  * تحويل بيانات الاستلام إلى صيغة Aramex
  * @param {Object} pickupData بيانات الاستلام
  * @returns {Object} بيانات الاستلام بصيغة Aramex

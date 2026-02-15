@@ -98,14 +98,14 @@ class AramexService {
         shipmentData
       );
 
-      if (response.status !== 200 || !response.data.Shipments?.[0]) {
-        console.error(
-          "Aramex API Error Response:",
-          JSON.stringify(response.data, null, 2)
-        );
-        throw new Error(
-          `خطأ في إنشاء الشحنة: ${JSON.stringify(response.data)}`
-        );
+      const data = response.data;
+      if (response.status !== 200 || !data?.Shipments?.[0]) {
+        const isHtml = typeof data === "string" && (data.includes("<!DOCTYPE") || data.includes("<html"));
+        const msg = isHtml
+          ? "استجابة غير صالحة من Aramex (صفحة خطأ). تحقق من صحة بيانات الشحنة والمرسل والمستلم."
+          : `خطأ في إنشاء الشحنة: ${JSON.stringify(data)}`;
+        console.error("Aramex API Error Response:", isHtml ? data?.substring?.(0, 200) : data);
+        throw new Error(msg);
       }
 
       const shipment = response.data.Shipments[0];
@@ -140,24 +140,25 @@ class AramexService {
         },
       };
     } catch (error) {
+      const rawData = error.response?.data;
+      const isHtml = typeof rawData === "string" && (rawData.includes("<!DOCTYPE") || rawData.includes("<html"));
       console.error(
         "Aramex Create Shipment Error:",
-        error.response?.data || error.message,
+        isHtml ? "(HTML response)" : rawData || error.message,
         "\nFull error:",
         error
       );
 
-      // تحسين رسالة الخطأ
       let errorMessage = "فشل في إنشاء الشحنة";
       if (error.code === "ETIMEDOUT") {
+        errorMessage = "انتهت مهلة الاتصال بخدمة Aramex. يرجى المحاولة مرة أخرى";
+      } else if (isHtml) {
         errorMessage =
-          "انتهت مهلة الاتصال بخدمة Aramex. يرجى المحاولة مرة أخرى";
-      } else if (error.response?.data) {
-        errorMessage = `خطأ من خدمة Aramex: ${JSON.stringify(
-          error.response.data
-        )}`;
+          "خطأ من خدمة Aramex: استجابة غير صالحة (Object reference not set). تحقق من اكتمال بيانات المرسل والمستلم والعنوان.";
+      } else if (rawData && typeof rawData === "object" && rawData.Message) {
+        errorMessage = `خطأ من خدمة Aramex: ${rawData.Message}`;
       } else if (error.message) {
-        errorMessage = `خطأ: ${error.message}`;
+        errorMessage = error.message;
       }
 
       throw new Error(errorMessage);
