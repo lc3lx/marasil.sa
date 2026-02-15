@@ -64,16 +64,18 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
       }
     }
 
-    // 0. كشف "تعليم" المساعد: تعلم001 السؤال والجواب — مسموح فقط للمستخدم المصرح له
+    // 0. كشف "تعليم" المساعد: تعلم001 السؤال والجواب — إن لم تُضبط قائمة المسموحين يُسمح لأي من يعرف تعلم001
     const teaching = geminiService.parseTeachingMessage(message);
     const allowedTeachUserIds = (process.env.AI_TEACH_ALLOWED_USER_IDS || "")
       .split(",")
       .map((id) => id.trim())
       .filter(Boolean);
     const masterTeachId = (process.env.AI_TEACH_MASTER_USER_ID || "").trim();
-    const canTeach =
-      allowedTeachUserIds.includes(String(user_id)) ||
-      (masterTeachId && String(user_id) === masterTeachId);
+    const hasRestriction = masterTeachId || allowedTeachUserIds.length > 0;
+    const canTeach = !hasRestriction
+      ? true
+      : allowedTeachUserIds.includes(String(user_id)) ||
+        (masterTeachId && String(user_id) === masterTeachId);
 
     if (teaching && canTeach) {
       await AiKnowledge.create({
