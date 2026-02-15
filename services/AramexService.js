@@ -64,33 +64,40 @@ exports.formatAddress = (address) => {
  * @returns {Object} بيانات الطرف بصيغة Aramex
  */
 exports.formatParty = (partyData) => {
-  if (!partyData) throw new Error("بيانات الطرف مطلوبة");
+  if (!partyData || typeof partyData !== "object") throw new Error("بيانات الطرف مطلوبة");
   const countryCode = toAramexCountryCode(
     partyData.country || partyData.CountryCode,
   );
-  const personName = (partyData.full_name || partyData.PersonName || "").toString().trim() || "غير محدد";
+  const personName = (partyData.full_name || partyData.PersonName || partyData.clientName || "").toString().trim() || "غير محدد";
   const city = (partyData.city || partyData.City || "Riyadh").toString().trim();
-  const line1 = [partyData.address, partyData.city, partyData.country].filter(Boolean).join("، ").trim() || "Address not specified";
+  const addr = (partyData.address || partyData.Line1 || partyData.clientAddress || "").toString().trim();
+  const line1 = [addr, city, countryCode].filter(Boolean).join("، ").trim() || "Address not specified";
+  const line2 = (partyData.addressLine2 || partyData.Line2 || "").toString().trim();
+  const line3 = (partyData.addressLine3 || partyData.Line3 || "").toString().trim();
+  const postCode = (partyData.postCode || partyData.PostCode || partyData.nationalAddress || "").toString().trim();
+  const email = (partyData.email || partyData.EmailAddress || "test@example.com").toString().trim();
+  const phone1 = toAramexPhone(partyData.mobile || partyData.phone || partyData.PhoneNumber1 || partyData.clientPhone);
+  const phone2 = partyData.phone2 ? toAramexPhone(partyData.phone2) : "";
   return {
-    AccountEntity: process.env.ARAMEX_ACCOUNT_ENTITY || "JED",
-    AccountNumber: process.env.ARAMEX_ACCOUNT_NUMBER,
-    Reference1: partyData._id ? String(partyData._id) : "Ref1",
+    AccountEntity: (process.env.ARAMEX_ACCOUNT_ENTITY || "JED").toString(),
+    AccountNumber: (process.env.ARAMEX_ACCOUNT_NUMBER || "").toString(),
+    Reference1: partyData._id != null ? String(partyData._id) : "Ref1",
     PartyAddress: {
       Line1: line1,
-      Line2: (partyData.addressLine2 || "").toString().trim(),
-      Line3: (partyData.addressLine3 || "").toString().trim(),
+      Line2: line2,
+      Line3: line3,
       City: city,
-      PostCode: (partyData.postCode || "").toString().trim(),
+      PostCode: postCode,
       CountryCode: countryCode,
     },
     Contact: {
       PersonName: personName,
       CompanyName: personName,
-      PhoneNumber1: toAramexPhone(partyData.mobile || partyData.phone),
-      PhoneNumber2: partyData.phone2 ? toAramexPhone(partyData.phone2) : "",
-      Type: partyData.type || "Business",
-      CellPhone: toAramexPhone(partyData.mobile || partyData.phone || "0000000000"),
-      EmailAddress: (partyData.email || "test@example.com").toString().trim(),
+      PhoneNumber1: phone1,
+      PhoneNumber2: phone2,
+      Type: (partyData.type || "Business").toString(),
+      CellPhone: phone1,
+      EmailAddress: email,
     },
   };
 };
@@ -141,24 +148,35 @@ exports.shipmentData = (
   const dueDate = new Date();
   dueDate.setDate(now.getDate() + 7);
 
+  const orderId = order && order._id != null ? String(order._id) : `ORD-${Date.now()}`;
+  const orderNumber = (order && order.order_number != null ? order.order_number : "") || "";
+  const orderPlatform = (order && order.platform != null ? order.platform : "") || "";
+  const customer = order && order.customer && typeof order.customer === "object" ? order.customer : null;
+  const totalAmount = order && order.total && typeof order.total === "object" && order.total.amount != null
+    ? parseFloat(order.total.amount)
+    : 0;
+  const nationalAddr = (customer && (customer.nationalAddress != null ? customer.nationalAddress : "")) || "";
+  if (!customer) throw new Error("بيانات المستلم (order.customer) مطلوبة");
+  if (!shipperAddress || typeof shipperAddress !== "object") throw new Error("عنوان المرسل مطلوب");
+
   return {
     ClientInfo: {
-      UserName: process.env.ARAMEX_USERNAME,
-      Password: process.env.ARAMEX_PASSWORD,
+      UserName: (process.env.ARAMEX_USERNAME || "").toString(),
+      Password: (process.env.ARAMEX_PASSWORD || "").toString(),
       Version: "v1.0",
-      AccountNumber: process.env.ARAMEX_ACCOUNT_NUMBER,
-      AccountPin: process.env.ARAMEX_ACCOUNT_PIN,
-      AccountEntity: process.env.ARAMEX_ACCOUNT_ENTITY || "JED",
-      AccountCountryCode: process.env.ARAMEX_ACCOUNT_COUNTRY_CODE || "SA",
+      AccountNumber: (process.env.ARAMEX_ACCOUNT_NUMBER || "").toString(),
+      AccountPin: (process.env.ARAMEX_ACCOUNT_PIN || "").toString(),
+      AccountEntity: (process.env.ARAMEX_ACCOUNT_ENTITY || "JED").toString(),
+      AccountCountryCode: (process.env.ARAMEX_ACCOUNT_COUNTRY_CODE || "SA").toString(),
       Source: 24,
     },
     Shipments: [
       {
-        Reference1: order._id || `ORD-${Date.now()}`,
-        Reference2: order.order_number || "",
-        Reference3: order.platform || "",
+        Reference1: orderId,
+        Reference2: orderNumber,
+        Reference3: orderPlatform,
         Shipper: exports.formatParty(shipperAddress),
-        Consignee: exports.formatParty(order.customer),
+        Consignee: exports.formatParty(customer),
         ShippingDateTime: exports.formatAramexDate(now), // استخدام التنسيق الجديد
         DueDate: exports.formatAramexDate(dueDate), // استخدام التنسيق الجديد
         ThirdParty: {
@@ -201,16 +219,16 @@ exports.shipmentData = (
             Value: weight,
             Unit: "KG",
           },
-          DescriptionOfGoods: `${orderDescription}   ,nationalAddress:${order.customer.nationalAddress}`,
+          DescriptionOfGoods: `${(orderDescription || "").toString().trim()}   ,nationalAddress:${nationalAddr}`,
           GoodsOriginCountry: "SA",
           NumberOfPieces: 6,
           ProductGroup: "DOM",
           ProductType: "CDS",
           PaymentType: "3",
           PaymentOptions: "",
-          ItemCount: order.items?.length || 1,
+          ItemCount: Array.isArray(order.items) ? order.items.length : 1,
           CustomsValueAmount: {
-            Value: parseFloat(order.total.amount),
+            Value: Number.isFinite(totalAmount) ? totalAmount : 0,
             CurrencyCode: "SAR",
           },
         },

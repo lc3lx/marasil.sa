@@ -24,33 +24,33 @@ const omnidPlatform = require("../platforms/shipment/omnidPlatform");
 
 /**
  * تحويل المستلم الأصلي (ClientAddress) إلى صيغة المرسل لـ createShipment (shipperAddress)
+ * يضمن عدم إرجاع null في أي حقل حتى لا ترفض Aramex الطلب (Object reference not set).
  */
 function receiverToShipperAddress(receiver) {
   if (!receiver || typeof receiver !== "object") return null;
-  return {
-    full_name: (receiver.clientName || receiver.full_name || "غير محدد").toString().trim(),
-    address: (receiver.clientAddress || receiver.address || "").toString().trim() || "عنوان غير محدد",
-    city: (receiver.city || receiver.City || "Riyadh").toString().trim(),
-    country: (receiver.country || receiver.CountryCode || "SA").toString().trim(),
-    mobile: (receiver.clientPhone || receiver.mobile || "").toString().trim() || "0500000000",
-    email: (receiver.clientEmail || receiver.email || "").toString().trim() || "noreply@marasil.sa",
-  };
+  const full_name = (receiver.clientName || receiver.full_name || receiver.PersonName || "غير محدد").toString().trim() || "غير محدد";
+  const address = (receiver.clientAddress || receiver.address || receiver.Line1 || "").toString().trim() || "عنوان غير محدد";
+  const city = (receiver.city || receiver.City || "Riyadh").toString().trim() || "Riyadh";
+  const country = (receiver.country || receiver.CountryCode || "SA").toString().trim() || "SA";
+  const mobile = (receiver.clientPhone || receiver.mobile || receiver.PhoneNumber1 || "").toString().trim() || "0500000000";
+  const email = (receiver.clientEmail || receiver.email || receiver.EmailAddress || "").toString().trim() || "noreply@marasil.sa";
+  return { full_name, address, city, country, mobile, email };
 }
 
 /**
  * تحويل المرسل الأصلي (كائن التاجر) إلى صيغة المستلم لـ createShipment (order.customer)
+ * يدعم مفاتيح Aramex (Line1, PersonName, ...) ويمنع أي حقل null لـ API.
  */
 function senderToOrderCustomer(sender) {
   if (!sender || typeof sender !== "object") return null;
-  return {
-    full_name: (sender.clientName || sender.full_name || sender.name || "مستلم").toString().trim(),
-    address: (sender.clientAddress || sender.address || "").toString().trim() || "عنوان غير محدد",
-    city: (sender.city || sender.City || "Riyadh").toString().trim(),
-    country: (sender.country || sender.CountryCode || "SA").toString().trim(),
-    mobile: (sender.clientPhone || sender.mobile || sender.phone || "").toString().trim() || "0500000000",
-    email: (sender.clientEmail || sender.email || "").toString().trim() || "noreply@marasil.sa",
-    nationalAddress: (sender.nationalAddress || sender.postCode || "").toString().trim(),
-  };
+  const full_name = (sender.clientName || sender.full_name || sender.name || sender.PersonName || "مستلم").toString().trim() || "مستلم";
+  const address = (sender.clientAddress || sender.address || sender.Line1 || "").toString().trim() || "عنوان غير محدد";
+  const city = (sender.city || sender.City || "Riyadh").toString().trim() || "Riyadh";
+  const country = (sender.country || sender.CountryCode || "SA").toString().trim() || "SA";
+  const mobile = (sender.clientPhone || sender.mobile || sender.phone || sender.PhoneNumber1 || "").toString().trim() || "0500000000";
+  const email = (sender.clientEmail || sender.email || sender.EmailAddress || "").toString().trim() || "noreply@marasil.sa";
+  const nationalAddress = (sender.nationalAddress || sender.postCode || sender.PostCode || "").toString().trim() || "";
+  return { full_name, address, city, country, mobile, email, nationalAddress };
 }
 
 /**
@@ -80,12 +80,19 @@ const _createReturnShipmentInternal = async (shipmentId, customerId) => {
   const weight = Number(originalShipment.weight) || 1;
   const Parcels = Number(originalShipment.boxNum) || 1;
   const shapmentingType = (originalShipment.shapmentingType || "Dry").toString();
-  const dimension = originalShipment.dimension || { length: 10, width: 10, height: 10 };
+  const dim = originalShipment.dimension && typeof originalShipment.dimension === "object"
+    ? originalShipment.dimension
+    : {};
+  const dimension = {
+    length: Number(dim.length) || 10,
+    width: Number(dim.width) || 10,
+    height: Number(dim.height) || 10,
+  };
 
   const body = {
     company,
     order: {
-      _id: originalShipment.orderId,
+      _id: originalShipment.orderId != null ? String(originalShipment.orderId) : undefined,
       customer: orderCustomer,
       total: { amount: 0, currency: "SAR" },
       payment_method: "Prepaid",
