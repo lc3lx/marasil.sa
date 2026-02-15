@@ -1,4 +1,10 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+let AiKnowledge;
+try {
+  AiKnowledge = require("../models/aiKnowledgeModel");
+} catch (e) {
+  AiKnowledge = null;
+}
 
 // تهيئة Gemini API مع دعم لـ function calling
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -1439,6 +1445,61 @@ function quickKeywordParse(
 }
 
 /**
+ * توليد رد قصير مرتبط بمنصة مراسيل عند عدم معرفة الإجابة (بديل عن "لا أعرف")
+ */
+async function generateMarasilFallbackReply(userMessage) {
+  try {
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-pro",
+      generationConfig: { temperature: 0.6, maxOutputTokens: 150 },
+    });
+    const prompt = `المستخدم سأل: "${userMessage}"
+اكتب رداً قصيراً (جملة أو جملتين) بالعربية، مرتبطاً بمنصة مراسيل marasil.sa (شحن، لوجستيات، تجار). لا تذكر أنك لا تعرف؛ قدّم معلومة مفيدة عن المنصة أو الشحن.`;
+    const result = await model.generateContent(prompt);
+    const text = result.response?.text?.()?.trim();
+    return text || "مراسيل منصة شحن إلكترونية للتجار. كيف أقدر أساعدك؟";
+  } catch (e) {
+    console.warn("⚠️ [Gemini] Marasil fallback reply failed:", e?.message);
+    return "مراسيل منصة شحن إلكترونية للتجار. كيف أقدر أساعدك؟";
+  }
+}
+
+/**
+ * عند رد CHAT بثقة منخفضة أو "لم أفهم": جرّب المعرفة المتعلمة ثم رد مراسيل الاحتياطي
+ */
+async function tryEnrichFromKnowledge(userMessage, result) {
+  if (!result || result.intent !== "CHAT") return result;
+  const lowConfidence = (result.confidence ?? 0.5) < 0.5;
+  const genericMessage =
+    /عذراً،?\s*(لم أفهم|لا أعرف|حدث خطأ|لم أستطع)/i.test(
+      result.message || ""
+    );
+  if (!lowConfidence && !genericMessage) return result;
+
+  if (!AiKnowledge) return result;
+
+  const matches = await AiKnowledge.findBestMatch(userMessage, 1);
+  if (matches.length && matches[0].score >= 2) {
+    await AiKnowledge.findByIdAndUpdate(matches[0]._id, {
+      $inc: { useCount: 1 },
+    }).catch(() => {});
+    console.log("📚 [Gemini] Using learned knowledge for reply");
+    return {
+      ...result,
+      confidence: 0.85,
+      message: matches[0].answer,
+    };
+  }
+
+  const fallback = await generateMarasilFallbackReply(userMessage);
+  return {
+    ...result,
+    confidence: 0.6,
+    message: fallback,
+  };
+}
+
+/**
  * إرسال رسالة لـ Gemini والحصول على رد - محسن بدعم function calling
  */
 async function sendToGemini(
@@ -1503,9 +1564,24 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
 
     const normalizedContext = context || NO_CONTEXT_PLACEHOLDER;
 
+    // حقن المعرفة المتعلمة في الـ prompt
+    let knowledgeBlock = "";
+    if (AiKnowledge) {
+      try {
+        const learned = await AiKnowledge.findBestMatch(userMessage, 10);
+        if (learned.length) {
+          knowledgeBlock =
+            "\n\n=== معرفة مُتعلمة من المحادثات (استخدمها إن وافقت سؤال المستخدم)\n" +
+            learned.map((k) => `س: ${k.question}\nج: ${k.answer}`).join("\n\n");
+        }
+      } catch (e) {
+        console.warn("⚠️ [Gemini] Load learned knowledge failed:", e?.message);
+      }
+    }
+
     const outputReminder = `\n\nمطلوب: ردّك يجب أن يكون جملة JSON واحدة صالحة فقط (بدون شرح خارج الـ JSON).`;
 
-    const fullPrompt = `${SYSTEM_PROMPT}\n\n${deepThinkingDirectives}\n\nContext: ${normalizedContext}\nUser: ${userMessage}${hintSection}${outputReminder}`;
+    const fullPrompt = `${SYSTEM_PROMPT}\n\n${deepThinkingDirectives}\n\nContext: ${normalizedContext}\nUser: ${userMessage}${hintSection}${knowledgeBlock}${outputReminder}`;
 
     const result = await model.generateContent(fullPrompt);
     const response = await result.response;
@@ -1559,7 +1635,7 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
 
         // التأكد من وجود الحقول المطلوبة
         if (geminiData.intent && geminiData.message) {
-          return {
+          let out = {
             intent: geminiData.intent,
             confidence: geminiData.confidence || 0.5,
             missing_fields: geminiData.missing_fields || [],
@@ -1567,36 +1643,36 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
             data: geminiData.data || {},
             api_call: geminiData.api_call,
           };
+          out = await tryEnrichFromKnowledge(userMessage, out);
+          return out;
         }
       }
 
-      // إذا لم نجد JSON صحيح، أعد رد دردشة عام
+      // إذا لم نجد JSON صحيح، أعد رد دردشة عام (مع محاولة المعرفة والرد المرتبط بمراسيل)
       console.log("⚠️ [Gemini] No valid JSON found, returning chat response");
       if (quickResult) {
         return quickResult;
       }
-
-      return {
+      return await tryEnrichFromKnowledge(userMessage, {
         intent: "CHAT",
         confidence: 0.3,
         missing_fields: [],
         message: "عذراً، لم أفهم طلبك. يرجى المحاولة مرة أخرى.",
         data: {},
-      };
+      });
     } catch (parseError) {
       console.error("❌ [Gemini] JSON parse error:", parseError.message);
       if (quickResult) {
         console.log("🔄 [Gemini] Falling back to quick response after parse error");
         return quickResult;
       }
-
-      return {
+      return await tryEnrichFromKnowledge(userMessage, {
         intent: "CHAT",
         confidence: 0.2,
         missing_fields: [],
         message: "عذراً، حدث خطأ في معالجة الطلب. يرجى المحاولة مرة أخرى.",
         data: {},
-      };
+      });
     }
   } catch (error) {
     console.error(
@@ -1616,14 +1692,13 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
       return quickFallback;
     }
 
-    // إذا فشل كل شيء، أعد رد خطأ
-    return {
+    return await tryEnrichFromKnowledge(userMessage, {
       intent: "CHAT",
       confidence: 0.1,
       missing_fields: [],
       message: "عذراً، حدث خطأ تقني. يرجى المحاولة لاحقاً.",
       data: {},
-    };
+    });
   }
 }
 
@@ -3104,6 +3179,46 @@ async function handleCreateShipmentFlow(
   }
 }
 
+/**
+ * كشف رسالة "تعليم" من المستخدم واستخراج السؤال والجواب
+ * أنماط مدعومة: السؤال: ... الجواب: ... | س: ... ج: ... | علم: ... الإجابة: ...
+ * @returns {{ question: string, answer: string } | null}
+ */
+function parseTeachingMessage(message) {
+  if (!message || typeof message !== "string") return null;
+  const trimmed = message.trim();
+
+  // السؤال: ... الجواب: ... أو الإجابة: ...
+  const match1 = trimmed.match(
+    /السؤال\s*[:\-]\s*([\s\S]*?)\s*(?:الجواب|الإجابة)\s*[:\-]\s*([\s\S]*)/i
+  );
+  if (match1) {
+    const question = match1[1].trim();
+    const answer = match1[2].trim();
+    if (question.length >= 3 && answer.length >= 2) return { question, answer };
+  }
+
+  // س: ... ج: ...
+  const match2 = trimmed.match(/س\s*[:\-]\s*([\s\S]*?)\s*ج\s*[:\-]\s*([\s\S]*)/i);
+  if (match2) {
+    const question = match2[1].trim();
+    const answer = match2[2].trim();
+    if (question.length >= 3 && answer.length >= 2) return { question, answer };
+  }
+
+  // علم: ... الإجابة: ... أو احفظ: ... الجواب: ...
+  const match3 = trimmed.match(
+    /(?:علم|احفظ)\s*[:\-]\s*([\s\S]*?)\s*(?:الإجابة|الجواب)\s*[:\-]\s*([\s\S]*)/i
+  );
+  if (match3) {
+    const question = match3[1].trim();
+    const answer = match3[2].trim();
+    if (question.length >= 3 && answer.length >= 2) return { question, answer };
+  }
+
+  return null;
+}
+
 module.exports = {
   sendToGemini,
   processGeminiResponse,
@@ -3111,4 +3226,5 @@ module.exports = {
   buildContext,
   quickKeywordParse,
   stateManager,
+  parseTeachingMessage,
 };

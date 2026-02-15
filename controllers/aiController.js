@@ -1,6 +1,7 @@
 const asyncHandler = require("express-async-handler");
 const mongoose = require("mongoose");
 const Conversation = require("../models/conversationModel");
+const AiKnowledge = require("../models/aiKnowledgeModel");
 const AIServices = require("../services/aiServices");
 const geminiService = require("../services/geminiService");
 
@@ -61,6 +62,34 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
         console.warn("⚠️ [AI-Controller] Database error:", dbError.message);
         customer = { _id: user_id, firstName: "عميل", lastName: "محترم" };
       }
+    }
+
+    // 0. كشف "تعليم" المساعد: س: ... ج: ... أو السؤال: ... الجواب: ...
+    const teaching = geminiService.parseTeachingMessage(message);
+    if (teaching) {
+      await AiKnowledge.create({
+        question: teaching.question,
+        answer: teaching.answer,
+        taughtBy: user_id,
+      });
+      await Conversation.findOrCreateConversation(user_id, session_id).then(
+        async (conv) => {
+          await conv.addMessage("user", message.trim(), { timestamp: new Date() });
+          await conv.addMessage(
+            "ai",
+            "تم حفظ المعلومة وتعلمتها، راح أستخدمها لاحقاً في الإجابة على أسئلة مشابهة.",
+            { intent: "CHAT", timestamp: new Date() }
+          );
+        }
+      );
+      return res.status(200).json({
+        success: true,
+        intent: "CHAT",
+        message:
+          "تم حفظ المعلومة وتعلمتها، راح أستخدمها لاحقاً في الإجابة على أسئلة مشابهة.",
+        data: { conversation_id: null, learned: true },
+        timestamp: new Date().toISOString(),
+      });
     }
 
     // 1. إيجاد أو إنشاء محادثة
