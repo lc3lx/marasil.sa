@@ -76,7 +76,7 @@ app.use(
     credentials: true,
     preflightContinue: false,
     optionsSuccessStatus: 204,
-  })
+  }),
 );
 
 // Handle preflight requests
@@ -129,7 +129,7 @@ app.use(
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000,
     },
-  })
+  }),
 );
 
 // Body parsers
@@ -228,7 +228,7 @@ app.post(
               payment.source?.message || "سبب غير محدد"
             }`,
           },
-          { upsert: true, new: true }
+          { upsert: true, new: true },
         );
 
         console.log("❌ تم تسجيل معاملة فاشلة:", failedTransaction._id);
@@ -254,11 +254,12 @@ app.post(
         // 🔍 التحقق من الدفع عبر API ميسر (استخدام المفتاح الحي للدفعات الحية)
         console.log("🔍 Verifying payment with Moyasar API...");
         const isLive = payload.live === true;
-        const secretKey = (
-          isLive
-            ? process.env.MOYASAR_SECRET_KEY_LIVE || process.env.MOYASAR_SECRET_KEY
+        const secretKey =
+          (isLive
+            ? process.env.MOYASAR_SECRET_KEY_LIVE ||
+              process.env.MOYASAR_SECRET_KEY
             : process.env.MOYASAR_SECRET_KEY
-        )?.trim?.() || process.env.MOYASAR_SECRET_KEY?.trim?.();
+          )?.trim?.() || process.env.MOYASAR_SECRET_KEY?.trim?.();
         if (!secretKey) {
           console.error("❌ MOYASAR_SECRET_KEY غير معرّف في .env");
           return res.status(500).json({ error: "تكوين الدفع غير مكتمل" });
@@ -273,7 +274,7 @@ app.post(
               Authorization: authHeader,
               "Content-Type": "application/json",
             },
-          }
+          },
         );
 
         const verifiedPayment = moyasarResponse.data;
@@ -295,7 +296,7 @@ app.post(
               description: `فشل الدفع - ${
                 verifiedPayment.source?.message || "Unknown error"
               }`,
-            }
+            },
           );
 
           return res
@@ -324,7 +325,7 @@ app.post(
           console.log(
             "📝 وُجدت معاملة معلقة:",
             pendingTransaction._id,
-            "- سيتم تحديثها"
+            "- سيتم تحديثها",
           );
         } else {
           console.log("📝 لم توجد معاملة معلقة - سيتم إنشاء جديدة");
@@ -334,7 +335,7 @@ app.post(
         const wallet = await Wallet.findOneAndUpdate(
           { customerId },
           { $inc: { balance: verifiedPayment.amount / 100 } }, // تحويل من هللة إلى ريال
-          { upsert: true, new: true }
+          { upsert: true, new: true },
         );
 
         // 🔹 تحديث المعاملة الموجودة أو إنشاء جديدة
@@ -354,7 +355,7 @@ app.post(
           {
             upsert: true,
             new: true,
-          }
+          },
         );
 
         console.log("✅ تم إنشاء/تحديث المعاملة:", transaction._id);
@@ -369,7 +370,7 @@ app.post(
         console.log(
           `✅ تم شحن محفظة ${customerId} بمبلغ ${
             verifiedPayment.amount / 100
-          } ريال`
+          } ريال`,
         );
         console.log(`📊 رصيد المحفظة الجديد: ${wallet.balance}`);
 
@@ -394,7 +395,7 @@ app.post(
       }
       return res.status(500).json({ error: "حدث خطأ في المعالجة" });
     }
-  })
+  }),
 );
 app.use("/api/auth", authRoutes);
 app.use("/api/public", require("./routes/publicRoutes"));

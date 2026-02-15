@@ -69,8 +69,41 @@ router.get("/replacements/shipments", (req, res, next) => {
     .catch(next);
 });
 
+// POST /api/public/returns/create-request — body: { token, shipmentId, type?, requestNote? }
+router.post("/returns/create-request", (req, res, next) => {
+  const { token, shipmentId, type, requestNote } = req.body || {};
+  const tokenStr = (token ?? "").toString().trim();
+  if (!tokenStr) {
+    return res.status(400).json({
+      success: false,
+      message: "رمز التاجر مطلوب (token)",
+    });
+  }
+  if (!shipmentId) {
+    return res.status(400).json({
+      success: false,
+      message: "معرف الشحنة مطلوب",
+    });
+  }
+  const typerequesst = type === "exchange" ? "exchange" : "return";
+  Customer.findOne({ returnPageSlug: tokenStr })
+    .select("_id")
+    .lean()
+    .then((customer) => {
+      if (!customer) {
+        return res.status(404).json({
+          success: false,
+          message: "رابط التاجر غير صالح أو منتهي",
+        });
+      }
+      req.body = { shipmentId, typerequesst, requestNote: requestNote || "" };
+      wrapResJson(res);
+      return shipmentReturnController.createReturnRequest(req, res, next);
+    })
+    .catch(next);
+});
+
 // GET /api/public/returns/page-config?token=:slug
-router.get("/returns/page-config", (req, res, next) => {
   const token = req.query.token;
   if (!token || typeof token !== "string" || !token.trim()) {
     return res.status(400).json({
@@ -81,6 +114,40 @@ router.get("/returns/page-config", (req, res, next) => {
   req.params = { slug: token.trim() };
   wrapResJson(res);
   return getReturnPageBySlug(req, res, next);
+});
+
+// POST /api/public/replacements/create-request — body: { token, shipmentId, type?, requestNote? }
+router.post("/replacements/create-request", (req, res, next) => {
+  const { token, shipmentId, type, requestNote } = req.body || {};
+  const tokenStr = (token ?? "").toString().trim();
+  if (!tokenStr) {
+    return res.status(400).json({
+      success: false,
+      message: "رمز التاجر مطلوب (token)",
+    });
+  }
+  if (!shipmentId) {
+    return res.status(400).json({
+      success: false,
+      message: "معرف الشحنة مطلوب",
+    });
+  }
+  const typerequesst = type === "exchange" ? "exchange" : "return";
+  Customer.findOne({ replacementPageSlug: tokenStr })
+    .select("_id")
+    .lean()
+    .then((customer) => {
+      if (!customer) {
+        return res.status(404).json({
+          success: false,
+          message: "رابط التاجر غير صالح أو منتهي",
+        });
+      }
+      req.body = { shipmentId, typerequesst, requestNote: requestNote || "" };
+      wrapResJson(res);
+      return shipmentReturnController.createReturnRequest(req, res, next);
+    })
+    .catch(next);
 });
 
 // GET /api/public/replacements/page-config?token=:slug
