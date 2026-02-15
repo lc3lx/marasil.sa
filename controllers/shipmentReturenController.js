@@ -12,17 +12,7 @@ const redbox = require("../platforms/shipment/redboxPlatform");
 const aramex = require("../platforms/shipment/aramexPlatform");
 const omin = require("../platforms/shipment/omnidPlatform");
 //servers import
-const { shipmentnorm } = require("../services/shipmentAccount");
-const smsaServers = require("../services/smsaService");
-const redboxServers = require("../services/redboxSeervice");
-const ominServers = require("../services/omnicServices");
-const aramxServers = require("../services/AramexService");
-const {
-  createAramexReturnShipment,
-} = require("../services/aramexReturnService");
-const {
-  createRedboxReturnShipment,
-} = require("../services/redboxReturnService");
+const shipmentCreationService = require("../services/shipmentCreationService");
 // helpers import
 const ApiEror = require("../utils/apiError");
 const asyncHandler = require("express-async-handler");
@@ -33,259 +23,108 @@ const crypto = require("crypto");
 const omnidPlatform = require("../platforms/shipment/omnidPlatform");
 
 /**
- * الحصول على أو إنشاء ClientAddress من كائن عنوان المرسل (التاجر) لاستخدامه كمستلم في الشحنة العكسية
+ * تحويل المستلم الأصلي (ClientAddress) إلى صيغة المرسل لـ createShipment (shipperAddress)
  */
-const getOrCreateSenderAsClientAddress = async (senderObject, customerId) => {
-  if (!senderObject || !customerId) return null;
-  const name = senderObject.clientName || senderObject.full_name || senderObject.PersonName || "مرسل";
-  const address = senderObject.clientAddress || senderObject.address || senderObject.Line1 || "عنوان غير محدد";
-  const phone = senderObject.clientPhone || senderObject.mobile || senderObject.PhoneNumber1 || "0000000000";
-  const email = senderObject.clientEmail || senderObject.email || senderObject.EmailAddress || "noreply@marasil.sa";
-  const city = senderObject.city || senderObject.City || "الرياض";
-  const country = senderObject.country || senderObject.CountryCode || "SA";
-  let addr = await ClientAddress.findOne({
-    customer: customerId,
-    clientPhone: phone.trim(),
-    city: city.trim(),
-    clientAddress: address.trim().substring(0, 100),
-  });
-  if (addr) return addr._id;
-  addr = await ClientAddress.create({
-    clientName: name,
-    clientAddress: address,
-    clientPhone: phone,
-    clientEmail: email || "noreply@marasil.sa",
-    country,
-    city,
-    customer: customerId,
-  });
-  return addr._id;
-};
+function receiverToShipperAddress(receiver) {
+  if (!receiver || typeof receiver !== "object") return null;
+  return {
+    full_name: (receiver.clientName || receiver.full_name || "غير محدد").toString().trim(),
+    address: (receiver.clientAddress || receiver.address || "").toString().trim() || "عنوان غير محدد",
+    city: (receiver.city || receiver.City || "Riyadh").toString().trim(),
+    country: (receiver.country || receiver.CountryCode || "SA").toString().trim(),
+    mobile: (receiver.clientPhone || receiver.mobile || "").toString().trim() || "0500000000",
+    email: (receiver.clientEmail || receiver.email || "").toString().trim() || "noreply@marasil.sa",
+  };
+}
 
-// Internal function, not exposed as an endpoint
+/**
+ * تحويل المرسل الأصلي (كائن التاجر) إلى صيغة المستلم لـ createShipment (order.customer)
+ */
+function senderToOrderCustomer(sender) {
+  if (!sender || typeof sender !== "object") return null;
+  return {
+    full_name: (sender.clientName || sender.full_name || sender.name || "مستلم").toString().trim(),
+    address: (sender.clientAddress || sender.address || "").toString().trim() || "عنوان غير محدد",
+    city: (sender.city || sender.City || "Riyadh").toString().trim(),
+    country: (sender.country || sender.CountryCode || "SA").toString().trim(),
+    mobile: (sender.clientPhone || sender.mobile || sender.phone || "").toString().trim() || "0500000000",
+    email: (sender.clientEmail || sender.email || "").toString().trim() || "noreply@marasil.sa",
+    nationalAddress: (sender.nationalAddress || sender.postCode || "").toString().trim(),
+  };
+}
+
+/**
+ * إنشاء شحنة عكسية = نفس إنشاء الشحنة العادية (shapmentController) لكن نعبّي بيانات المرسل كالمستلم الأصلي وبيانات المستلم كالمرسل الأصلي
+ */
 const _createReturnShipmentInternal = async (shipmentId, customerId) => {
-  console.log(customerId);
-  const originalShipment = await Shapment.findById(shipmentId).populate(
-    "receiverAddress"
-  );
-
+  const originalShipment = await Shapment.findById(shipmentId).populate("receiverAddress");
   if (!originalShipment) {
     throw new ApiEror(`لم يتم العثور على شحنة بالمعرف ${shipmentId}`, 404);
   }
 
   const company = originalShipment.shapmentCompany;
   const shippingCompany = await shappingCompany.findOne({ company });
-
   if (!shippingCompany || shippingCompany.status !== "Enabled") {
     throw new ApiEror(`شركة الشحن ${company} غير متاحة حالياً`, 400);
   }
 
-  // حساب تكلفة الشحنة المرتجعة
-  const shippingType = shippingCompany.shippingTypes[0]; // استخدام نوع الشحن الأول أو يمكن تحديده بشكل مناسب
-  const orderWithWeight = {
-    ...originalShipment.toObject(),
-    weight: originalShipment.weight || 1, // استخدام الوزن الأصلي أو القيمة الافتراضية
-    payment_method: "Prepaid", // دفع مسبق للشحنات المرتجعة
+  const originalReceiver = originalShipment.receiverAddress; // العميل → يصبح المرسل في الشحنة العكسية
+  const originalSender = originalShipment.senderAddress || {};  // التاجر → يصبح المستلم في الشحنة العكسية
+
+  const shipperAddress = receiverToShipperAddress(originalReceiver);
+  const orderCustomer = senderToOrderCustomer(originalSender);
+  if (!shipperAddress || !orderCustomer) {
+    throw new ApiEror("بيانات المرسل أو المستلم ناقصة لإنشاء الشحنة العكسية", 400);
+  }
+
+  const weight = Number(originalShipment.weight) || 1;
+  const Parcels = Number(originalShipment.boxNum) || 1;
+  const shapmentingType = (originalShipment.shapmentingType || "Dry").toString();
+  const dimension = originalShipment.dimension || { length: 10, width: 10, height: 10 };
+
+  const body = {
+    company,
+    order: {
+      _id: originalShipment.orderId,
+      customer: orderCustomer,
+      total: { amount: 0, currency: "SAR" },
+      payment_method: "Prepaid",
+      paymentMethod: "Prepaid",
+      platform: "manual",
+      items: [],
+    },
+    orderDescription: `شحنة إرجاع - ${(originalShipment.orderDescription || "").toString().trim() || "إرجاع"}`,
+    shipperAddress,
+    weight,
+    Parcels,
+    shapmentingType,
+    dimension,
   };
 
-  // حساب التكلفة باستخدام نفس دالة حساب التكلفة للشحنات العادية
-  const pricing = shipmentnorm(shippingType, orderWithWeight);
-  const shippingCost = pricing.total;
+  const result = await shipmentCreationService.createShipment(customerId, body);
 
-  // البحث عن محفظة العميل أو إنشاؤها إذا لم تكن موجودة
-  let wallet = await Wallet.findOne({ customerId: customerId });
-  if (!wallet) {
-    console.log("Wallet not found for customer:", customerId);
-    // إنشاء محفظة جديدة برصيد صفر إذا لم تكن موجودة
-    wallet = await Wallet.create({
-      customerId,
-      balance: 0,
-      transactions: [],
-    });
-  }
-
-  // التحقق من كفاية الرصيد
-  if (wallet.balance < shippingCost) {
-    throw new ApiEror(
-      `رصيدك الحالي (${wallet.balance} ريال) لا يكفي لإنشاء شحنة الإرجاع. التكلفة المطلوبة: ${shippingCost} ريال`,
-      402
-    );
-  }
-
-  let returnShipmentResult;
-  let shipmentData;
-
-  switch (company) {
-    case "smsa":
-      shipmentData = smsaServers.ShapmentdataC2b(originalShipment);
-      returnShipmentResult = await smsaExxpress.createReturnShipment(
-        shipmentData
-      );
-      break;
-    case "aramex":
-      // إنشاء شحنة الإرجاع في Aramex (نفس التفاصيل، مرسل↔مستلم)
-      const aramexResult = await createAramexReturnShipment(originalShipment, aramex);
-      returnShipmentResult = aramexResult.aramexResult;
-      break;
-
-    case "redbox":
-      // إنشاء شحنة الإرجاع في Redbox (نفس التفاصيل، مرسل↔مستلم)
-      const redboxResult = await createRedboxReturnShipment(
-        originalShipment,
-        redbox
-      );
-      returnShipmentResult = redboxResult.redboxResult;
-      break;
-
-    case "omniclama":
-      // تحضير بيانات شحنة الإرجاع لشركة Omni
-      try {
-        // استخراج بيانات المرسل والمستلم من الشحنة الأصلية
-        const { senderAddress, receiverAddress } = originalShipment;
-
-        // تبديل عناوين المرسل والمستبل
-        const returnShipmentData = {
-          ...originalShipment.toObject(),
-          senderAddress: receiverAddress, // المرسل يصبح هو المستلم الأصلي
-          receiverAddress: senderAddress, // المستلم يصبح هو المرسل الأصلي
-          direction_type: 2, // تعيين نوع الشحنة كشحنة إرجاع
-          return_reason: "Return requested by customer", // سبب الإرجاع
-          status: "pending_return", // تحديث حالة الشحنة
-          created_at: new Date(),
-          updated_at: new Date(),
-        };
-
-        // خصم تكلفة الشحن من رصيد العميل
-        wallet.balance -= shippingCost;
-        await wallet.save();
-
-        // تسجيل المعاملة
-        const transaction = new Transaction({
-          walletId: wallet._id,
-          customerId: customerId,
-          amount: shippingCost,
-          type: "debit",
-          description: `خصم تكلفة شحنة إرجاع - ${newReturnShipment.trackingId}`,
-          status: "completed",
-          referenceId: newReturnShipment._id,
-          referenceType: "return_shipment",
-        });
-        await transaction.save();
-
-        // إضافة المعاملة إلى سجل المعاملات في المحفظة
-        wallet.transactions.push(transaction._id);
-        await wallet.save();
-
-        return {
-          newReturnShipment,
-          returnShipmentResult: {
-            success: true,
-            message: `تم إنشاء شحنة الإرجاع بنجاح وتم خصم ${shippingCost} ريال من رصيدك`,
-            trackingNumber: newReturnShipment.trackingId,
-            shippingCost: shippingCost,
-            remainingBalance: wallet.balance,
-          },
-        };
-      } catch (error) {
-        console.error("Error creating Omni return shipment:", error);
-        throw new ApiEror(`فشل في إنشاء شحنة الإرجاع: ${error.message}`, 500);
-      }
-
-    default:
-      throw new ApiEror(
-        `شركة الشحن ${company} غير مدعومة لعمليات الإرجاع`,
-        400
-      );
-  }
-
-  if (!returnShipmentResult) {
-    throw new ApiEror("لم يتم إرجاع نتيجة من شركة الشحن.", 500);
-  }
-  const trackingNumber = returnShipmentResult.trackingNumber || returnShipmentResult.tracking_number;
-  if (!trackingNumber) {
-    throw new ApiEror("لم يتم إرجاع رقم تتبع من شركة الشحن.", 500);
-  }
-  if (!returnShipmentResult.trackingNumber) returnShipmentResult.trackingNumber = trackingNumber;
-
-  // الشحنة العكسية: نفس التفاصيل لكن معلومات المرسل تصبح المستلم ومعلومات المستلم تصبح المرسل
-  const orig = originalShipment.toObject();
-  const originalReceiver = originalShipment.receiverAddress; // العميل (سيكون مرسل الشحنة العكسية)
-  const originalSender = orig.senderAddress || originalShipment.senderAddress; // التاجر (سيكون مستلم الشحنة العكسية)
-
-  const receiverAddressId = await getOrCreateSenderAsClientAddress(originalSender, customerId);
-  if (!receiverAddressId) {
-    throw new ApiEror("تعذر إنشاء عنوان المستلم للشحنة العكسية (المرسل الأصلي).", 500);
-  }
-
-  const senderAsObject = originalReceiver && typeof originalReceiver === "object"
-    ? {
-        clientName: originalReceiver.clientName || originalReceiver.full_name,
-        clientAddress: originalReceiver.clientAddress || originalReceiver.address,
-        clientPhone: originalReceiver.clientPhone || originalReceiver.mobile,
-        clientEmail: originalReceiver.clientEmail || originalReceiver.email,
-        city: originalReceiver.city,
-        country: originalReceiver.country,
-      }
-    : orig.receiverAddress || originalSender;
-
-  const returnShipmentData = {
-    ...orig,
-    _id: undefined,
-    __v: undefined,
-    senderAddress: senderAsObject,
-    receiverAddress: receiverAddressId,
-    isReturnShipment: true,
-    shapmentType: "reverse",
-    originalShipmentId: originalShipment._id,
-    shapmentPrice: shippingCost,
-    shipmentstates: "READY_FOR_PICKUP",
-    shapmentingType: originalShipment.shapmentingType || "Dry",
-    paymentMathod: "Prepaid",
-    trackingId: trackingNumber,
-    trackingURL: returnShipmentResult.trackingURL || returnShipmentResult.shipping_label_url || "",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-  delete returnShipmentData._id;
-
-  const newReturnShipment = await Shapment.create(returnShipmentData);
-
-  // خصم تكلفة الشحن من رصيد العميل
-  wallet.balance -= shippingCost;
-  await wallet.save();
-
-  // تسجيل المعاملة (بعد إنشاء الشحنة لاستخدام newReturnShipment._id)
-  const transaction = new Transaction({
-    walletId: wallet._id,
-    customerId: customerId,
-    amount: shippingCost,
-    type: "debit",
-    description: `خصم تكلفة شحنة إرجاع - ${trackingNumber}`,
-    status: "completed",
-    method: "return_shipment",
-    referenceId: newReturnShipment._id.toString(),
-    referenceType: "return_shipment",
+  await Shapment.findByIdAndUpdate(result.shipment._id, {
+    $set: {
+      shapmentType: "reverse",
+      isReturnShipment: true,
+      originalShipmentId: originalShipment._id,
+    },
   });
-  await transaction.save();
 
-  // إضافة المعاملة إلى سجل المعاملات في المحفظة
-  wallet.transactions.push(transaction._id);
-  await wallet.save();
+  const newReturnShipment = await Shapment.findById(result.shipment._id);
+  const trackingNumber = result.tracking?.number || newReturnShipment?.trackingId;
+  const wallet = await Wallet.findOne({ customerId });
 
-  // Create a response object with the new return shipment details
-  const response = {
-    newReturnShipment,
+  return {
+    newReturnShipment: newReturnShipment || result.shipment,
     returnShipmentResult: {
       success: true,
       message: "تم إنشاء شحنة الإرجاع بنجاح",
-      trackingNumber: newReturnShipment.trackingId,
-      shippingCost: shippingCost,
-      remainingBalance: wallet.balance,
+      trackingNumber,
+      shippingCost: result.shipment?.totalprice,
+      remainingBalance: wallet?.balance,
     },
   };
-
-  console.log("Return shipment created successfully:", response);
-  return response;
 };
 
 // Exposed endpoint for manual creation by admin
@@ -296,11 +135,7 @@ module.exports.createReturnShipment = asyncHandler(async (req, res, next) => {
   }
 
   const { newReturnShipment, returnShipmentResult } =
-    await _createReturnShipmentInternal(
-      shipmentId,
-      smsaRetailId,
-      req.customer._id
-    );
+    await _createReturnShipmentInternal(shipmentId, req.customer._id);
 
   res.status(201).json({
     status: "success",
