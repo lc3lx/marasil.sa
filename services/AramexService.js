@@ -64,30 +64,33 @@ exports.formatAddress = (address) => {
  * @returns {Object} بيانات الطرف بصيغة Aramex
  */
 exports.formatParty = (partyData) => {
+  if (!partyData) throw new Error("بيانات الطرف مطلوبة");
   const countryCode = toAramexCountryCode(
     partyData.country || partyData.CountryCode,
   );
+  const personName = (partyData.full_name || partyData.PersonName || "").toString().trim() || "غير محدد";
+  const city = (partyData.city || partyData.City || "Riyadh").toString().trim();
+  const line1 = [partyData.address, partyData.city, partyData.country].filter(Boolean).join("، ").trim() || "Address not specified";
   return {
     AccountEntity: process.env.ARAMEX_ACCOUNT_ENTITY || "JED",
     AccountNumber: process.env.ARAMEX_ACCOUNT_NUMBER,
-
-    Reference1: partyData._id || "Ref1",
+    Reference1: partyData._id ? String(partyData._id) : "Ref1",
     PartyAddress: {
-      Line1: [partyData.address, partyData.city, partyData.country].filter(Boolean).join("، ") || "Address not specified",
-      Line2: partyData.addressLine2 || "",
-      Line3: partyData.addressLine3 || "",
-      City: partyData.city,
-      PostCode: partyData.postCode || "",
+      Line1: line1,
+      Line2: (partyData.addressLine2 || "").toString().trim(),
+      Line3: (partyData.addressLine3 || "").toString().trim(),
+      City: city,
+      PostCode: (partyData.postCode || "").toString().trim(),
       CountryCode: countryCode,
     },
     Contact: {
-      PersonName: partyData.full_name,
-      CompanyName: partyData.full_name,
-      PhoneNumber1: toAramexPhone(partyData.mobile),
+      PersonName: personName,
+      CompanyName: personName,
+      PhoneNumber1: toAramexPhone(partyData.mobile || partyData.phone),
       PhoneNumber2: partyData.phone2 ? toAramexPhone(partyData.phone2) : "",
       Type: partyData.type || "Business",
-      CellPhone: toAramexPhone(partyData.mobile || "0000000000"),
-      EmailAddress: partyData.email || "test@example.com",
+      CellPhone: toAramexPhone(partyData.mobile || partyData.phone || "0000000000"),
+      EmailAddress: (partyData.email || "test@example.com").toString().trim(),
     },
   };
 };
@@ -221,25 +224,56 @@ exports.shipmentData = (
 };
 
 /**
- * تحويل عنوان عميل (ClientAddress أو كائن مرسل) إلى صيغة formatParty
+ * تحويل عنوان عميل (ClientAddress أو كائن مرسل) إلى صيغة formatParty مع دعم كل المفاتيح الشائعة
  */
 function addressToParty(addr) {
-  if (!addr) return null;
-  const full_name = addr.clientName || addr.full_name || addr.PersonName || "Unknown";
-  const address = addr.clientAddress || addr.address || addr.Line1 || "";
-  const city = addr.city || addr.City || "Riyadh";
-  const country = addr.country || addr.CountryCode || "SA";
-  const mobile = addr.clientPhone || addr.mobile || addr.PhoneNumber1 || addr.CellPhone || "";
-  const email = addr.clientEmail || addr.email || addr.EmailAddress || "noreply@marasil.sa";
+  if (!addr || typeof addr !== "object") return null;
+  const full_name = (
+    addr.clientName ||
+    addr.full_name ||
+    addr.name ||
+    addr.PersonName ||
+    addr.contactName ||
+    addr.CompanyName ||
+    ""
+  ).toString().trim();
+  const address = (
+    addr.clientAddress ||
+    addr.address ||
+    addr.Line1 ||
+    addr.address_line1 ||
+    addr.addressDetails ||
+    ""
+  ).toString().trim();
+  const city = (addr.city || addr.City || "Riyadh").toString().trim();
+  const country = (addr.country || addr.CountryCode || "SA").toString().trim();
+  const mobile = (
+    addr.clientPhone ||
+    addr.mobile ||
+    addr.phone ||
+    addr.PhoneNumber1 ||
+    addr.CellPhone ||
+    ""
+  ).toString().trim();
+  const email = (
+    addr.clientEmail ||
+    addr.email ||
+    addr.EmailAddress ||
+    "noreply@marasil.sa"
+  ).toString().trim();
+  const line2 = (addr.addressLine2 || addr.address_line2 || "").toString().trim();
+  const postCode = (addr.postCode || addr.PostCode || addr.nationalAddress || "").toString().trim();
+  const nameFallback = full_name || city || "غير محدد";
   return exports.formatParty({
     _id: addr._id,
-    full_name,
-    address,
+    full_name: nameFallback,
+    address: address || [city, country].filter(Boolean).join("، "),
     city,
     country,
     mobile,
-    email,
-    postCode: addr.postCode || addr.PostCode || addr.nationalAddress || "",
+    email: email || "noreply@marasil.sa",
+    postCode,
+    addressLine2: line2,
   });
 }
 
