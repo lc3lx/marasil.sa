@@ -90,7 +90,7 @@ const SetImageUrl = (doc) => {
   const val = doc.bankReceipt.trim();
   if (val.startsWith("http://") || val.startsWith("https://")) return;
   const base = (process.env.BASE_URL || "https://www.marasil.sa").replace(/\/$/, "");
-  doc.bankReceipt = `${base}/bankReceipt/${val}`;
+  doc.bankReceipt = `${base}/uploads/bankReceipt/${val}`;
 };
 
 transactionSchema.post("init", function (doc) {
