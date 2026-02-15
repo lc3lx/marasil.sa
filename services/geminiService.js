@@ -3180,16 +3180,21 @@ async function handleCreateShipmentFlow(
 }
 
 /**
- * كشف رسالة "تعليم" من المستخدم واستخراج السؤال والجواب
- * أنماط مدعومة: السؤال: ... الجواب: ... | س: ... ج: ... | علم: ... الإجابة: ...
+ * كشف رسالة "تعليم" من المستخدم باستخدام الكلمة السرية تعلم001 فقط
+ * الصيغة: تعلم001 السؤال: ... الجواب: ...  أو  تعلم001 س: ... ج: ...
+ * بهذا لا يستطيع أي أحد التعلم إلا من يعرف الكلمة.
  * @returns {{ question: string, answer: string } | null}
  */
 function parseTeachingMessage(message) {
   if (!message || typeof message !== "string") return null;
   const trimmed = message.trim();
+  const secret = "تعلم001";
+  if (!trimmed.includes(secret)) return null;
 
-  // السؤال: ... الجواب: ... أو الإجابة: ...
-  const match1 = trimmed.match(
+  const afterSecret = trimmed.slice(trimmed.indexOf(secret) + secret.length).trim();
+
+  // بعد تعلم001: السؤال: ... الجواب: ... أو الإجابة: ...
+  const match1 = afterSecret.match(
     /السؤال\s*[:\-]\s*([\s\S]*?)\s*(?:الجواب|الإجابة)\s*[:\-]\s*([\s\S]*)/i
   );
   if (match1) {
@@ -3198,21 +3203,13 @@ function parseTeachingMessage(message) {
     if (question.length >= 3 && answer.length >= 2) return { question, answer };
   }
 
-  // س: ... ج: ...
-  const match2 = trimmed.match(/س\s*[:\-]\s*([\s\S]*?)\s*ج\s*[:\-]\s*([\s\S]*)/i);
+  // بعد تعلم001: س: ... ج: ...
+  const match2 = afterSecret.match(
+    /س\s*[:\-]\s*([\s\S]*?)\s*ج\s*[:\-]\s*([\s\S]*)/i
+  );
   if (match2) {
     const question = match2[1].trim();
     const answer = match2[2].trim();
-    if (question.length >= 3 && answer.length >= 2) return { question, answer };
-  }
-
-  // علم: ... الإجابة: ... أو احفظ: ... الجواب: ...
-  const match3 = trimmed.match(
-    /(?:علم|احفظ)\s*[:\-]\s*([\s\S]*?)\s*(?:الإجابة|الجواب)\s*[:\-]\s*([\s\S]*)/i
-  );
-  if (match3) {
-    const question = match3[1].trim();
-    const answer = match3[2].trim();
     if (question.length >= 3 && answer.length >= 2) return { question, answer };
   }
 

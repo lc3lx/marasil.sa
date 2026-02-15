@@ -64,9 +64,18 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
       }
     }
 
-    // 0. كشف "تعليم" المساعد: س: ... ج: ... أو السؤال: ... الجواب: ...
+    // 0. كشف "تعليم" المساعد: تعلم001 السؤال والجواب — مسموح فقط للمستخدم المصرح له
     const teaching = geminiService.parseTeachingMessage(message);
-    if (teaching) {
+    const allowedTeachUserIds = (process.env.AI_TEACH_ALLOWED_USER_IDS || "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const masterTeachId = (process.env.AI_TEACH_MASTER_USER_ID || "").trim();
+    const canTeach =
+      allowedTeachUserIds.includes(String(user_id)) ||
+      (masterTeachId && String(user_id) === masterTeachId);
+
+    if (teaching && canTeach) {
       await AiKnowledge.create({
         question: teaching.question,
         answer: teaching.answer,
@@ -88,6 +97,25 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
         message:
           "تم حفظ المعلومة وتعلمتها، راح أستخدمها لاحقاً في الإجابة على أسئلة مشابهة.",
         data: { conversation_id: null, learned: true },
+        timestamp: new Date().toISOString(),
+      });
+    }
+    if (teaching && !canTeach) {
+      await Conversation.findOrCreateConversation(user_id, session_id).then(
+        async (conv) => {
+          await conv.addMessage("user", message.trim(), { timestamp: new Date() });
+          await conv.addMessage(
+            "ai",
+            "عذراً، لا يمكن تنفيذ هذا الطلب.",
+            { intent: "CHAT", timestamp: new Date() }
+          );
+        }
+      );
+      return res.status(200).json({
+        success: true,
+        intent: "CHAT",
+        message: "عذراً، لا يمكن تنفيذ هذا الطلب.",
+        data: { conversation_id: null },
         timestamp: new Date().toISOString(),
       });
     }
