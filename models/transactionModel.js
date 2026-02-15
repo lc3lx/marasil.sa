@@ -86,10 +86,11 @@ const transactionSchema = new mongoose.Schema({
 });
 
 const SetImageUrl = (doc) => {
-  if (doc.bankReceipt) {
-    const ImageUrl = `${process.env.BASE_URL}/bankReceipt/${doc.bankReceipt}`;
-    doc.bankReceipt = ImageUrl;
-  }
+  if (!doc.bankReceipt || typeof doc.bankReceipt !== "string") return;
+  const val = doc.bankReceipt.trim();
+  if (val.startsWith("http://") || val.startsWith("https://")) return;
+  const base = (process.env.BASE_URL || "https://www.marasil.sa").replace(/\/$/, "");
+  doc.bankReceipt = `${base}/bankReceipt/${val}`;
 };
 
 transactionSchema.post("init", function (doc) {

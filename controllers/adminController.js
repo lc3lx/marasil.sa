@@ -175,16 +175,17 @@ exports.getCompanyInfo = asyncHandler(async (req, res, next) => {
     return res.status(404).json({ error: "Customer not found" });
   }
   const brandLogoPath = customer.brand_logo
-    ? !customer.brand_logo.includes("/uploads/") &&
-      !customer.brand_logo.startsWith("http")
-      ? `/uploads/Logo/${customer.brand_logo}`
-      : customer.brand_logo
+    ? customer.brand_logo.startsWith("http://") || customer.brand_logo.startsWith("https://")
+      ? customer.brand_logo
+      : customer.brand_logo.includes("/")
+        ? customer.brand_logo.startsWith("/")
+          ? customer.brand_logo
+          : `/${customer.brand_logo}`
+        : `/uploads/Logo/${customer.brand_logo}`
     : null;
   const info = {
     brand_color: customer.brand_color,
-    brand_logo: brandLogoPath
-      ? getImageFullUrl(brandLogoPath)
-      : customer.brand_logo,
+    brand_logo: brandLogoPath ? getImageFullUrl(brandLogoPath) : customer.brand_logo,
     company_name_ar: customer.company_name_ar,
     company_name_en: customer.company_name_en,
     brand_email: customer.brand_email,
@@ -273,28 +274,32 @@ exports.getMe = asyncHandler(async (req, res, next) => {
   // إضافة المسار الكامل مع base URL للصور
   const customerData = customer.toObject();
   if (customerData.profileImage) {
-    if (
-      !customerData.profileImage.includes("/uploads/") &&
-      !customerData.profileImage.startsWith("http")
-    ) {
+    const img = customerData.profileImage;
+    if (img.startsWith("http://") || img.startsWith("https://")) {
+      customerData.profileImage = img;
+    } else if (img.includes("/")) {
       customerData.profileImage = getImageFullUrl(
-        `/uploads/customers/${customerData.profileImage}`
+        img.startsWith("/") ? img : `/${img}`
       );
     } else {
-      customerData.profileImage = getImageFullUrl(customerData.profileImage);
+      customerData.profileImage = getImageFullUrl(
+        `/uploads/customers/${img}`
+      );
     }
     console.log("✅ profileImage مع base URL:", customerData.profileImage);
   }
   if (customerData.brand_logo) {
-    if (
-      !customerData.brand_logo.includes("/uploads/") &&
-      !customerData.brand_logo.startsWith("http")
-    ) {
+    const logo = customerData.brand_logo;
+    if (logo.startsWith("http://") || logo.startsWith("https://")) {
+      customerData.brand_logo = logo;
+    } else if (logo.includes("/")) {
       customerData.brand_logo = getImageFullUrl(
-        `/uploads/Logo/${customerData.brand_logo}`
+        logo.startsWith("/") ? logo : `/${logo}`
       );
     } else {
-      customerData.brand_logo = getImageFullUrl(customerData.brand_logo);
+      customerData.brand_logo = getImageFullUrl(
+        `/uploads/Logo/${logo}`
+      );
     }
     console.log("✅ brand_logo مع base URL:", customerData.brand_logo);
   }
@@ -557,28 +562,32 @@ exports.updateLoggedCustomerdata = asyncHandler(async (req, res, next) => {
   // إضافة المسار الكامل مع base URL للصور
   const customerData = customer.toObject();
   if (customerData.profileImage) {
-    if (
-      !customerData.profileImage.includes("/uploads/") &&
-      !customerData.profileImage.startsWith("http")
-    ) {
+    const img = customerData.profileImage;
+    if (img.startsWith("http://") || img.startsWith("https://")) {
+      customerData.profileImage = img;
+    } else if (img.includes("/")) {
       customerData.profileImage = getImageFullUrl(
-        `/uploads/customers/${customerData.profileImage}`
+        img.startsWith("/") ? img : `/${img}`
       );
     } else {
-      customerData.profileImage = getImageFullUrl(customerData.profileImage);
+      customerData.profileImage = getImageFullUrl(
+        `/uploads/customers/${img}`
+      );
     }
     console.log("✅ profileImage مع base URL:", customerData.profileImage);
   }
   if (customerData.brand_logo) {
-    if (
-      !customerData.brand_logo.includes("/uploads/") &&
-      !customerData.brand_logo.startsWith("http")
-    ) {
+    const logo = customerData.brand_logo;
+    if (logo.startsWith("http://") || logo.startsWith("https://")) {
+      customerData.brand_logo = logo;
+    } else if (logo.includes("/")) {
       customerData.brand_logo = getImageFullUrl(
-        `/uploads/Logo/${customerData.brand_logo}`
+        logo.startsWith("/") ? logo : `/${logo}`
       );
     } else {
-      customerData.brand_logo = getImageFullUrl(customerData.brand_logo);
+      customerData.brand_logo = getImageFullUrl(
+        `/uploads/Logo/${logo}`
+      );
     }
     console.log("✅ brand_logo مع base URL:", customerData.brand_logo);
   }
