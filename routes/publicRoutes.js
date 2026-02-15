@@ -20,6 +20,7 @@ function wrapResJson(res) {
 }
 
 // GET /api/public/returns/shipments?token=:slug&phone=xxx (أو email أو awb)
+// الـ token يجب أن يساوي returnPageSlug لأحد العملاء (يُنشأ عند حفظ إعدادات صفحة الاسترجاع من لوحة التاجر)
 router.get("/returns/shipments", (req, res, next) => {
   const token = (req.query.token || "").toString().trim();
   if (!token) {
@@ -36,6 +37,7 @@ router.get("/returns/shipments", (req, res, next) => {
         return res.status(404).json({
           success: false,
           message: "رابط التاجر غير صالح أو منتهي",
+          hint: "تأكد أن الرابط من لوحة التاجر بعد حفظ إعدادات صفحة الاسترجاع، أو أن رمز الرابط (token) صحيح.",
         });
       }
       wrapResJson(res);
