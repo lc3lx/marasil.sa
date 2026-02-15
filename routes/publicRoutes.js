@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const {
   getReturnPageBySlug,
   getReplacementPageBySlug,
@@ -19,8 +20,28 @@ function wrapResJson(res) {
   };
 }
 
+/**
+ * إيجاد التاجر بالـ token مع بدائل: returnPageSlug ثم replacementPageSlug ثم _id (مع تعيين returnPageSlug إن لزم).
+ * @returns {Promise<{ _id }|null>}
+ */
+async function findCustomerByReturnToken(token) {
+  let customer = await Customer.findOne({ returnPageSlug: token }).select("_id").lean();
+  if (customer) return customer;
+  customer = await Customer.findOne({ replacementPageSlug: token }).select("_id").lean();
+  if (customer) return customer;
+  if (mongoose.Types.ObjectId.isValid(token) && String(new mongoose.Types.ObjectId(token)) === token) {
+    customer = await Customer.findById(token).select("_id returnPageSlug").lean();
+    if (customer) {
+      await Customer.findByIdAndUpdate(customer._id, {
+        $set: { returnPageSlug: token },
+      });
+      return { _id: customer._id };
+    }
+  }
+  return null;
+}
+
 // GET /api/public/returns/shipments?token=:slug&phone=xxx (أو email أو awb)
-// الـ token يجب أن يساوي returnPageSlug لأحد العملاء (يُنشأ عند حفظ إعدادات صفحة الاسترجاع من لوحة التاجر)
 router.get("/returns/shipments", (req, res, next) => {
   const token = (req.query.token || "").toString().trim();
   if (!token) {
@@ -29,9 +50,7 @@ router.get("/returns/shipments", (req, res, next) => {
       message: "رمز التاجر مطلوب (token)",
     });
   }
-  Customer.findOne({ returnPageSlug: token })
-    .select("_id")
-    .lean()
+  findCustomerByReturnToken(token)
     .then((customer) => {
       if (!customer) {
         return res.status(404).json({
@@ -47,6 +66,13 @@ router.get("/returns/shipments", (req, res, next) => {
 });
 
 // GET /api/public/replacements/shipments?token=:slug&phone=xxx (أو email أو awb)
+function findCustomerByReplacementToken(token) {
+  return Customer.findOne({
+    $or: [{ replacementPageSlug: token }, { returnPageSlug: token }],
+  })
+    .select("_id")
+    .lean();
+}
 router.get("/replacements/shipments", (req, res, next) => {
   const token = (req.query.token || "").toString().trim();
   if (!token) {
@@ -55,9 +81,7 @@ router.get("/replacements/shipments", (req, res, next) => {
       message: "رمز التاجر مطلوب (token)",
     });
   }
-  Customer.findOne({ replacementPageSlug: token })
-    .select("_id")
-    .lean()
+  findCustomerByReplacementToken(token)
     .then((customer) => {
       if (!customer) {
         return res.status(404).json({
@@ -88,9 +112,7 @@ router.post("/returns/create-request", (req, res, next) => {
     });
   }
   const typerequesst = type === "exchange" ? "exchange" : "return";
-  Customer.findOne({ returnPageSlug: tokenStr })
-    .select("_id")
-    .lean()
+  findCustomerByReturnToken(tokenStr)
     .then((customer) => {
       if (!customer) {
         return res.status(404).json({
@@ -136,9 +158,7 @@ router.post("/replacements/create-request", (req, res, next) => {
     });
   }
   const typerequesst = type === "exchange" ? "exchange" : "return";
-  Customer.findOne({ replacementPageSlug: tokenStr })
-    .select("_id")
-    .lean()
+  findCustomerByReplacementToken(tokenStr)
     .then((customer) => {
       if (!customer) {
         return res.status(404).json({

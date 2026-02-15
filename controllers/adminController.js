@@ -768,3 +768,47 @@ exports.getReplacementPageBySlug = asyncHandler(async (req, res, next) => {
     data: settings,
   });
 });
+
+// @desc للتاجر المسجّل: التأكد من وجود رابط صفحة الاسترجاع وإرجاعه (إنشاء slug إن لم يكن موجوداً). اختياري: ?slug=xxx لتعيين slug معيّن إن لم يكن مستخدماً.
+// @route GET /api/customer/return-page-link
+// @access Protect
+exports.getReturnPageLink = asyncHandler(async (req, res) => {
+  const requestedSlug = (req.query.slug || "").toString().trim();
+  let customer = await Customer.findById(req.customer._id).select("returnPageSlug").lean();
+  let slug = customer?.returnPageSlug;
+  if (requestedSlug && /^[a-zA-Z0-9_-]+$/.test(requestedSlug) && requestedSlug.length <= 64) {
+    const used = await Customer.findOne({ returnPageSlug: requestedSlug }).select("_id").lean();
+    if (!used || String(used._id) === String(req.customer._id)) {
+      slug = requestedSlug;
+      await Customer.findByIdAndUpdate(req.customer._id, { $set: { returnPageSlug: slug } });
+    }
+  }
+  if (!slug) {
+    slug = crypto.randomBytes(8).toString("base64url");
+    await Customer.findByIdAndUpdate(req.customer._id, { $set: { returnPageSlug: slug } });
+  }
+  const base = (process.env.BASE_URL || "https://www.marasil.sa").replace(/\/$/, "");
+  const returnPageUrl = `${base}/returns?token=${slug}`;
+  res.status(200).json({
+    status: "success",
+    data: { returnPageSlug: slug, returnPageUrl },
+  });
+});
+
+// @desc للتاجر المسجّل: التأكد من وجود رابط صفحة الاستبدال وإرجاعه (إنشاء slug إن لم يكن موجوداً)
+// @route GET /api/customer/replacement-page-link
+// @access Protect
+exports.getReplacementPageLink = asyncHandler(async (req, res) => {
+  const customer = await Customer.findById(req.customer._id).select("replacementPageSlug").lean();
+  let slug = customer?.replacementPageSlug;
+  if (!slug) {
+    slug = crypto.randomBytes(8).toString("base64url");
+    await Customer.findByIdAndUpdate(req.customer._id, { $set: { replacementPageSlug: slug } });
+  }
+  const base = (process.env.BASE_URL || "https://www.marasil.sa").replace(/\/$/, "");
+  const replacementPageUrl = `${base}/replacements?token=${slug}`;
+  res.status(200).json({
+    status: "success",
+    data: { replacementPageSlug: slug, replacementPageUrl },
+  });
+});

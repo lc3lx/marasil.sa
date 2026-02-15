@@ -18,6 +18,8 @@ const {
   updateTrackingSettings,
   getReturnPageBySlug,
   getReplacementPageBySlug,
+  getReturnPageLink,
+  getReplacementPageLink,
 } = require("../controllers/adminController");
 const {
   createCustomerValidator,
@@ -43,6 +45,8 @@ router.use(auth.Protect); // apply protect  for all routes (admin and users)
 
 // Customers routes
 router.get("/getMe", getMe);
+router.get("/return-page-link", getReturnPageLink);
+router.get("/replacement-page-link", getReplacementPageLink);
 router.put(
   "/changeMyPassword",
   changeLoggedCustomerPasswordValidator,
