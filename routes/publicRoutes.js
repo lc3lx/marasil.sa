@@ -104,6 +104,7 @@ router.post("/returns/create-request", (req, res, next) => {
 });
 
 // GET /api/public/returns/page-config?token=:slug
+router.get("/returns/page-config", (req, res, next) => {
   const token = req.query.token;
   if (!token || typeof token !== "string" || !token.trim()) {
     return res.status(400).json({
