@@ -107,17 +107,21 @@ exports.Shapmentdata = (
     dimension.height || dimension.high || dimension?.Height || 0
   );
 
+  // SMSA: رقم الطلب بحد أقصى 50 حرف
+  const rawOrderNumber = order.order_number != null ? String(order.order_number) : String(order._id || "");
+  const OrderNumber = rawOrderNumber.length > 50 ? rawOrderNumber.slice(0, 50) : rawOrderNumber;
+
   const shipmentData = {
-    CODAmount: isCOD ? order.total.amount : 0,
+    CODAmount: isCOD ? (order.total?.amount ?? 0) : 0,
     ConsigneeAddress: exports.formatAddress(order.customer, {
       isRecipient: true,
     }),
 
     ShipperAddress: exports.formatAddress(shipperAddress),
-    ContentDescription: orderDescription,
-    DeclaredValue: Math.max(parseFloat(order.total.amount || 0.1), 0.1),
+    ContentDescription: (orderDescription || "").toString().trim() || "شحنة",
+    DeclaredValue: Math.max(parseFloat(order.total?.amount || 0.1), 0.1),
     DutyPaid: false,
-    OrderNumber: String(order._id),
+    OrderNumber,
     Parcels: Parcels,
     ServiceCode: serviceCode, // يتم تمريره من المتحكم
     ShipDate: new Date().toISOString(),

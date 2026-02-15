@@ -82,10 +82,12 @@ async function createShipment(customerId, body) {
       status: { name: "pending" },
       items: orderInput.items || [],
       created_at: new Date(),
+      ...(orderInput.order_number != null && orderInput.order_number !== "" && { order_number: String(orderInput.order_number).slice(0, 50) }),
     });
     await newOrder.save();
     orderToUse = newOrder.toObject();
     orderToUse._id = newOrder._id;
+    if (newOrder.order_number) orderToUse.order_number = newOrder.order_number;
   }
 
   const shippingCompany = await shappingCompany.findOne({ company });

@@ -89,18 +89,20 @@ const _createReturnShipmentInternal = async (shipmentId, customerId) => {
     height: Number(dim.height) || 10,
   };
 
+  // نفس هيئة الطلب وقت إنشاء شحنة عادية: عدم إرسال _id لإنشاء طلب جديد (مرجع فريد)، ورقم طلب قصير لـ SMSA (حد 50)
+  const returnOrderNumber = "RET-" + String(originalShipment._id).slice(-12);
   const body = {
     company,
     order: {
-      _id: originalShipment.orderId != null ? String(originalShipment.orderId) : undefined,
       customer: orderCustomer,
       total: { amount: 0, currency: "SAR" },
       payment_method: "Prepaid",
       paymentMethod: "Prepaid",
       platform: "manual",
       items: [],
+      order_number: returnOrderNumber,
     },
-    orderDescription: `شحنة إرجاع - ${(originalShipment.orderDescription || "").toString().trim() || "إرجاع"}`,
+    orderDescription: (originalShipment.orderDescription || "إرجاع").toString().trim().slice(0, 200) || "شحنة إرجاع",
     shipperAddress,
     weight,
     Parcels,
