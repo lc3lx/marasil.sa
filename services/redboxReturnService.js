@@ -64,160 +64,28 @@ const prepareRedboxReturnShipment = (originalShipment) => {
  */
 const createRedboxReturnShipment = async (originalShipment, redboxService) => {
   try {
-    // تحضير بيانات الشحنة المرتجعة
     const returnShipmentData = prepareRedboxReturnShipment(originalShipment);
-    
-    // تحضير البيانات المطلوبة لإنشاء الشحنة في Redbox
-    // نستخدم معرف الشحنة الأصلية كـ original_shipment_id
     const redboxShipmentData = {
-      original_shipment_id: originalShipment.redboxShipmentId || originalShipment._id.toString()
+      original_shipment_id: originalShipment.redboxShipmentId || originalShipment._id.toString(),
+      ...(returnShipmentData.reference && { reference: returnShipmentData.reference }),
     };
-    
-    // إضافة الحقول الاختيارية فقط إذا كانت موجودة
-    if (returnShipmentData.reference) {
-      redboxShipmentData.reference = returnShipmentData.reference;
-    }
-    
-    // إنشاء الشحنة في نظام Redbox
+
     const redboxResult = await redboxService.createShipment(redboxShipmentData);
-    
+
     if (!redboxResult || !redboxResult.success) {
       throw new Error(redboxResult.message || 'فشل في إنشاء شحنة الإرجاع في Redbox');
     }
-    
-    // تحديث بيانات الشحنة المرتجعة بالاستجابة من Redbox
-    returnShipmentData.trackingId = redboxResult.tracking_number || `RET-${Date.now()}`;
-    returnShipmentData.redboxShipmentId = redboxResult.shipment_id || redboxResult.id;
-    returnShipmentData.shippingLabelUrl = redboxResult.shipping_label_url;
-    returnShipmentData.redboxResponse = redboxResult;
-    
-    // الحصول على نموذج العناوين
-    const ClientAddress = mongoose.model('ClientAddress');
-    
-    // تحضير بيانات المرسل والمستلم مع القيم الافتراضية
-    const prepareAddressData = (address, isReceiver = true) => {
-      if (!address) {
-        const defaultName = isReceiver ? 'عميل' : 'متجر';
-        return {
-          full_name: defaultName,
-          mobile: '0500000000',
-          email: isReceiver ? 'no-email@example.com' : 'store@example.com',
-          address: isReceiver ? 'عنوان غير محدد' : 'عنوان المتجر',
-          city: 'غير محدد',
-          country: 'SA',
-          district: 'غير محدد'
-        };
-      }
-      return {
-        full_name: address.full_name || (isReceiver ? 'عميل' : 'متجر'),
-        mobile: address.mobile || address.mobile ,
-        email: address.email || (isReceiver ? 'no-email@example.com' : 'store@example.com'),
-        address: address.address || address.address_line1 || (isReceiver ? 'عنوان غير محدد' : 'عنوان المتجر'),
-        city: address.city || 'غير محدد',
-        country: address.country || 'SA',
-        district: address.district || address.city || 'غير محدد',
-        ...address
-      };
-    };
-    
-    const senderAddress = prepareAddressData(originalShipment.senderAddress, true);
-    const receiverAddress = prepareAddressData(originalShipment.receiverAddress, false);
-    
-    // تسجيل بيانات العناوين للتصحيح
-    console.log('Sender Address Data:', JSON.stringify(senderAddress, null, 2));
-    console.log('Receiver Address Data:', JSON.stringify(receiverAddress, null, 2));
-    
-    // دالة مساعدة للبحث عن عنوان موجود أو إنشاء عنوان جديد
-    const findOrCreateAddress = async (addressData, isReceiver = true) => {
-      try {
-        // محاولة العثور على عنوان موجود
-        const existingAddress = await ClientAddress.findOne({
-          clientPhone: phone,
-          customerId: originalShipment.customerId
-        });
-        
-        if (existingAddress) {
-          console.log('Found existing address:', existingAddress._id);
-          return existingAddress;
-        }
-        
-        console.log('Creating new address with data:', {
-          clientName: addressName,
-          clientPhone: phone,
-          clientEmail: email,
-          clientAddress: addressText,
-          addressDetails: addressText,
-          district: district,
-          city: city,
-          country: country,
-          customer: originalShipment.customerId,
-          isDefault: false
-        });
-        
-        // إنشاء عنوان جديد
-        const newAddress = new ClientAddress({
-          clientName: addressName,
-          clientPhone: phone,
-          clientEmail: email,
-          clientAddress: addressText,
-          addressDetails: addressText, // Using the same as clientAddress for now
-          district: district,
-          city: city,
-          country: country,
-          customer: originalShipment.customerId,
-          isDefault: false
-        });
-        
-        // التحقق من صحة النموذج قبل الحفظ
-        const validationError = newAddress.validateSync();
-        if (validationError) {
-          console.error('Validation error before save:', validationError);
-          throw validationError;
-        }
-        
-        return await newAddress.save();
-      } catch (error) {
-        console.error('Error in findOrCreateAddress:', error);
-        // إعادة رمي الخطأ مع رسالة أوضح
-        if (error.name === 'ValidationError') {
-          const missingFields = Object.keys(error.errors).join(', ');
-          throw new Error(`حقول مطلوبة مفقودة: ${missingFields}. ${error.message}`);
-        }
-        throw error;
-      }
-    };
-    
-    // البحث عن أو إنشاء عنوان المستلم (المرسل الأصلي)
-    const savedReceiverAddress = await findOrCreateAddress(senderAddress, true);
-    
-    // البحث عن أو إنشاء عنوان المرسل (المستلم الأصلي)
-    const savedSenderAddress = await findOrCreateAddress(receiverAddress, false);
-    
-    // تحضير بيانات الشحنة المرتجعة مع الحقول المطلوبة
-    const returnShipmentToSave = {
-      ...returnShipmentData,
-      customerId: originalShipment.customerId, // إضافة معرف العميل المطلوب
-      receiverAddress: savedReceiverAddress._id, // استخدام معرف العنوان المحفوظ
-      senderAddress: savedSenderAddress._id, // استخدام معرف العنوان المحفوظ
-      paymentMathod: 'Prepaid', // دائمًا مدفوع مسبقًا للشحنات المرتجعة
-      shapmentCompany: 'redbox',
-      status: 'created',
-      // نسخ باقي الحقول المطلوبة من الشحنة الأصلية
-      orderId: originalShipment.orderId,
-      weight: originalShipment.weight,
-      dimension: originalShipment.dimension,
-      orderDescription: originalShipment.orderDescription ? `إرجاع - ${originalShipment.orderDescription}` : 'شحنة إرجاع',
-      originalShipmentId: originalShipment._id // حفظ معرف الشحنة الأصلية
-    };
-    
-    // حفظ الشحنة المرتجعة في قاعدة البيانات
-    const ReturnShipment = mongoose.model('Shapment', require('../models/shipmentModel').shapmentSchema);
-    const newReturnShipment = await ReturnShipment.create(returnShipmentToSave);
-    
+
+    // سجل الشحنة العكسية في DB يُنشأ في الـ controller مع مبادلة المرسل/المستلم
     return {
       success: true,
-      returnShipment: newReturnShipment,
-      redboxResult
+      returnShipment: null,
+      redboxResult: {
+        ...redboxResult,
+        trackingNumber: redboxResult.tracking_number || redboxResult.trackingNumber,
+        tracking_number: redboxResult.tracking_number || redboxResult.trackingNumber,
+        shipping_label_url: redboxResult.shipping_label_url,
+      },
     };
   } catch (error) {
     console.error('Error in createRedboxReturnShipment:', error);

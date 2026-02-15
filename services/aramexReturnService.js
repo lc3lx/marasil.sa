@@ -58,26 +58,15 @@ const aramexDataService = require("./AramexService");
 
 const createAramexReturnShipment = async (originalShipment, aramexPlatform) => {
   try {
-    // بناء طلب CreateShipments بصيغة Aramex الصحيحة (وليس كائن قاعدة البيانات)
+    // بناء طلب CreateShipments بصيغة Aramex الصحيحة (مرسل=المستلم الأصلي، مستلم=المرسل الأصلي)
     const aramexPayload = aramexDataService.returnShipmentData(originalShipment);
 
-    // إنشاء الشحنة في نظام Aramex
+    // إنشاء الشحنة العكسية في نظام Aramex فقط؛ سجل الشحنة في DB يُنشأ في الـ controller مع مبادلة المرسل/المستلم
     const aramexResult = await aramexPlatform.createShipment(aramexPayload);
-
-    // حفظ الشحنة المرتجعة في قاعدة البيانات (بيانات محلية للتوثيق)
-    const returnShipmentDoc = prepareAramexReturnShipment(originalShipment);
-    if (aramexResult && aramexResult.trackingNumber) {
-      returnShipmentDoc.trackingId = aramexResult.trackingNumber;
-    }
-    const ReturnShipment = mongoose.model(
-      "Shapment",
-      require("../models/shipmentModel").shapmentSchema
-    );
-    const newReturnShipment = await ReturnShipment.create(returnShipmentDoc).catch(() => null);
 
     return {
       success: true,
-      returnShipment: newReturnShipment,
+      returnShipment: null,
       aramexResult,
     };
   } catch (error) {

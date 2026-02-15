@@ -27,9 +27,40 @@ const {
 const ApiEror = require("../utils/apiError");
 const asyncHandler = require("express-async-handler");
 const ReturnShipment = require("../models/returnShipmentModel");
+const ClientAddress = require("../models/clientAddressModel");
 const sendMail = require("../utils/SendMail");
 const crypto = require("crypto");
 const omnidPlatform = require("../platforms/shipment/omnidPlatform");
+
+/**
+ * الحصول على أو إنشاء ClientAddress من كائن عنوان المرسل (التاجر) لاستخدامه كمستلم في الشحنة العكسية
+ */
+const getOrCreateSenderAsClientAddress = async (senderObject, customerId) => {
+  if (!senderObject || !customerId) return null;
+  const name = senderObject.clientName || senderObject.full_name || senderObject.PersonName || "مرسل";
+  const address = senderObject.clientAddress || senderObject.address || senderObject.Line1 || "عنوان غير محدد";
+  const phone = senderObject.clientPhone || senderObject.mobile || senderObject.PhoneNumber1 || "0000000000";
+  const email = senderObject.clientEmail || senderObject.email || senderObject.EmailAddress || "noreply@marasil.sa";
+  const city = senderObject.city || senderObject.City || "الرياض";
+  const country = senderObject.country || senderObject.CountryCode || "SA";
+  let addr = await ClientAddress.findOne({
+    customer: customerId,
+    clientPhone: phone.trim(),
+    city: city.trim(),
+    clientAddress: address.trim().substring(0, 100),
+  });
+  if (addr) return addr._id;
+  addr = await ClientAddress.create({
+    clientName: name,
+    clientAddress: address,
+    clientPhone: phone,
+    clientEmail: email || "noreply@marasil.sa",
+    country,
+    city,
+    customer: customerId,
+  });
+  return addr._id;
+};
 
 // Internal function, not exposed as an endpoint
 const _createReturnShipmentInternal = async (shipmentId, customerId) => {
@@ -92,28 +123,19 @@ const _createReturnShipmentInternal = async (shipmentId, customerId) => {
       );
       break;
     case "aramex":
-      // استخدام الدالة المخصصة لإنشاء شحنة إرجاع Aramex
-      const result = await createAramexReturnShipment(originalShipment, aramex);
-      returnShipmentResult = result.aramexResult;
-
-      // تحديث البيانات المرجعة
-      return {
-        newReturnShipment: result.returnShipment,
-        returnShipmentResult: result.aramexResult,
-      };
+      // إنشاء شحنة الإرجاع في Aramex (نفس التفاصيل، مرسل↔مستلم)
+      const aramexResult = await createAramexReturnShipment(originalShipment, aramex);
+      returnShipmentResult = aramexResult.aramexResult;
+      break;
 
     case "redbox":
-      // استخدام الدالة المخصصة لإنشاء شحنة إرجاع Redbox
+      // إنشاء شحنة الإرجاع في Redbox (نفس التفاصيل، مرسل↔مستلم)
       const redboxResult = await createRedboxReturnShipment(
         originalShipment,
         redbox
       );
-
-      // تحديث البيانات المرجعة
-      return {
-        newReturnShipment: redboxResult.returnShipment,
-        returnShipmentResult: redboxResult.redboxResult,
-      };
+      returnShipmentResult = redboxResult.redboxResult;
+      break;
 
     case "omniclama":
       // تحضير بيانات شحنة الإرجاع لشركة Omni
@@ -176,26 +198,53 @@ const _createReturnShipmentInternal = async (shipmentId, customerId) => {
       );
   }
 
-  if (!returnShipmentResult || !returnShipmentResult.trackingNumber) {
+  if (!returnShipmentResult) {
+    throw new ApiEror("لم يتم إرجاع نتيجة من شركة الشحن.", 500);
+  }
+  const trackingNumber = returnShipmentResult.trackingNumber || returnShipmentResult.tracking_number;
+  if (!trackingNumber) {
     throw new ApiEror("لم يتم إرجاع رقم تتبع من شركة الشحن.", 500);
   }
+  if (!returnShipmentResult.trackingNumber) returnShipmentResult.trackingNumber = trackingNumber;
 
-  // إنشاء سجل الشحنة المرتجعة أولاً (قبل المعاملة لاستخدام _id فيها) — نوعها عكسية
+  // الشحنة العكسية: نفس التفاصيل لكن معلومات المرسل تصبح المستلم ومعلومات المستلم تصبح المرسل
+  const orig = originalShipment.toObject();
+  const originalReceiver = originalShipment.receiverAddress; // العميل (سيكون مرسل الشحنة العكسية)
+  const originalSender = orig.senderAddress || originalShipment.senderAddress; // التاجر (سيكون مستلم الشحنة العكسية)
+
+  const receiverAddressId = await getOrCreateSenderAsClientAddress(originalSender, customerId);
+  if (!receiverAddressId) {
+    throw new ApiEror("تعذر إنشاء عنوان المستلم للشحنة العكسية (المرسل الأصلي).", 500);
+  }
+
+  const senderAsObject = originalReceiver && typeof originalReceiver === "object"
+    ? {
+        clientName: originalReceiver.clientName || originalReceiver.full_name,
+        clientAddress: originalReceiver.clientAddress || originalReceiver.address,
+        clientPhone: originalReceiver.clientPhone || originalReceiver.mobile,
+        clientEmail: originalReceiver.clientEmail || originalReceiver.email,
+        city: originalReceiver.city,
+        country: originalReceiver.country,
+      }
+    : orig.receiverAddress || originalSender;
+
   const returnShipmentData = {
-    ...originalShipment.toObject(),
+    ...orig,
+    _id: undefined,
+    __v: undefined,
+    senderAddress: senderAsObject,
+    receiverAddress: receiverAddressId,
     isReturnShipment: true,
-    shapmentType: "reverse", // شحنة عكسية (إرجاع/استبدال)
+    shapmentType: "reverse",
     originalShipmentId: originalShipment._id,
     shapmentPrice: shippingCost,
     shipmentstates: "READY_FOR_PICKUP",
     shapmentingType: originalShipment.shapmentingType || "Dry",
     paymentMathod: "Prepaid",
-    trackingId: returnShipmentResult.trackingNumber,
-    trackingURL: returnShipmentResult.trackingURL,
-    status: "pending_return",
+    trackingId: trackingNumber,
+    trackingURL: returnShipmentResult.trackingURL || returnShipmentResult.shipping_label_url || "",
     createdAt: new Date(),
     updatedAt: new Date(),
-    __v: undefined,
   };
   delete returnShipmentData._id;
 
@@ -211,7 +260,7 @@ const _createReturnShipmentInternal = async (shipmentId, customerId) => {
     customerId: customerId,
     amount: shippingCost,
     type: "debit",
-    description: `خصم تكلفة شحنة إرجاع - ${returnShipmentResult.trackingNumber}`,
+    description: `خصم تكلفة شحنة إرجاع - ${trackingNumber}`,
     status: "completed",
     method: "return_shipment",
     referenceId: newReturnShipment._id.toString(),
