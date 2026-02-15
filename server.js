@@ -397,6 +397,7 @@ app.post(
   })
 );
 app.use("/api/auth", authRoutes);
+app.use("/api/public", require("./routes/publicRoutes"));
 app.use("/api/customer", customerRoutes);
 app.use("/api/admin", dashboardRoutes);
 app.use("/api/order", orderRoutes);
