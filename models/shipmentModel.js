@@ -84,6 +84,15 @@ const shapmentSchema = new mongoose.Schema(
     omniclamaResponse: { type: Object, default: null },
     smsaResponse: { type: Object, default: null },
     aramexResponse: { type: Object, default: null },
+    // طلب استلام أرامكس: pickupId, pickupGUID (يُحفظان عند إنشاء طلب الاستلام بعد الشحنة)
+    pickupRequest: {
+      success: { type: Boolean },
+      pickupId: { type: String },
+      pickupGUID: { type: String },
+      scheduledDate: { type: Date },
+      message: { type: String },
+      error: { type: mongoose.Schema.Types.Mixed },
+    },
     companyshipmentid: String,
     totalprice: { type: Number },
     // Pricing Information

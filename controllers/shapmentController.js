@@ -353,9 +353,10 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
 
           if (pickupResult.success) {
             console.log("✅ [Controller] تم إنشاء طلب الاستلام بنجاح");
-            // إضافة معلومات طلب الاستلام للرد
+            // إضافة معلومات طلب الاستلام للرد (مع pickupId و pickupGUID للتخزين والعرض)
             trackingInfo.pickupRequest = {
               pickupId: pickupResult.pickupId,
+              pickupGUID: pickupResult.pickupGUID,
               scheduledDate: pickupResult.scheduledDate,
               message: pickupResult.message,
               success: true,
@@ -472,12 +473,14 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
       aramexResponse: apiResponses.aramex || null,
       redboxResponse: apiResponses.redbox || null,
       omniclamaResponse: apiResponses.omniclama || null,
-      // حفظ معلومات طلب الاستلام إذا كان موجوداً
+      // حفظ معلومات طلب الاستلام إذا كان موجوداً (pickupId و pickupGUID للشحنات أرامكس)
       ...(trackingInfo.pickupRequest && {
         pickupRequest: {
           pickupId: trackingInfo.pickupRequest.pickupId,
+          pickupGUID: trackingInfo.pickupRequest.pickupGUID,
           scheduledDate: trackingInfo.pickupRequest.scheduledDate,
           success: trackingInfo.pickupRequest.success,
+          message: trackingInfo.pickupRequest.message,
           ...(trackingInfo.pickupRequest.error && {
             error: trackingInfo.pickupRequest.error,
           }),
@@ -544,11 +547,12 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           number: trackingInfo.trackingNumber,
           url: `${shippingCompany.trackingURL}${trackingInfo.trackingNumber}`,
         },
-        // إضافة معلومات طلب الاستلام إذا كان موجوداً
+        // إضافة معلومات طلب الاستلام إذا كان موجوداً (pickupId و pickupGUID)
         ...(trackingInfo.pickupRequest && {
           pickupRequest: {
             success: trackingInfo.pickupRequest.success,
             pickupId: trackingInfo.pickupRequest.pickupId,
+            pickupGUID: trackingInfo.pickupRequest.pickupGUID,
             scheduledDate: trackingInfo.pickupRequest.scheduledDate,
             message: trackingInfo.pickupRequest.message,
             ...(trackingInfo.pickupRequest.error && {

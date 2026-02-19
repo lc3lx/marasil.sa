@@ -48,7 +48,11 @@ function normalizeArabicText(text = "") {
     .trim();
 }
 
-function includesNormalized(haystack = "", pattern = "", haystackNormalized = false) {
+function includesNormalized(
+  haystack = "",
+  pattern = "",
+  haystackNormalized = false,
+) {
   if (!haystack || !pattern) return false;
   const normalizedHaystack = haystackNormalized
     ? haystack
@@ -167,9 +171,9 @@ const SYSTEM_PROMPT = `أنت مساعد ذكاء اصطناعي رسمي لمن
 === عند السؤال عن خدماتنا (خدمات مراسيل) ===
 عندما يسأل التاجر عن الخدمات أو "شو تقدمون" أو "خدماتكم" أو "ما خدمات مراسيل":
 ردّ بإبداع وتسويق ودي، واذكر:
-1) إدارة الشحنات والطلبات بأسهل طريقة — اللي تحبها قلبك
-2) التكامل مع منصات المتاجر: سلة، زيد، شوبيفي
-3) طباعة البواليص من شركات الشحن اللي في قاعدة البيانات — بأقل الأسعار
+1) إدارة الشحنات والطلبات بأسهل طريقة — اللي يحبها قلبك
+2) التكامل مع منصات المتاجر: سلة، زد، شوبيفاي
+3) طباعة البوالص من شركات الشحن اللي في قاعدة البيانات — بأقل الأسعار
 اجعل الرد قصيراً، جذاباً، وبدون قوائم جامدة. استخدم لغة ترحيبية وتشويقية.
 
 7. **generalService.getShippingCompanies()**
@@ -587,7 +591,7 @@ function quickKeywordParse(
   message,
   userInfo = null,
   context = "",
-  userId = null
+  userId = null,
 ) {
   const userName = userInfo?.firstName || "عميلنا الكريم";
   const normalizedMessage = normalizeArabicText(message || "");
@@ -680,17 +684,23 @@ function quickKeywordParse(
     "الغي",
   ];
   const hasCancelIntent = cancelPatternsWithNumber.some((p) =>
-    includesNormalized(normalizedMessage, p, true)
+    includesNormalized(normalizedMessage, p, true),
   );
   const cancelNumberMatch = normalizedMessage.match(/(\d{6,})/);
   if (hasCancelIntent && cancelNumberMatch) {
-    console.log("✅ [Quick Parse] Matched CANCEL with number in same message:", cancelNumberMatch[1]);
+    console.log(
+      "✅ [Quick Parse] Matched CANCEL with number in same message:",
+      cancelNumberMatch[1],
+    );
     return {
       intent: "CANCEL",
       confidence: 0.95,
       missing_fields: [],
       message: `تمام ${userName}، جاري إلغاء الشحنة رقم ${cancelNumberMatch[1]}...`,
-      data: { shipment_id: cancelNumberMatch[1], tracking_number: cancelNumberMatch[1] },
+      data: {
+        shipment_id: cancelNumberMatch[1],
+        tracking_number: cancelNumberMatch[1],
+      },
     };
   }
 
@@ -702,14 +712,26 @@ function quickKeywordParse(
     !lowerMessage.includes("balance") &&
     !includesNormalized(normalizedMessage, "بكم", true)
   ) {
-    if (context && (context.includes("إلغاء") || context.includes("لإلغاء الشحنة أحتاج") || context.includes("الغاء") || context.includes("رقم الشحنة المراد إلغاؤها"))) {
-      console.log("✅ [Quick Parse] Number only in CANCEL context → CANCEL:", numberOnlyMatch[1]);
+    if (
+      context &&
+      (context.includes("إلغاء") ||
+        context.includes("لإلغاء الشحنة أحتاج") ||
+        context.includes("الغاء") ||
+        context.includes("رقم الشحنة المراد إلغاؤها"))
+    ) {
+      console.log(
+        "✅ [Quick Parse] Number only in CANCEL context → CANCEL:",
+        numberOnlyMatch[1],
+      );
       return {
         intent: "CANCEL",
         confidence: 0.95,
         missing_fields: [],
         message: `تمام ${userName}، جاري إلغاء الشحنة رقم ${numberOnlyMatch[1]}...`,
-        data: { shipment_id: numberOnlyMatch[1], tracking_number: numberOnlyMatch[1] },
+        data: {
+          shipment_id: numberOnlyMatch[1],
+          tracking_number: numberOnlyMatch[1],
+        },
       };
     }
     console.log("✅ [Quick Parse] Matched standalone tracking number");
@@ -724,7 +746,7 @@ function quickKeywordParse(
 
   // التحقق من رقم التتبع مع كلمات توضيحية (مثل "هاي رقم التتبع 50724610926")
   const numberWithWordsMatch = normalizedMessage.match(
-    /(?:رقم|هاي|هذا|التتبع|الشحنه|الطلب|الطلبيه|الكود|المرسل|هاي الرقم)\s*:?\s*(\d{6,})/i
+    /(?:رقم|هاي|هذا|التتبع|الشحنه|الطلب|الطلبيه|الكود|المرسل|هاي الرقم)\s*:?\s*(\d{6,})/i,
   );
   if (numberWithWordsMatch) {
     console.log("✅ [Quick Parse] Matched tracking number with words");
@@ -781,7 +803,7 @@ function quickKeywordParse(
   ];
 
   const hasTrackKeyword = trackPatterns.some((pattern) =>
-    includesNormalized(normalizedMessage, pattern, true)
+    includesNormalized(normalizedMessage, pattern, true),
   );
   if (hasTrackKeyword) {
     const numberMatch = normalizedMessage.match(/(\d{6,})/);
@@ -808,16 +830,26 @@ function quickKeywordParse(
 
   // إنشاء شحنة مع تفاصيل كاملة (شركة + وزن [+ دفع]) → نسأل مرسل/مستلم جديد أو موجود
   const createWithDetailsPatterns = [
-    "اعمل شحنة", "اعمل شحن", "ابدى اعمل شحنة", "بدي اعمل شحنة", "ابي اعمل شحنة",
-    "اشحن", "اشحن بشركة", "شحنة بشركة", "انشاء شحنة", "شحنة جديد"
+    "اعمل شحنة",
+    "اعمل شحن",
+    "ابدى اعمل شحنة",
+    "بدي اعمل شحنة",
+    "ابي اعمل شحنة",
+    "اشحن",
+    "اشحن بشركة",
+    "شحنة بشركة",
+    "انشاء شحنة",
+    "شحنة جديد",
   ];
   const hasCreateWithDetails = createWithDetailsPatterns.some((p) =>
-    includesNormalized(normalizedMessage, p, true)
+    includesNormalized(normalizedMessage, p, true),
   );
   if (hasCreateWithDetails) {
     const details = extractShipmentDetails(message);
     if (details.weight && details.company) {
-      console.log("✅ [Quick Parse] Create shipment with full details → ask sender/recipient choice");
+      console.log(
+        "✅ [Quick Parse] Create shipment with full details → ask sender/recipient choice",
+      );
       return {
         intent: "CHAT",
         confidence: 0.9,
@@ -889,7 +921,7 @@ function quickKeywordParse(
   ];
   if (
     balancePatterns.some((pattern) =>
-      includesNormalized(normalizedMessage, pattern, true)
+      includesNormalized(normalizedMessage, pattern, true),
     )
   ) {
     console.log("✅ [Quick Parse] Matched BALANCE pattern");
@@ -922,7 +954,7 @@ function quickKeywordParse(
   ];
   if (
     listPatterns.some((pattern) =>
-      includesNormalized(normalizedMessage, pattern, true)
+      includesNormalized(normalizedMessage, pattern, true),
     )
   ) {
     console.log("✅ [Quick Parse] Matched LIST_SHIPMENTS pattern");
@@ -976,10 +1008,12 @@ function quickKeywordParse(
   ];
   if (
     servicesPatterns.some((pattern) =>
-      includesNormalized(normalizedMessage, pattern, true)
+      includesNormalized(normalizedMessage, pattern, true),
     )
   ) {
-    console.log("✅ [Quick Parse] Matched SERVICES question → GET_SERVICES_INFO");
+    console.log(
+      "✅ [Quick Parse] Matched SERVICES question → GET_SERVICES_INFO",
+    );
     return {
       intent: "CHAT",
       confidence: 0.9,
@@ -1017,7 +1051,7 @@ function quickKeywordParse(
   ];
   if (
     companyPatterns.some((pattern) =>
-      includesNormalized(normalizedMessage, pattern, true)
+      includesNormalized(normalizedMessage, pattern, true),
     )
   ) {
     console.log("✅ [Quick Parse] Matched COMPANY_INFO pattern");
@@ -1058,7 +1092,7 @@ function quickKeywordParse(
   ];
   if (
     shippingCompaniesPatterns.some((pattern) =>
-      includesNormalized(normalizedMessage, pattern, true)
+      includesNormalized(normalizedMessage, pattern, true),
     )
   ) {
     console.log("✅ [Quick Parse] Matched SHIPPING_COMPANIES → fetch from DB");
@@ -1072,10 +1106,21 @@ function quickKeywordParse(
   }
 
   // متابعة حساب السعر: السياق يذكر أننا ننتظر وزن/دفع والرسالة تحتوي وزناً (واختيارياً طريقة دفع)
-  if (context && (context.includes("لحساب سعر") || context.includes("أحتاج أعرف وزن") || context.includes("وزن الشحنة بالكيلو") || context.includes("طريقة الدفع"))) {
-    const hasWeight = /\d+(?:\.\d+)?\s*(?:ك(?:يلو|ليو|جم|غ|يلو|ليوغرام|ليو)|كيلوغرام|kg)/i.test(normalizedMessage) || /(?:وزنها|وزن)\s*(\d+)/i.test(normalizedMessage);
+  if (
+    context &&
+    (context.includes("لحساب سعر") ||
+      context.includes("أحتاج أعرف وزن") ||
+      context.includes("وزن الشحنة بالكيلو") ||
+      context.includes("طريقة الدفع"))
+  ) {
+    const hasWeight =
+      /\d+(?:\.\d+)?\s*(?:ك(?:يلو|ليو|جم|غ|يلو|ليوغرام|ليو)|كيلوغرام|kg)/i.test(
+        normalizedMessage,
+      ) || /(?:وزنها|وزن)\s*(\d+)/i.test(normalizedMessage);
     if (hasWeight) {
-      console.log("✅ [Quick Parse] Pricing continuation (weight in message) → CALCULATE_PRICING");
+      console.log(
+        "✅ [Quick Parse] Pricing continuation (weight in message) → CALCULATE_PRICING",
+      );
       return {
         intent: "CHAT",
         confidence: 0.9,
@@ -1138,17 +1183,25 @@ function quickKeywordParse(
     "كم محسوبه",
   ];
   const hasPricingIntent = pricingPatterns.some((pattern) =>
-    includesNormalized(normalizedMessage, pattern, true)
+    includesNormalized(normalizedMessage, pattern, true),
   );
   if (hasPricingIntent) {
     // إذا كانت الرسالة تحتوي وزن و/أو شركة (ارمكس، سمسا، إلخ) → حساب فوري عبر shipmentAccount
-    const hasWeightInMessage = /\d+(?:\.\d+)?\s*(?:ك(?:يلو|ليو|جم|غ|يلو|ليوغرام|ليو)|كيلوغرام|kg)/i.test(normalizedMessage) ||
+    const hasWeightInMessage =
+      /\d+(?:\.\d+)?\s*(?:ك(?:يلو|ليو|جم|غ|يلو|ليوغرام|ليو)|كيلوغرام|kg)/i.test(
+        normalizedMessage,
+      ) ||
       /(?:وزنها|وزن الشحنة|وزن)\s*(\d+(?:\.\d+)?)/i.test(normalizedMessage) ||
       /شحنة\s+عادي[^\d]*(\d+)/i.test(normalizedMessage) ||
       /\d+(?:\.\d+)?\s*كيلوغرام/i.test(normalizedMessage);
-    const hasCompanyInMessage = /ارمكس|ارامكس|أرامكس|سمسا|ريد بوكس|لاما|ومني|omni/i.test(normalizedMessage);
+    const hasCompanyInMessage =
+      /ارمكس|ارامكس|أرامكس|سمسا|ريد بوكس|لاما|ومني|omni/i.test(
+        normalizedMessage,
+      );
     if (hasWeightInMessage || hasCompanyInMessage) {
-      console.log("✅ [Quick Parse] PRICING with details in message → CALCULATE_PRICING via shipmentAccount");
+      console.log(
+        "✅ [Quick Parse] PRICING with details in message → CALCULATE_PRICING via shipmentAccount",
+      );
       return {
         intent: "CHAT",
         confidence: 0.9,
@@ -1212,7 +1265,7 @@ function quickKeywordParse(
 
   if (
     continuationPatterns.some((pattern) =>
-      includesNormalized(normalizedMessage, pattern, true)
+      includesNormalized(normalizedMessage, pattern, true),
     )
   ) {
     console.log("✅ [Quick Parse] Matched CONTINUATION pattern");
@@ -1232,7 +1285,7 @@ function quickKeywordParse(
         if (contextTrackingMatch) {
           console.log(
             "✅ [Quick Parse] Found tracking number in context for continuation:",
-            contextTrackingMatch[1]
+            contextTrackingMatch[1],
           );
           return {
             intent: "TRACK",
@@ -1244,7 +1297,7 @@ function quickKeywordParse(
         } else {
           // إذا كان هناك سياق تتبع لكن لا رقم محدد
           console.log(
-            "✅ [Quick Parse] Continuation in tracking context without number"
+            "✅ [Quick Parse] Continuation in tracking context without number",
           );
           return {
             intent: "CHAT",
@@ -1294,13 +1347,19 @@ function quickKeywordParse(
       ) {
         const cancelNumInMessage = normalizedMessage.match(/(\d{6,})/);
         if (cancelNumInMessage) {
-          console.log("✅ [Quick Parse] Continuation in CANCEL context with number:", cancelNumInMessage[1]);
+          console.log(
+            "✅ [Quick Parse] Continuation in CANCEL context with number:",
+            cancelNumInMessage[1],
+          );
           return {
             intent: "CANCEL",
             confidence: 0.9,
             missing_fields: [],
             message: `تمام ${userName}، جاري إلغاء الشحنة رقم ${cancelNumInMessage[1]}...`,
-            data: { shipment_id: cancelNumInMessage[1], tracking_number: cancelNumInMessage[1] },
+            data: {
+              shipment_id: cancelNumInMessage[1],
+              tracking_number: cancelNumInMessage[1],
+            },
           };
         }
       }
@@ -1355,7 +1414,7 @@ function quickKeywordParse(
 
   if (
     shipmentTypePatterns.some((pattern) =>
-      includesNormalized(normalizedMessage, pattern, true)
+      includesNormalized(normalizedMessage, pattern, true),
     )
   ) {
     console.log("✅ [Quick Parse] Matched SHIPMENT_TYPE pattern");
@@ -1373,10 +1432,10 @@ function quickKeywordParse(
         cleanMessage.includes("عادي") || cleanMessage.includes("اقتصادي")
           ? "اقتصادي"
           : cleanMessage.includes("برو")
-          ? "برو"
-          : cleanMessage.includes("سريع")
-          ? "برو"
-          : "اقتصادي";
+            ? "برو"
+            : cleanMessage.includes("سريع")
+              ? "برو"
+              : "اقتصادي";
 
       return {
         intent: "CHAT",
@@ -1417,8 +1476,9 @@ function quickKeywordParse(
   ];
 
   if (
-    shipmentDetailsPatterns.some((pattern) =>
-      pattern.test(normalizedMessage) || pattern.test(lowerMessage)
+    shipmentDetailsPatterns.some(
+      (pattern) =>
+        pattern.test(normalizedMessage) || pattern.test(lowerMessage),
     )
   ) {
     console.log("✅ [Quick Parse] Matched SHIPMENT_DETAILS pattern");
@@ -1470,10 +1530,9 @@ async function generateMarasilFallbackReply(userMessage) {
 async function tryEnrichFromKnowledge(userMessage, result) {
   if (!result || result.intent !== "CHAT") return result;
   const lowConfidence = (result.confidence ?? 0.5) < 0.5;
-  const genericMessage =
-    /عذراً،?\s*(لم أفهم|لا أعرف|حدث خطأ|لم أستطع)/i.test(
-      result.message || ""
-    );
+  const genericMessage = /عذراً،?\s*(لم أفهم|لا أعرف|حدث خطأ|لم أستطع)/i.test(
+    result.message || "",
+  );
   if (!lowConfidence && !genericMessage) return result;
 
   if (!AiKnowledge) return result;
@@ -1506,7 +1565,7 @@ async function sendToGemini(
   userMessage,
   context = "",
   userId = null,
-  userInfo = null
+  userInfo = null,
 ) {
   try {
     // 1. أولاً جرب Quick Parse للأسئلة البسيطة
@@ -1515,14 +1574,14 @@ async function sendToGemini(
       userMessage,
       userInfo,
       context,
-      userId
+      userId,
     );
 
     if (quickResult) {
       console.log("⚡ [Gemini] Quick parse produced hint:", quickResult.intent);
       if (!ENABLE_DEEP_THINKING) {
         console.log(
-          "⚡ [Gemini] Deep thinking disabled, returning quick response"
+          "⚡ [Gemini] Deep thinking disabled, returning quick response",
         );
         return quickResult;
       }
@@ -1530,7 +1589,7 @@ async function sendToGemini(
 
     console.log(
       "🚀 [Gemini] Proceeding with Gemini API for deep reasoning",
-      ENABLE_DEEP_THINKING ? "(expanded mode)" : ""
+      ENABLE_DEEP_THINKING ? "(expanded mode)" : "",
     );
 
     const model = genAI.getGenerativeModel({
@@ -1615,7 +1674,10 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
 
         // إزالة حقل التحليل الداخلي قبل إرسال القرار للباكند (الباكند يهتم بالـ intent والـ data فقط)
         if (Object.prototype.hasOwnProperty.call(geminiData, "reasoning")) {
-          console.log("🧠 [Gemini] Reasoning (internal):", geminiData.reasoning?.substring?.(0, 120) || geminiData.reasoning);
+          console.log(
+            "🧠 [Gemini] Reasoning (internal):",
+            geminiData.reasoning?.substring?.(0, 120) || geminiData.reasoning,
+          );
           delete geminiData.reasoning;
         }
 
@@ -1629,8 +1691,7 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
             geminiData.missing_fields || quickResult.missing_fields || [];
           geminiData.confidence =
             geminiData.confidence || quickResult.confidence || 0.6;
-          geminiData.message =
-            geminiData.message || quickResult.message || "";
+          geminiData.message = geminiData.message || quickResult.message || "";
         }
 
         // التأكد من وجود الحقول المطلوبة
@@ -1663,7 +1724,9 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
     } catch (parseError) {
       console.error("❌ [Gemini] JSON parse error:", parseError.message);
       if (quickResult) {
-        console.log("🔄 [Gemini] Falling back to quick response after parse error");
+        console.log(
+          "🔄 [Gemini] Falling back to quick response after parse error",
+        );
         return quickResult;
       }
       return await tryEnrichFromKnowledge(userMessage, {
@@ -1677,7 +1740,7 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
   } catch (error) {
     console.error(
       "❌ [Gemini] Error communicating with Gemini API:",
-      error.message
+      error.message,
     );
 
     // في حالة الخطأ، أعد رد Quick Parse أو رد عام
@@ -1685,7 +1748,7 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
       userMessage,
       userInfo,
       context,
-      userId
+      userId,
     );
     if (quickFallback) {
       console.log("🔄 [Gemini] Using quick parse fallback");
@@ -1709,7 +1772,7 @@ async function processGeminiResponse(
   geminiResponse,
   services,
   userId = null,
-  userInfo = null
+  userInfo = null,
 ) {
   // (الكود الأصلي)
   const { intent, api_call, data } = geminiResponse;
@@ -1726,16 +1789,16 @@ async function processGeminiResponse(
         console.log("🔄 [AI] Services available:", !!services);
         console.log(
           "🔄 [AI] Shipment service available:",
-          !!services.shipmentService
+          !!services.shipmentService,
         );
         console.log(
           "🔄 [AI] Track method available:",
-          typeof services.shipmentService.trackShipment
+          typeof services.shipmentService.trackShipment,
         );
 
         try {
           apiResult = await services.shipmentService.trackShipment(
-            data.tracking_number
+            data.tracking_number,
           );
           console.log("🔄 [AI] API result:", apiResult);
           shouldCallAPI = true;
@@ -1787,9 +1850,9 @@ async function processGeminiResponse(
         const servicesMessage =
           `أهلاً فيك ${userName} 🌟\n\n` +
           `عندنا اللي يريحك ويوفر عليك:\n\n` +
-          `📦 **إدارة الشحنات والطلبات** — بأسهل طريقة، اللي تحبها قلبك. تنشئ، تتابع، وتتحكم بكل شحنة من مكان واحد.\n\n` +
-          `🔗 **تكامل مع متجرك:** ربط مباشر مع **سلة** و **زيد** و **شوبيفي** — الطلبات تنزل عندنا والشحن ينساب معك.\n\n` +
-          `🏷️ **طباعة البواليص** من كل شركات الشحن اللي عندنا في المنصة، **بأقل الأسعار** — بدون ما تروح لشركة وشركة.\n\n` +
+          `📦 **إدارة الشحنات والطلبات** — بأسهل طريقة، اللي يحبها قلبك. تنشئ، تتابع، وتتحكم بكل شحنة من مكان واحد.\n\n` +
+          `🔗 **تكامل مع متجرك:** ربط مباشر مع **سلة** و **زيد** و **شوبيفاي** — الطلبات تنزل عندنا والشحن يناسب معك.\n\n` +
+          `🏷️ **طباعة البوالص** من كل شركات الشحن اللي عندنا في المنصة، **بأقل الأسعار** — بدون ما تروح لشركة وشركة.\n\n` +
           `تبغى نبدأ من وين؟ شحناتك، الرصيد، أو أسعار شركة معينة؟ 😊`;
         return {
           success: true,
@@ -1858,7 +1921,7 @@ async function processGeminiResponse(
             start: data.start === true,
             startWithDetails: data.startWithDetails === true,
             shipmentDetails: data.shipmentDetails || null,
-          }
+          },
         );
       }
 
@@ -1866,7 +1929,7 @@ async function processGeminiResponse(
       if (data && data.action === "CALCULATE_PRICING" && data.shipmentDetails) {
         console.log(
           "🔄 [AI] Executing CALCULATE_PRICING with details:",
-          data.shipmentDetails
+          data.shipmentDetails,
         );
 
         try {
@@ -1890,7 +1953,7 @@ async function processGeminiResponse(
           if (!shipmentDetails.paymentMethod) {
             shipmentDetails.paymentMethod = "COD";
             console.log(
-              "💳 [AI] No payment method specified, defaulting to COD"
+              "💳 [AI] No payment method specified, defaulting to COD",
             );
           }
 
@@ -1912,36 +1975,42 @@ async function processGeminiResponse(
           if (shipmentDetails.company) {
             const requested = (shipmentDetails.company || "").trim();
             let specificCompany = companiesResult.companies.find(
-              (c) => (c.name || "").trim() === requested
+              (c) => (c.name || "").trim() === requested,
             );
             if (!specificCompany && requested) {
               const requestedNorm = normalizeArabicText(requested);
               specificCompany = companiesResult.companies.find((c) => {
                 const nameNorm = normalizeArabicText((c.name || "").trim());
-                return nameNorm === requestedNorm || nameNorm.includes(requestedNorm) || requestedNorm.includes(nameNorm) || (requestedNorm.includes("ارمكس") && nameNorm.includes("aramex"));
+                return (
+                  nameNorm === requestedNorm ||
+                  nameNorm.includes(requestedNorm) ||
+                  requestedNorm.includes(nameNorm) ||
+                  (requestedNorm.includes("ارمكس") &&
+                    nameNorm.includes("aramex"))
+                );
               });
             }
 
             if (specificCompany) {
               console.log(
-                `🎯 [AI] Calculating for specific company: ${shipmentDetails.company}`
+                `🎯 [AI] Calculating for specific company: ${shipmentDetails.company}`,
               );
               pricingComparison = await calculatePricingForSpecificCompany(
                 specificCompany,
-                shipmentDetails
+                shipmentDetails,
               );
             } else {
               // الشركة غير موجودة، احسب للجميع
               pricingComparison = await calculatePricingForAllCompanies(
                 companiesResult.companies,
-                shipmentDetails
+                shipmentDetails,
               );
             }
           } else {
             // حساب الأسعار لكل شركة
             pricingComparison = await calculatePricingForAllCompanies(
               companiesResult.companies,
-              shipmentDetails
+              shipmentDetails,
             );
           }
 
@@ -1953,7 +2022,10 @@ async function processGeminiResponse(
           }\n\n`;
 
           // إذا كانت شركة واحدة، غير الرسالة
-          const formatPrice = (n) => (Number(n) != null && !Number.isNaN(Number(n)) ? Number(Number(n).toFixed(2)) : n);
+          const formatPrice = (n) =>
+            Number(n) != null && !Number.isNaN(Number(n))
+              ? Number(Number(n).toFixed(2))
+              : n;
           if (
             Array.isArray(pricingComparison) &&
             pricingComparison.length === 1
@@ -1977,7 +2049,10 @@ async function processGeminiResponse(
             message: pricingMessage,
           };
         } catch (error) {
-          console.error("❌ [AI] CALCULATE_PRICING failed:", error?.message || error);
+          console.error(
+            "❌ [AI] CALCULATE_PRICING failed:",
+            error?.message || error,
+          );
           const friendlyMessage =
             error?.message && error.message.includes("البيانات")
               ? `عذراً، ${error.message} تأكد من وجود شركات شحن مفعّلة في النظام.`
@@ -1996,7 +2071,7 @@ async function processGeminiResponse(
       if (data && data.shipment_id) {
         console.log("🔄 [AI] Executing cancelShipment:", data.shipment_id);
         apiResult = await services.shipmentService.cancelShipment(
-          data.shipment_id
+          data.shipment_id,
         );
         shouldCallAPI = true;
       } else {
@@ -2048,7 +2123,7 @@ async function processGeminiResponse(
               (ship, index) =>
                 `${index + 1}. رقم ${ship.trackingId} - حالة: ${
                   ship.status
-                } - ${ship.totalPrice} ريال`
+                } - ${ship.totalPrice} ريال`,
             )
             .join("\n") +
           (apiResult.shipments.length > 3 ? "\n\n... وغيرها" : "");
@@ -2072,25 +2147,25 @@ async function processGeminiResponse(
       case "trackShipment":
         console.log(
           "🔄 [AI] Executing trackShipment:",
-          api_call.params.tracking_number
+          api_call.params.tracking_number,
         );
         apiResult = await services.shipmentService.trackShipment(
-          api_call.params.tracking_number
+          api_call.params.tracking_number,
         );
         break;
       case "createShipment":
         console.log("🔄 [AI] Executing createShipment:", api_call.params);
         apiResult = await services.shipmentService.createShipmentFromAI(
-          api_call.params
+          api_call.params,
         );
         break;
       case "cancelShipment":
         console.log(
           "🔄 [AI] Executing cancelShipment:",
-          api_call.params.shipment_id
+          api_call.params.shipment_id,
         );
         apiResult = await services.shipmentService.cancelShipment(
-          api_call.params.shipment_id
+          api_call.params.shipment_id,
         );
         break;
       case "getBalance":
@@ -2112,7 +2187,7 @@ async function processGeminiResponse(
       case "getPricingInfo":
         console.log("🔄 [AI] Executing getPricingInfo:", api_call.params);
         apiResult = await services.generalService.getPricingInfo(
-          api_call.params
+          api_call.params,
         );
         break;
       default:
@@ -2122,7 +2197,11 @@ async function processGeminiResponse(
 
     // تنسيق رسالة شركات الشحن من قاعدة البيانات عند استدعاء getShippingCompanies
     let apiMessage = apiResult.success ? "تم التنفيذ بنجاح" : apiResult.message;
-    if (api_call.name === "getShippingCompanies" && apiResult.success && apiResult.companies?.length) {
+    if (
+      api_call.name === "getShippingCompanies" &&
+      apiResult.success &&
+      apiResult.companies?.length
+    ) {
       const companies = apiResult.companies;
       apiMessage = `🚚 **شركات الشحن المتاحة عندنا:**\n\n`;
       companies.forEach((c, i) => {
@@ -2173,7 +2252,7 @@ function extractShipmentDetails(message) {
 
   // استخراج الوزن - دعم كيلو، كليو، وزنها، وزن الشحنة، إلخ
   const weightMatch = normalizedMessage.match(
-    /(\d+(?:\.\d+)?)\s*(?:ك(?:يلو|ليو|جم|غ|يلو|ليوغرام)|كيلوغرام|kg)/i
+    /(\d+(?:\.\d+)?)\s*(?:ك(?:يلو|ليو|جم|غ|يلو|ليوغرام)|كيلوغرام|kg)/i,
   );
   if (weightMatch) {
     details.weight = parseFloat(weightMatch[1]);
@@ -2269,8 +2348,8 @@ function pickShippingTypeForCompany(company, shipmentDetails) {
   const shippingTypes = Array.isArray(company.shippingTypes)
     ? company.shippingTypes
     : Array.isArray(company.shipmentType)
-    ? company.shipmentType
-    : [];
+      ? company.shipmentType
+      : [];
 
   if (!shippingTypes.length) return null;
 
@@ -2280,7 +2359,7 @@ function pickShippingTypeForCompany(company, shipmentDetails) {
 
   if (requestedType) {
     const matched = shippingTypes.find((type) =>
-      includesNormalized(type.type || "", requestedType)
+      includesNormalized(type.type || "", requestedType),
     );
     if (matched) return matched;
   }
@@ -2297,7 +2376,7 @@ function pickShippingTypeForCompany(company, shipmentDetails) {
 // حساب الأسعار لشركة محددة
 async function calculatePricingForSpecificCompany(company, shipmentDetails) {
   console.log(
-    `🏢 [AI] Calculating pricing for specific company: ${company.name}`
+    `🏢 [AI] Calculating pricing for specific company: ${company.name}`,
   );
 
   const shipmentAccount = require("./shipmentAccount");
@@ -2381,9 +2460,7 @@ async function calculatePricingForAllCompanies(companies, shipmentDetails) {
       const shippingType = pickShippingTypeForCompany(company, shipmentDetails);
 
       if (!shippingType) {
-        console.warn(
-          `⚠️ [AI] No shipping types available for ${company.name}`
-        );
+        console.warn(`⚠️ [AI] No shipping types available for ${company.name}`);
         continue;
       }
 
@@ -2437,7 +2514,7 @@ function extractNumber(message) {
 function extractBoxesCount(message) {
   const normalized = normalizeArabicText(message || "");
   const contextualMatch = normalized.match(
-    /(عدد|صندوق|صناديق|كرتون|كراتين)\s*(\d+)/i
+    /(عدد|صندوق|صناديق|كرتون|كراتين)\s*(\d+)/i,
   );
   if (contextualMatch) return parseInt(contextualMatch[2], 10);
   const fallback = normalized.match(/(\d+)/);
@@ -2466,39 +2543,72 @@ function extractPaymentMethod(message) {
 function isAffirmativeReply(message) {
   const normalized = normalizeArabicText(message || "");
   const patterns = ["نعم", "اي", "ايه", "تمام", "موافق", "توكل", "اوكي"];
-  return patterns.some((pattern) => includesNormalized(normalized, pattern, true));
+  return patterns.some((pattern) =>
+    includesNormalized(normalized, pattern, true),
+  );
 }
 
 function isNegativeReply(message) {
   const normalized = normalizeArabicText(message || "");
   const patterns = ["لا", "مو", "غير", "الغ", "إلغاء", "وقف"];
-  return patterns.some((pattern) => includesNormalized(normalized, pattern, true));
+  return patterns.some((pattern) =>
+    includesNormalized(normalized, pattern, true),
+  );
 }
 
 function isExistingSenderRecipientChoice(message) {
   const normalized = normalizeArabicText(message || "");
-  const patterns = ["موجودين", "موجود", "مسبقا", "مسبقاً", "اللي عندي", "عندي", "موجودة", "استخدم اللي عندي"];
-  return patterns.some((pattern) => includesNormalized(normalized, pattern, true));
+  const patterns = [
+    "موجودين",
+    "موجود",
+    "مسبقا",
+    "مسبقاً",
+    "اللي عندي",
+    "عندي",
+    "موجودة",
+    "استخدم اللي عندي",
+  ];
+  return patterns.some((pattern) =>
+    includesNormalized(normalized, pattern, true),
+  );
 }
 
 function isNewSenderRecipientChoice(message) {
   const normalized = normalizeArabicText(message || "");
   const patterns = ["جديد", "جديدين", "انشاء", "اعمل جديد", "مرسل جديد"];
-  return patterns.some((pattern) => includesNormalized(normalized, pattern, true));
+  return patterns.some((pattern) =>
+    includesNormalized(normalized, pattern, true),
+  );
 }
 
 /** يفسر اختيار المستخدم: رقم المرسل ورقم المستلم (مثال: "1 و 2" أو "المرسل 1 المستلم 2") */
 function parseSenderRecipientSelection(message) {
   const normalized = (message || "").trim();
   const twoNumbers = normalized.match(/(\d+)\s*(?:و|وال)\s*(\d+)/);
-  if (twoNumbers) return { senderIndex: parseInt(twoNumbers[1], 10), recipientIndex: parseInt(twoNumbers[2], 10) };
+  if (twoNumbers)
+    return {
+      senderIndex: parseInt(twoNumbers[1], 10),
+      recipientIndex: parseInt(twoNumbers[2], 10),
+    };
   const anyTwo = normalized.match(/(\d+)\s+(\d+)/);
-  if (anyTwo) return { senderIndex: parseInt(anyTwo[1], 10), recipientIndex: parseInt(anyTwo[2], 10) };
+  if (anyTwo)
+    return {
+      senderIndex: parseInt(anyTwo[1], 10),
+      recipientIndex: parseInt(anyTwo[2], 10),
+    };
   const senderMatch = normalized.match(/المرسل\s*(\d+)/i);
   const recipientMatch = normalized.match(/المستلم\s*(\d+)/i);
-  if (senderMatch && recipientMatch) return { senderIndex: parseInt(senderMatch[1], 10), recipientIndex: parseInt(recipientMatch[1], 10) };
+  if (senderMatch && recipientMatch)
+    return {
+      senderIndex: parseInt(senderMatch[1], 10),
+      recipientIndex: parseInt(recipientMatch[1], 10),
+    };
   const singleDigit = normalized.match(/^(\d+)$/);
-  if (singleDigit) return { senderIndex: parseInt(singleDigit[1], 10), recipientIndex: parseInt(singleDigit[1], 10) };
+  if (singleDigit)
+    return {
+      senderIndex: parseInt(singleDigit[1], 10),
+      recipientIndex: parseInt(singleDigit[1], 10),
+    };
   return null;
 }
 
@@ -2509,12 +2619,12 @@ function findCompanyInOptions(message, options) {
     includesNormalized(normalized, "اقل سعر", true)
   ) {
     return options.reduce((min, current) =>
-      current.total < min.total ? current : min
+      current.total < min.total ? current : min,
     );
   }
 
   return options.find((option) =>
-    includesNormalized(normalized, option.name, true)
+    includesNormalized(normalized, option.name, true),
   );
 }
 
@@ -2523,7 +2633,7 @@ async function handleCreateShipmentFlow(
   userId,
   userInfo,
   services,
-  options = {}
+  options = {},
 ) {
   const startFlow = options.start === true;
   const startWithDetails = options.startWithDetails === true;
@@ -2537,7 +2647,10 @@ async function handleCreateShipmentFlow(
   if (!state) {
     state = stateManager.setState(userId, {
       flow: "CREATE_SHIPMENT",
-      step: startWithDetails && shipmentDetails ? "AWAIT_SENDER_RECIPIENT_CHOICE" : "ASK_SENDER_NAME",
+      step:
+        startWithDetails && shipmentDetails
+          ? "AWAIT_SENDER_RECIPIENT_CHOICE"
+          : "ASK_SENDER_NAME",
       data: startWithDetails && shipmentDetails ? { ...shipmentDetails } : {},
     });
   }
@@ -2560,7 +2673,9 @@ async function handleCreateShipmentFlow(
     };
   }
 
-  const skipNegativeCheck = state.step === "AWAIT_SENDER_RECIPIENT_CHOICE" || state.step === "AWAIT_SENDER_RECIPIENT_SELECT";
+  const skipNegativeCheck =
+    state.step === "AWAIT_SENDER_RECIPIENT_CHOICE" ||
+    state.step === "AWAIT_SENDER_RECIPIENT_SELECT";
   if (!skipNegativeCheck && isNegativeReply(normalizedMessage)) {
     stateManager.clearState(userId);
     return {
@@ -2582,8 +2697,10 @@ async function handleCreateShipmentFlow(
           services.shipmentService.getSenderAddresses(),
           services.shipmentService.getClientAddresses(),
         ]);
-        const senders = sendersRes.success ? (sendersRes.data || []) : [];
-        const recipients = recipientsRes.success ? (recipientsRes.data || []) : [];
+        const senders = sendersRes.success ? sendersRes.data || [] : [];
+        const recipients = recipientsRes.success
+          ? recipientsRes.data || []
+          : [];
         if (senders.length === 0 && recipients.length === 0) {
           return {
             success: true,
@@ -2594,11 +2711,21 @@ async function handleCreateShipmentFlow(
         }
         if (senders.length === 0) {
           nextState({ step: "ASK_SENDER_NAME", data: { ...data } });
-          return { success: true, intent: "CHAT", result: {}, message: `ما في مرسلين محفوظين. مين المرسل؟ (اسم المرسل)` };
+          return {
+            success: true,
+            intent: "CHAT",
+            result: {},
+            message: `ما في مرسلين محفوظين. مين المرسل؟ (اسم المرسل)`,
+          };
         }
         if (recipients.length === 0) {
           nextState({ step: "ASK_SENDER_NAME", data: { ...data } });
-          return { success: true, intent: "CHAT", result: {}, message: `ما في مستلمين محفوظين. خلينا ننشئ مرسل أولاً. مين المرسل؟` };
+          return {
+            success: true,
+            intent: "CHAT",
+            result: {},
+            message: `ما في مستلمين محفوظين. خلينا ننشئ مرسل أولاً. مين المرسل؟`,
+          };
         }
         nextState({
           step: "AWAIT_SENDER_RECIPIENT_SELECT",
@@ -2608,8 +2735,17 @@ async function handleCreateShipmentFlow(
             recipientsList: recipients,
           },
         });
-        const senderLines = senders.map((s, i) => `${i + 1}. ${s.alias || s.location || "عنوان " + (i + 1)} - ${s.city || ""}`).join("\n");
-        const recipientLines = recipients.map((r, i) => `${i + 1}. ${r.clientName || "مستلم"} - ${r.city || ""}`).join("\n");
+        const senderLines = senders
+          .map(
+            (s, i) =>
+              `${i + 1}. ${s.alias || s.location || "عنوان " + (i + 1)} - ${s.city || ""}`,
+          )
+          .join("\n");
+        const recipientLines = recipients
+          .map(
+            (r, i) => `${i + 1}. ${r.clientName || "مستلم"} - ${r.city || ""}`,
+          )
+          .join("\n");
         return {
           success: true,
           intent: "CHAT",
@@ -2638,7 +2774,11 @@ async function handleCreateShipmentFlow(
       const selection = parseSenderRecipientSelection(message);
       const sendersList = data.sendersList || [];
       const recipientsList = data.recipientsList || [];
-      if (!selection || selection.senderIndex < 1 || selection.recipientIndex < 1) {
+      if (
+        !selection ||
+        selection.senderIndex < 1 ||
+        selection.recipientIndex < 1
+      ) {
         return {
           success: true,
           intent: "CHAT",
@@ -2657,10 +2797,18 @@ async function handleCreateShipmentFlow(
         };
       }
       const senderAddressLine =
-        [senderAddr.location, senderAddr.detalis, senderAddr.street, senderAddr.district, senderAddr.city]
+        [
+          senderAddr.location,
+          senderAddr.detalis,
+          senderAddr.street,
+          senderAddr.district,
+          senderAddr.city,
+        ]
           .filter(Boolean)
           .join(" ")
-          .trim() || (senderAddr.city || "العنوان غير محدد");
+          .trim() ||
+        senderAddr.city ||
+        "العنوان غير محدد";
       const senderPayload = {
         name: senderAddr.alias || senderAddr.location || "المرسل",
         address: senderAddressLine,
@@ -2693,14 +2841,18 @@ async function handleCreateShipmentFlow(
         shipmentType: data.shipmentType,
         dimensions: data.dimensions || null,
       };
-      const creationResult = await services.shipmentService.createShipmentFromAI(shipmentPayload);
+      const creationResult =
+        await services.shipmentService.createShipmentFromAI(shipmentPayload);
       if (!creationResult.success) {
         stateManager.clearState(userId);
         return {
           success: false,
           intent: "CHAT",
           result: creationResult,
-          message: (creationResult.message || "صار خطأ أثناء إنشاء الشحنة. حاول مرة ثانية.") + "\n\nيمكنك البدء من جديد بقول: بدي اعمل شحنة...",
+          message:
+            (creationResult.message ||
+              "صار خطأ أثناء إنشاء الشحنة. حاول مرة ثانية.") +
+            "\n\nيمكنك البدء من جديد بقول: بدي اعمل شحنة...",
         };
       }
       stateManager.clearState(userId);
@@ -2917,11 +3069,24 @@ async function handleCreateShipmentFlow(
       if (weightFromData != null && weightFromData > 0) {
         const boxesFromMsg = extractBoxesCount(message);
         if (boxesFromMsg && boxesFromMsg > 0) {
-          nextState({ step: "ASK_DESCRIPTION", data: { ...data, boxes: boxesFromMsg } });
-          return { success: true, intent: "CHAT", result: {}, message: "وصف مختصر لمحتوى الشحنة؟" };
+          nextState({
+            step: "ASK_DESCRIPTION",
+            data: { ...data, boxes: boxesFromMsg },
+          });
+          return {
+            success: true,
+            intent: "CHAT",
+            result: {},
+            message: "وصف مختصر لمحتوى الشحنة؟",
+          };
         }
         nextState({ step: "ASK_BOXES", data: { ...data } });
-        return { success: true, intent: "CHAT", result: {}, message: "كم عدد الصناديق؟" };
+        return {
+          success: true,
+          intent: "CHAT",
+          result: {},
+          message: "كم عدد الصناديق؟",
+        };
       }
       const details = extractShipmentDetails(message);
       if (!details.weight) {
@@ -3015,21 +3180,21 @@ async function handleCreateShipmentFlow(
         success: true,
         intent: "CHAT",
         result: {},
-        message:
-          "طريقة الدفع تكون مسبق أو دفع عند الاستلام (COD). وش تختار؟",
+        message: "طريقة الدفع تكون مسبق أو دفع عند الاستلام (COD). وش تختار؟",
       };
     }
     case "ASK_PAYMENT_METHOD": {
       const paymentFromData = data.paymentMethod;
-      let paymentMethod = paymentFromData ? extractPaymentMethod(paymentFromData) || paymentFromData : extractPaymentMethod(message);
+      let paymentMethod = paymentFromData
+        ? extractPaymentMethod(paymentFromData) || paymentFromData
+        : extractPaymentMethod(message);
       if (!paymentMethod && paymentFromData) paymentMethod = paymentFromData;
       if (!paymentMethod) {
         return {
           success: true,
           intent: "CHAT",
           result: {},
-          message:
-            "فضلاً اختر طريقة الدفع: مسبق أو دفع عند الاستلام (COD).",
+          message: "فضلاً اختر طريقة الدفع: مسبق أو دفع عند الاستلام (COD).",
         };
       }
 
@@ -3053,7 +3218,7 @@ async function handleCreateShipmentFlow(
 
       const pricingComparison = await calculatePricingForAllCompanies(
         companiesResult.companies,
-        shipmentDetails
+        shipmentDetails,
       );
 
       if (!pricingComparison.length) {
@@ -3078,7 +3243,7 @@ async function handleCreateShipmentFlow(
       const pricingLines = pricingComparison
         .map(
           (option, index) =>
-            `${index + 1}. ${option.name} (${option.type}) - ${option.total} ريال`
+            `${index + 1}. ${option.name} (${option.type}) - ${option.total} ريال`,
         )
         .join("\n");
 
@@ -3097,7 +3262,7 @@ async function handleCreateShipmentFlow(
           success: true,
           intent: "CHAT",
           result: {},
-          message: "ما قدرت أحدد الشركة. قل اسم الشركة بوضوح أو قل \"الأرخص\".",
+          message: 'ما قدرت أحدد الشركة. قل اسم الشركة بوضوح أو قل "الأرخص".',
         };
       }
 
@@ -3124,7 +3289,8 @@ async function handleCreateShipmentFlow(
           success: true,
           intent: "CHAT",
           result: {},
-          message: "تمام، إذا حاب تغير شركة الشحن قل اسم الشركة أو قل \"إلغاء\" لإنهاء الطلب.",
+          message:
+            'تمام، إذا حاب تغير شركة الشحن قل اسم الشركة أو قل "إلغاء" لإنهاء الطلب.',
         };
       }
 
@@ -3142,9 +3308,8 @@ async function handleCreateShipmentFlow(
         pricing: data.selectedPricing,
       };
 
-      const creationResult = await services.shipmentService.createShipmentFromAI(
-        shipmentPayload
-      );
+      const creationResult =
+        await services.shipmentService.createShipmentFromAI(shipmentPayload);
 
       if (!creationResult.success) {
         stateManager.clearState(userId);
@@ -3154,7 +3319,7 @@ async function handleCreateShipmentFlow(
           result: creationResult,
           message:
             (creationResult.message ||
-            "صار خطأ أثناء إنشاء الشحنة. حاول مرة ثانية.") +
+              "صار خطأ أثناء إنشاء الشحنة. حاول مرة ثانية.") +
             "\n\nيمكنك البدء من جديد بقول: بدي اعمل شحنة...",
         };
       }
@@ -3191,11 +3356,13 @@ function parseTeachingMessage(message) {
   const secret = "تعلم001";
   if (!trimmed.includes(secret)) return null;
 
-  const afterSecret = trimmed.slice(trimmed.indexOf(secret) + secret.length).trim();
+  const afterSecret = trimmed
+    .slice(trimmed.indexOf(secret) + secret.length)
+    .trim();
 
   // بعد تعلم001: السؤال: ... الجواب: ... أو الإجابة: ...
   const match1 = afterSecret.match(
-    /السؤال\s*[:\-]\s*([\s\S]*?)\s*(?:الجواب|الإجابة)\s*[:\-]\s*([\s\S]*)/i
+    /السؤال\s*[:\-]\s*([\s\S]*?)\s*(?:الجواب|الإجابة)\s*[:\-]\s*([\s\S]*)/i,
   );
   if (match1) {
     const question = match1[1].trim();
@@ -3205,7 +3372,7 @@ function parseTeachingMessage(message) {
 
   // بعد تعلم001: س: ... ج: ...
   const match2 = afterSecret.match(
-    /س\s*[:\-]\s*([\s\S]*?)\s*ج\s*[:\-]\s*([\s\S]*)/i
+    /س\s*[:\-]\s*([\s\S]*?)\s*ج\s*[:\-]\s*([\s\S]*)/i,
   );
   if (match2) {
     const question = match2[1].trim();
