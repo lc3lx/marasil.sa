@@ -51,10 +51,15 @@ function shouldQueueAsUnanswered(geminiResponse, finalMessage) {
   const intent = String(geminiResponse?.intent || "").toUpperCase();
   if (intent !== "CHAT") return false;
 
+  const escalateAction =
+    String(geminiResponse?.data?.action || "").toUpperCase() ===
+    "ESCALATE_TO_ADMIN";
+  if (escalateAction) return true;
+
   const confidence = Number(geminiResponse?.confidence ?? 0.5);
   const messageText = String(finalMessage || "").trim();
   const genericPattern =
-    /(لم أفهم|لا أعرف|حدث خطأ|يرجى المحاولة|خطأ تقني|عذر[اًا])/i;
+    /(لم أفهم|لا أعرف|حدث خطأ|يرجى المحاولة|خطأ تقني|عذر[اًا]|تم رفع سؤالك للإدارة|للإدارة المختصة)/i;
 
   return confidence < 0.5 || genericPattern.test(messageText);
 }
@@ -99,6 +104,7 @@ async function queueUnansweredQuestion({
         new: true,
       }
     );
+    console.log("🧠 [AI-Controller] queued unanswered question:", question);
   } catch (error) {
     console.warn("⚠️ [AI-Controller] queueUnansweredQuestion failed:", error?.message);
   }
