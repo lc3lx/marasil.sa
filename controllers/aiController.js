@@ -66,10 +66,8 @@ async function queueUnansweredQuestion({
   messageId = null,
   geminiResponse,
   executionMessage,
-  isAdminUser = false,
 }) {
   try {
-    if (isAdminUser) return;
     const question = String(userMessage || "").trim();
     if (!question || question.length < 3) return;
     if (!shouldQueueAsUnanswered(geminiResponse, executionMessage)) return;
@@ -570,7 +568,6 @@ exports.chatWithAI = asyncHandler(async (req, res, next) => {
         null,
       geminiResponse,
       executionMessage: executionResult.message,
-      isAdminUser,
     });
 
     // تحديث آخر intent في metadata المحادثة
