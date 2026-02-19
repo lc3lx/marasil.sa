@@ -61,6 +61,95 @@ function includesNormalized(
   return normalizedHaystack.includes(normalizedPattern);
 }
 
+function isCompanyLocationQuestion(message = "", normalizedMessage = "") {
+  const normalized =
+    normalizedMessage || normalizeArabicText(message || "");
+  const patterns = [
+    "وين موقع الشركة",
+    "وين موقعكم",
+    "موقع الشركة",
+    "موقعكم",
+    "عنوان الشركة",
+    "عنوانكم",
+    "وين مقركم",
+    "مقر الشركة",
+    "كيف اوصل لكم",
+    "طريقة الوصول",
+  ];
+  return patterns.some((p) => includesNormalized(normalized, p, true));
+}
+
+function hasStrongTrackingSignal(message = "", normalizedMessage = "") {
+  const normalized =
+    normalizedMessage || normalizeArabicText(message || "");
+  const lowerMessage = String(message || "").toLowerCase();
+  const signals = [
+    "تتبع",
+    "رقم التتبع",
+    "رقم الشحنة",
+    "وين الشحنة",
+    "فين الشحنة",
+    "وين طلبي",
+    "وين الطلب",
+    "حالة الشحنة",
+    "track",
+    "tracking",
+    "shipment",
+  ];
+  return (
+    signals.some((p) => includesNormalized(normalized, p, true)) ||
+    lowerMessage.includes("track") ||
+    lowerMessage.includes("tracking") ||
+    lowerMessage.includes("shipment")
+  );
+}
+
+function applyIntentGuardrails(userMessage, result, userInfo = null) {
+  if (!result || typeof result !== "object") return result;
+  const normalizedMessage = normalizeArabicText(userMessage || "");
+  const userName = userInfo?.firstName || "عميلنا";
+  const intent = String(result.intent || "").toUpperCase();
+
+  if (intent !== "TRACK") return result;
+
+  const textTrackingMatch = normalizedMessage.match(/(\d{6,})/);
+  const dataTrackingNumber = result?.data?.tracking_number;
+  const hasTrackingNumber = Boolean(textTrackingMatch || dataTrackingNumber);
+  const companyLocation = isCompanyLocationQuestion(
+    userMessage,
+    normalizedMessage,
+  );
+  const strongTrackSignal = hasStrongTrackingSignal(
+    userMessage,
+    normalizedMessage,
+  );
+
+  // حماية ضد خلط "موقع الشركة" مع "تتبع الشحنة"
+  if (companyLocation && !hasTrackingNumber) {
+    return {
+      intent: "CHAT",
+      confidence: 0.95,
+      missing_fields: [],
+      message: `حياك الله ${userName}، إذا تقصد موقع الشركة أو العنوان تقدر تقول: معلومات الشركة، وأعطيك التفاصيل مباشرة.`,
+      data: {},
+    };
+  }
+
+  // لو intent صار TRACK بدون أي إشارة تتبع واضحة، رجّعه CHAT بثقة منخفضة
+  if (!strongTrackSignal && !hasTrackingNumber) {
+    return {
+      intent: "CHAT",
+      confidence: 0.25,
+      missing_fields: [],
+      message:
+        "ممكن توضح طلبك أكثر؟ إذا تقصد تتبع شحنة أرسل رقم التتبع، وإذا تقصد معلومات الشركة اكتب: معلومات الشركة.",
+      data: {},
+    };
+  }
+
+  return result;
+}
+
 /**
  * System Prompt الصارم للمساعد الذكي - محسن ليشمل وصف APIs وتفكير خطوة بخطوة
  */
@@ -111,9 +200,16 @@ const SYSTEM_PROMPT = `أنت مساعد ذكاء اصطناعي رسمي لمن
 === تدقيق الإملاء والجودة (إلزامي) ===
 قبل إخراج message:
 - راجع الإملاء والصياغة مرة أخيرة
-- استخدم الصيغ المعتمدة دائماً: "زد" وليس "زيد"، "شوبيفاي"، "اللي يحبها قلبك"، "يناسبك"، "طباعة البوالص"
+- استخدم الصيغ المعتمدة دائماً: "زيد" وليس "زد"، "شوبيفاي"، "اللي يحبها قلبك"، "يناسبك"، "طباعة البوالص"
 - اجعل الرد واضحًا، مختصرًا، وخاليًا من الأخطاء اللغوية
 - لا تضف وجوهًا تعبيرية في نهاية الرد إلا إذا طلب المستخدم ذلك
+
+=== سياسة عدم المعرفة (إلزامي) ===
+إذا لم تجد إجابة دقيقة من القواعد أو المعرفة المتعلمة:
+- لا تؤلف إجابة
+- قدّم اعتذارًا مهنيًا بلهجة سعودية رسمية
+- أخبر المستخدم أن الاستفسار سيتم رفعه للإدارة المختصة
+- أبقِ الرد واضحًا ومطمئنًا
 
 === تفكير خطوة بخطوة (إلزامي) ===
 قبل أي رد، نفّذ بالترتيب:
@@ -179,7 +275,7 @@ const SYSTEM_PROMPT = `أنت مساعد ذكاء اصطناعي رسمي لمن
 عندما يسأل التاجر عن الخدمات أو "شو تقدمون" أو "خدماتكم" أو "ما خدمات مراسيل":
 استخدم الصياغة التالية بالنص تقريباً (بدون إيموجي):
 إدارة الشحنات والطلبات بأسهل طريقة يحبها قلبك تنشئ تتابع وتتحكم بكل شحنة من مكان واحد
-تكامل مع متجرك ربط مباشر مع (سلة) و (زد) و (شوبيفاي) والطلبات تنزل عندنا والشحن يناسبك
+تكامل مع متجرك ربط مباشر مع (سلة) و (زيد) و (شوبيفاي) والطلبات تنزل عندنا والشحن يناسبك
 طباعة البوالص من كل شركات الشحن في منصتنا بأقل الأسعار ما تحتاج تتنقل من شركة لشركة
 ثم اختم بـ:
 تبغى نبدأ من وين ؟
@@ -770,17 +866,43 @@ function quickKeywordParse(
     };
   }
 
+  // أسئلة موقع/عنوان الشركة (أولوية قبل التتبع لتفادي الالتقاط الخاطئ)
+  const companyLocationPatterns = [
+    "وين موقع الشركة",
+    "وين موقعكم",
+    "موقع الشركة",
+    "موقعكم",
+    "عنوان الشركة",
+    "عنوانكم",
+    "وين مقركم",
+    "مقر الشركة",
+    "كيف اوصل لكم",
+    "طريقة الوصول",
+  ];
+  if (
+    companyLocationPatterns.some((pattern) =>
+      includesNormalized(normalizedMessage, pattern, true),
+    )
+  ) {
+    console.log("✅ [Quick Parse] Matched COMPANY LOCATION pattern");
+    return {
+      intent: "CHAT",
+      confidence: 0.92,
+      missing_fields: [],
+      message: `حياك الله ${userName}، واضح أنك تسأل عن موقع الشركة. إذا تحب أعطيك معلومات الشركة كاملة الآن.`,
+      data: { action: "GET_COMPANY_INFO" },
+    };
+  }
+
   // تتبع شحنة - أولوية عالية (مع أو بدون رقم)
   const trackPatterns = [
     "تتبع",
     "track",
     "تابع",
-    "شو الحل",
     "بدي اتبع",
     "اريد اتبع",
     "اتبع",
     "تبع",
-    "زبط الوضع",
     "هاي رقم التتبع",
     "رقم التتبع",
     "رقم الشحنة",
@@ -804,9 +926,6 @@ function quickKeywordParse(
     "وين الطرد",
     "فين الطرد",
     "اطلع الشحنة",
-    "بعتلك ايه",
-    "شو بعتلك",
-    "وش بعتلك",
     "اخبار الشحنه",
     "كيف صار الطلب",
     "شلون صار الطلب",
@@ -1535,10 +1654,18 @@ async function generateMarasilFallbackReply(userMessage) {
   }
 }
 
+function buildFormalAdminEscalationMessage(userInfo = null) {
+  const userName = userInfo?.firstName || "عميلنا الكريم";
+  return (
+    `حياك الله ${userName}، نعتذر منك حالياً ما عندي جواب دقيق على هذا الاستفسار. ` +
+    "تم رفع سؤالك للإدارة المختصة، وبنرجع لك بالرد الرسمي بأقرب وقت."
+  );
+}
+
 /**
  * عند رد CHAT بثقة منخفضة أو "لم أفهم": جرّب المعرفة المتعلمة ثم رد مراسيل الاحتياطي
  */
-async function tryEnrichFromKnowledge(userMessage, result) {
+async function tryEnrichFromKnowledge(userMessage, result, userInfo = null) {
   if (!result || result.intent !== "CHAT") return result;
   const lowConfidence = (result.confidence ?? 0.5) < 0.5;
   const genericMessage = /عذراً،?\s*(لم أفهم|لا أعرف|حدث خطأ|لم أستطع)/i.test(
@@ -1561,11 +1688,15 @@ async function tryEnrichFromKnowledge(userMessage, result) {
     };
   }
 
-  const fallback = await generateMarasilFallbackReply(userMessage);
+  const fallback = buildFormalAdminEscalationMessage(userInfo);
   return {
     ...result,
-    confidence: 0.6,
+    confidence: 0.25,
     message: fallback,
+    data: {
+      ...(result.data || {}),
+      action: "ESCALATE_TO_ADMIN",
+    },
   };
 }
 
@@ -1587,14 +1718,22 @@ async function sendToGemini(
       context,
       userId,
     );
+    const guardedQuickResult = applyIntentGuardrails(
+      userMessage,
+      quickResult,
+      userInfo,
+    );
 
-    if (quickResult) {
-      console.log("⚡ [Gemini] Quick parse produced hint:", quickResult.intent);
+    if (guardedQuickResult) {
+      console.log(
+        "⚡ [Gemini] Quick parse produced hint:",
+        guardedQuickResult.intent,
+      );
       if (!ENABLE_DEEP_THINKING) {
         console.log(
           "⚡ [Gemini] Deep thinking disabled, returning quick response",
         );
-        return quickResult;
+        return guardedQuickResult;
       }
     }
 
@@ -1619,12 +1758,12 @@ async function sendToGemini(
 تذكّر: تغيير اللهجة لا يغيّر النية؛ حافظ على استمرارية السياق.`
       : "حلل النية والسياق ثم قرر الـ intent والـ API. أخرج جملة JSON واحدة فقط.";
 
-    const quickIntentHint = quickResult
+    const quickIntentHint = guardedQuickResult
       ? {
-          intent: quickResult.intent,
-          data: quickResult.data || {},
-          missing_fields: quickResult.missing_fields || [],
-          base_message: quickResult.message || "",
+          intent: guardedQuickResult.intent,
+          data: guardedQuickResult.data || {},
+          missing_fields: guardedQuickResult.missing_fields || [],
+          base_message: guardedQuickResult.message || "",
         }
       : null;
 
@@ -1693,17 +1832,20 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
           delete geminiData.reasoning;
         }
 
-        if (quickResult) {
-          geminiData.intent = geminiData.intent || quickResult.intent;
+        if (guardedQuickResult) {
+          geminiData.intent = geminiData.intent || guardedQuickResult.intent;
           geminiData.data = {
-            ...(quickResult.data || {}),
+            ...(guardedQuickResult.data || {}),
             ...(geminiData.data || {}),
           };
           geminiData.missing_fields =
-            geminiData.missing_fields || quickResult.missing_fields || [];
+            geminiData.missing_fields ||
+            guardedQuickResult.missing_fields ||
+            [];
           geminiData.confidence =
-            geminiData.confidence || quickResult.confidence || 0.6;
-          geminiData.message = geminiData.message || quickResult.message || "";
+            geminiData.confidence || guardedQuickResult.confidence || 0.6;
+          geminiData.message =
+            geminiData.message || guardedQuickResult.message || "";
         }
 
         // التأكد من وجود الحقول المطلوبة
@@ -1716,15 +1858,16 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
             data: geminiData.data || {},
             api_call: geminiData.api_call,
           };
-          out = await tryEnrichFromKnowledge(userMessage, out);
+          out = applyIntentGuardrails(userMessage, out, userInfo);
+          out = await tryEnrichFromKnowledge(userMessage, out, userInfo);
           return out;
         }
       }
 
       // إذا لم نجد JSON صحيح، أعد رد دردشة عام (مع محاولة المعرفة والرد المرتبط بمراسيل)
       console.log("⚠️ [Gemini] No valid JSON found, returning chat response");
-      if (quickResult) {
-        return quickResult;
+      if (guardedQuickResult) {
+        return guardedQuickResult;
       }
       return await tryEnrichFromKnowledge(userMessage, {
         intent: "CHAT",
@@ -1732,14 +1875,14 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
         missing_fields: [],
         message: "عذراً، لم أفهم طلبك. يرجى المحاولة مرة أخرى.",
         data: {},
-      });
+      }, userInfo);
     } catch (parseError) {
       console.error("❌ [Gemini] JSON parse error:", parseError.message);
       if (quickResult) {
         console.log(
           "🔄 [Gemini] Falling back to quick response after parse error",
         );
-        return quickResult;
+        return guardedQuickResult || quickResult;
       }
       return await tryEnrichFromKnowledge(userMessage, {
         intent: "CHAT",
@@ -1747,7 +1890,7 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
         missing_fields: [],
         message: "عذراً، حدث خطأ في معالجة الطلب. يرجى المحاولة مرة أخرى.",
         data: {},
-      });
+      }, userInfo);
     }
   } catch (error) {
     console.error(
@@ -1762,9 +1905,14 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
       context,
       userId,
     );
-    if (quickFallback) {
+    const guardedQuickFallback = applyIntentGuardrails(
+      userMessage,
+      quickFallback,
+      userInfo,
+    );
+    if (guardedQuickFallback) {
       console.log("🔄 [Gemini] Using quick parse fallback");
-      return quickFallback;
+      return guardedQuickFallback;
     }
 
     return await tryEnrichFromKnowledge(userMessage, {
@@ -1773,7 +1921,7 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
       missing_fields: [],
       message: "عذراً، حدث خطأ تقني. يرجى المحاولة لاحقاً.",
       data: {},
-    });
+    }, userInfo);
   }
 }
 
@@ -1862,7 +2010,7 @@ async function processGeminiResponse(
         const servicesMessage =
           `أهلاً فيك ${userName}\n\n` +
           `إدارة الشحنات والطلبات بأسهل طريقة يحبها قلبك تنشئ تتابع وتتحكم بكل شحنة من مكان واحد\n\n` +
-          `تكامل مع متجرك ربط مباشر مع (سلة) و (زد) و (شوبيفاي) والطلبات تنزل عندنا والشحن يناسبك\n\n` +
+          `تكامل مع متجرك ربط مباشر مع (سلة) و (زيد) و (شوبيفاي) والطلبات تنزل عندنا والشحن يناسبك\n\n` +
           `طباعة البوالص من كل شركات الشحن في منصتنا بأقل الأسعار ما تحتاج تتنقل من شركة لشركة\n\n` +
           `تبغى نبدأ من وين ؟\n` +
           `شحناتك\n` +
@@ -1874,6 +2022,54 @@ async function processGeminiResponse(
           result: null,
           message: servicesMessage,
         };
+      }
+
+      // طلب معلومات الشركة (الموقع/العنوان/التواصل)
+      if (data && data.action === "GET_COMPANY_INFO") {
+        try {
+          const infoResult = await services.generalService.getCompanyInfo();
+          if (!infoResult.success || !infoResult.companyInfo) {
+            return {
+              success: true,
+              intent: "CHAT",
+              result: infoResult,
+              message:
+                "حياك الله، حالياً ما قدرت أوصل لتفاصيل معلومات الشركة. تقدر ترجع تسألني بعد شوي.",
+            };
+          }
+
+          const userName = userInfo?.firstName || "عميلنا";
+          const info = infoResult.companyInfo;
+          const servicesText = Array.isArray(info.services)
+            ? info.services.slice(0, 3).join("، ")
+            : "";
+          const contactPhone = info.contact?.phone || "غير متوفر";
+          const contactEmail = info.contact?.email || "غير متوفر";
+
+          const companyMessage =
+            `حياك الله ${userName}، هذه معلومات الشركة:\n\n` +
+            `اسم الشركة: ${info.name || "مراسيل"}\n` +
+            `الوصف: ${info.description || "منصة شحن إلكترونية للتجار والشركات"}\n` +
+            `أبرز الخدمات: ${servicesText || "إنشاء وتتبع الشحنات"}\n` +
+            `الهاتف: ${contactPhone}\n` +
+            `البريد: ${contactEmail}\n\n` +
+            `إذا تحب، أقدر أكمل لك بباقي التفاصيل.`;
+
+          return {
+            success: true,
+            intent: "CHAT",
+            result: infoResult,
+            message: companyMessage,
+          };
+        } catch (err) {
+          console.error("❌ [AI] GET_COMPANY_INFO failed:", err);
+          return {
+            success: false,
+            intent: "CHAT",
+            result: null,
+            message: "حدث خطأ في جلب معلومات الشركة. حاول مرة ثانية بعد شوي.",
+          };
+        }
       }
 
       // طلب قائمة شركات الشحن من قاعدة البيانات
