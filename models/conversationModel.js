@@ -69,6 +69,25 @@ const conversationSchema = new mongoose.Schema({
       default: 0
     },
     lastIntent: String,
+    learningSession: {
+      active: {
+        type: Boolean,
+        default: false
+      },
+      currentQuestionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "AiUnansweredQuestion",
+        default: null
+      },
+      startedAt: {
+        type: Date,
+        default: null
+      },
+      lastAskedAt: {
+        type: Date,
+        default: null
+      }
+    }
   }
 }, {
   timestamps: true,
