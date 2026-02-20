@@ -62,8 +62,7 @@ function includesNormalized(
 }
 
 function isCompanyLocationQuestion(message = "", normalizedMessage = "") {
-  const normalized =
-    normalizedMessage || normalizeArabicText(message || "");
+  const normalized = normalizedMessage || normalizeArabicText(message || "");
   const patterns = [
     "وين موقع الشركة",
     "وين موقعكم",
@@ -80,8 +79,7 @@ function isCompanyLocationQuestion(message = "", normalizedMessage = "") {
 }
 
 function hasStrongTrackingSignal(message = "", normalizedMessage = "") {
-  const normalized =
-    normalizedMessage || normalizeArabicText(message || "");
+  const normalized = normalizedMessage || normalizeArabicText(message || "");
   const lowerMessage = String(message || "").toLowerCase();
   const signals = [
     "تتبع",
@@ -200,7 +198,7 @@ const SYSTEM_PROMPT = `أنت مساعد ذكاء اصطناعي رسمي لمن
 === تدقيق الإملاء والجودة (إلزامي) ===
 قبل إخراج message:
 - راجع الإملاء والصياغة مرة أخيرة
-- استخدم الصيغ المعتمدة دائماً: "زيد" وليس "زد"، "شوبيفاي"، "اللي يحبها قلبك"، "يناسبك"، "طباعة البوالص"
+- استخدم الصيغ المعتمدة دائماً: "" وليس "زد"، "شوبيفاي"، "اللي يحبها قلبك"، "يناسبك"، "طباعة البوالص"
 - اجعل الرد واضحًا، مختصرًا، وخاليًا من الأخطاء اللغوية
 - لا تضف وجوهًا تعبيرية في نهاية الرد إلا إذا طلب المستخدم ذلك
 
@@ -275,7 +273,7 @@ const SYSTEM_PROMPT = `أنت مساعد ذكاء اصطناعي رسمي لمن
 عندما يسأل التاجر عن الخدمات أو "شو تقدمون" أو "خدماتكم" أو "ما خدمات مراسيل":
 استخدم الصياغة التالية بالنص تقريباً (بدون إيموجي):
 إدارة الشحنات والطلبات بأسهل طريقة يحبها قلبك تنشئ تتابع وتتحكم بكل شحنة من مكان واحد
-تكامل مع متجرك ربط مباشر مع (سلة) و (زيد) و (شوبيفاي) والطلبات تنزل عندنا والشحن يناسبك
+تكامل مع متجرك ربط مباشر مع (سلة) و (زد) و (شوبيفاي) والطلبات تنزل عندنا والشحن يناسبك
 طباعة البوالص من كل شركات الشحن في منصتنا بأقل الأسعار ما تحتاج تتنقل من شركة لشركة
 ثم اختم بـ:
 تبغى نبدأ من وين ؟
@@ -1869,13 +1867,17 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
       if (guardedQuickResult) {
         return guardedQuickResult;
       }
-      return await tryEnrichFromKnowledge(userMessage, {
-        intent: "CHAT",
-        confidence: 0.3,
-        missing_fields: [],
-        message: "عذراً، لم أفهم طلبك. يرجى المحاولة مرة أخرى.",
-        data: {},
-      }, userInfo);
+      return await tryEnrichFromKnowledge(
+        userMessage,
+        {
+          intent: "CHAT",
+          confidence: 0.3,
+          missing_fields: [],
+          message: "عذراً، لم أفهم طلبك. يرجى المحاولة مرة أخرى.",
+          data: {},
+        },
+        userInfo,
+      );
     } catch (parseError) {
       console.error("❌ [Gemini] JSON parse error:", parseError.message);
       if (quickResult) {
@@ -1884,13 +1886,17 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
         );
         return guardedQuickResult || quickResult;
       }
-      return await tryEnrichFromKnowledge(userMessage, {
-        intent: "CHAT",
-        confidence: 0.2,
-        missing_fields: [],
-        message: "عذراً، حدث خطأ في معالجة الطلب. يرجى المحاولة مرة أخرى.",
-        data: {},
-      }, userInfo);
+      return await tryEnrichFromKnowledge(
+        userMessage,
+        {
+          intent: "CHAT",
+          confidence: 0.2,
+          missing_fields: [],
+          message: "عذراً، حدث خطأ في معالجة الطلب. يرجى المحاولة مرة أخرى.",
+          data: {},
+        },
+        userInfo,
+      );
     }
   } catch (error) {
     console.error(
@@ -1915,13 +1921,17 @@ ${JSON.stringify(quickIntentHint, null, 2)}`
       return guardedQuickFallback;
     }
 
-    return await tryEnrichFromKnowledge(userMessage, {
-      intent: "CHAT",
-      confidence: 0.1,
-      missing_fields: [],
-      message: "عذراً، حدث خطأ تقني. يرجى المحاولة لاحقاً.",
-      data: {},
-    }, userInfo);
+    return await tryEnrichFromKnowledge(
+      userMessage,
+      {
+        intent: "CHAT",
+        confidence: 0.1,
+        missing_fields: [],
+        message: "عذراً، حدث خطأ تقني. يرجى المحاولة لاحقاً.",
+        data: {},
+      },
+      userInfo,
+    );
   }
 }
 
@@ -2010,7 +2020,7 @@ async function processGeminiResponse(
         const servicesMessage =
           `أهلاً فيك ${userName}\n\n` +
           `إدارة الشحنات والطلبات بأسهل طريقة يحبها قلبك تنشئ تتابع وتتحكم بكل شحنة من مكان واحد\n\n` +
-          `تكامل مع متجرك ربط مباشر مع (سلة) و (زيد) و (شوبيفاي) والطلبات تنزل عندنا والشحن يناسبك\n\n` +
+          `تكامل مع متجرك ربط مباشر مع (سلة) و () و (شوبيفاي) والطلبات تنزل عندنا والشحن يناسبك\n\n` +
           `طباعة البوالص من كل شركات الشحن في منصتنا بأقل الأسعار ما تحتاج تتنقل من شركة لشركة\n\n` +
           `تبغى نبدأ من وين ؟\n` +
           `شحناتك\n` +
