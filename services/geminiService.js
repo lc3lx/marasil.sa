@@ -2889,7 +2889,7 @@ async function handleCreateShipmentFlow(
       success: true,
       intent: "CHAT",
       result: {},
-      message: `تمام ${userName} 👍 عندك تفاصيل الشحنة (${shipmentDetails.company || "شركة"}، ${shipmentDetails.weight} كجم، ${shipmentDetails.paymentMethod === "CASH" ? "دفع مسبق" : "دفع عند الاستلام"}).\n\nبدك تعمل **مرسل جديد ومستلم جديد** أو **موجودين مسبقاً**؟ (قل "جديد" أو "موجودين")`,
+      message: `تمام ${userName}، عندك تفاصيل الشحنة (${shipmentDetails.company || "شركة"}، ${shipmentDetails.weight} كجم، ${shipmentDetails.paymentMethod === "CASH" ? "دفع مسبق" : "دفع عند الاستلام"}).\n\nتبغى تسوي **مرسل جديد ومستلم جديد** أو **موجودين مسبقاً**؟ (قول "جديد" أو "موجودين")`,
     };
   }
 
@@ -2986,7 +2986,7 @@ async function handleCreateShipmentFlow(
         success: true,
         intent: "CHAT",
         result: {},
-        message: `قل "موجودين" إذا تحب تختار من المرسلين والمستلمين اللي عندك، أو "جديد" لإنشاء مرسل ومستلم جديد.`,
+        message: `قول "موجودين" إذا تبغى تختار من المرسلين والمستلمين اللي عندك، أو "جديد" لإنشاء مرسل ومستلم جديد.`,
       };
     }
 
@@ -3471,7 +3471,7 @@ async function handleCreateShipmentFlow(
         success: true,
         intent: "CHAT",
         result: {},
-        message: `تمام ${userName}، هذه أسعار الشركات المتاحة:\n\n${pricingLines}\n\nاختر الشركة اللي تناسبك (أو قل "الأرخص").`,
+        message: `تمام ${userName}، هذه أسعار الشركات المتاحة:\n\n${pricingLines}\n\nاختر الشركة اللي تناسبك (أو قول "الأرخص").`,
       };
     }
     case "AWAIT_COMPANY": {
@@ -3482,7 +3482,7 @@ async function handleCreateShipmentFlow(
           success: true,
           intent: "CHAT",
           result: {},
-          message: 'ما قدرت أحدد الشركة. قل اسم الشركة بوضوح أو قل "الأرخص".',
+          message: 'ما قدرت أحدد الشركة. قول اسم الشركة بوضوح أو قول "الأرخص".',
         };
       }
 
@@ -3510,7 +3510,7 @@ async function handleCreateShipmentFlow(
           intent: "CHAT",
           result: {},
           message:
-            'تمام، إذا حاب تغير شركة الشحن قل اسم الشركة أو قل "إلغاء" لإنهاء الطلب.',
+            'تمام، إذا تبغى تغير شركة الشحن قول اسم الشركة أو قول "إلغاء" لإنهاء الطلب.',
         };
       }
 
