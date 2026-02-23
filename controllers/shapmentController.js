@@ -1220,7 +1220,7 @@ module.exports.getAllShipments = asyncHandler(async (req, res, next) => {
     const filter = {};
 
     if (req.query.status) {
-      filter.shipmentStatus = req.query.status;
+      filter.shipmentstates = req.query.status;
     }
 
     if (req.query.shipper) {
@@ -1228,7 +1228,10 @@ module.exports.getAllShipments = asyncHandler(async (req, res, next) => {
     }
 
     if (req.query.paymentMethod) {
-      filter.paymentMethod = req.query.paymentMethod;
+      const normalized = String(req.query.paymentMethod).trim();
+      if (normalized === "COD" || normalized === "Prepaid") {
+        filter.paymentMathod = normalized;
+      }
     }
 
     if (req.query.startDate && req.query.endDate) {
