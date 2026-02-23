@@ -98,8 +98,11 @@ exports.Shapmentdata = (
   console.log("Payment method (paymentMethod):", order.paymentMethod);
   console.log("Payment method (payment_method):", order.payment_method);
 
-  const isCOD = order.paymentMethod === "COD" || order.payment_method === "COD";
-  console.log("Is COD payment:", isCOD);
+  // دفع عند الاستلام (COD): قيمة الطلب كما هي. دفع مسبق (Prepaid): قيمة الطلب صفر.
+  const payment = (order.paymentMethod || order.payment_method || "").toString().toUpperCase();
+  const isCOD = payment === "COD";
+  const orderValueForCOD = isCOD ? Number(order.total?.amount ?? 0) : 0;
+  console.log("Is COD payment:", isCOD, "→ CODAmount:", orderValueForCOD);
 
   const parcelLength = Number(dimension.length || 0);
   const parcelWidth = Number(dimension.width || 0);
@@ -112,7 +115,7 @@ exports.Shapmentdata = (
   const OrderNumber = rawOrderNumber.length > 50 ? rawOrderNumber.slice(0, 50) : rawOrderNumber;
 
   const shipmentData = {
-    CODAmount: isCOD ? (order.total?.amount ?? 0) : 0,
+    CODAmount: orderValueForCOD,
     ConsigneeAddress: exports.formatAddress(order.customer, {
       isRecipient: true,
     }),
