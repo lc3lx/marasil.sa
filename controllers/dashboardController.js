@@ -580,9 +580,11 @@ exports.getAllShipments = asyncHandler(async (req, res) => {
   }
 
   if (req.query.paymentMethod) {
-    const normalizedPayment = String(req.query.paymentMethod).toUpperCase();
-    if (["COD", "PREPAID"].includes(normalizedPayment)) {
-      searchQuery.paymentMathod = normalizedPayment === "PREPAID" ? "Prepaid" : "COD";
+    const normalizedPayment = String(req.query.paymentMethod).trim().toUpperCase();
+    if (normalizedPayment === "COD") {
+      searchQuery.paymentMathod = { $regex: /^cod$/i };
+    } else if (normalizedPayment === "PREPAID") {
+      searchQuery.paymentMathod = { $regex: /^prepaid$/i };
     }
   }
 
