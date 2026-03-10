@@ -309,7 +309,8 @@ module.exports.createShapment = asyncHandler(async (req, res, next) => {
           shipperAddress,
           weight,
           Parcels,
-          orderDescription
+          orderDescription,
+          shapmentingType
         );
         trackingInfo = await redbox.createShipment(shipmentData);
 

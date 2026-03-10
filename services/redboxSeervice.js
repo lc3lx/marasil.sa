@@ -5,6 +5,7 @@
  * @param {Number} weight وزن الشحنة
  * @param {Number} parcels عدد الطرود
  * @param {String} orderDescription وصف الشحنة
+ * @param {String} [shapmentingType] نوع الشحن (Dry, Cold, Quick, Box, offices)
  * @returns {Object} بيانات الشحنة بصيغة RedBox
  */
 exports.shipmentdata = (
@@ -12,7 +13,8 @@ exports.shipmentdata = (
   shipperAddress,
   weight,
   parcels,
-  orderDescription
+  orderDescription,
+  shapmentingType
 ) => {
   // التحقق من البيانات المطلوبة
   if (!order || !shipperAddress || !weight) {
@@ -83,6 +85,11 @@ exports.shipmentdata = (
     weight_unit: "KG",
     weight_value: parseFloat(weight) || 1,
   };
+
+  if (String(shapmentingType || "").trim() === "Dry") {
+    shipmentdata.delivery_method = "home_delivery";
+  }
+
   console.log(shipmentdata);
   return shipmentdata;
 };

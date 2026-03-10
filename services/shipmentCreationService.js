@@ -192,7 +192,8 @@ async function createShipment(customerId, body) {
         shipperAddress,
         weight,
         Parcels,
-        orderDescription
+        orderDescription,
+        shapmentingType
       );
       trackingInfo = await redbox.createShipment(shipmentData);
       if (trackingInfo && trackingInfo.success) {
